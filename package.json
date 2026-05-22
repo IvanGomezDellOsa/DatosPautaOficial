@@ -1,0 +1,29 @@
+{
+  "name": "datos-pauta-oficial",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/react": "^5.0.5",
+    "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.25",
+    "astro": "^6.3.7",
+    "minisearch": "^7.2.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sql.js-httpvfs": "^0.8.12",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}
