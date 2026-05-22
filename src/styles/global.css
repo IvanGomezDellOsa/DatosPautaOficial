@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Tokens base. El sistema visual completo (tipografia, color, grilla,
+   micro-interacciones) se define en el brief de diseno de Fase 3. */
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: "tnum" 1; /* cifras tabulares: monto alineado */
+}

@@ -1,0 +1,28 @@
+# dependencias
+node_modules/
+
+# build de Astro
+dist/
+.astro/
+
+# base de datos generada — derivada de etl/data/*.csv via etl/build_db.py.
+# No se versiona: es un artefacto reproducible, no una fuente.
+public/data/*.sqlite
+public/data/*.sqlite3
+public/data/*.db
+
+# Python (ETL)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# entornos y secretos
+.env
+.env.*
+!.env.example
+
+# logs y temporales del sistema
+*.log
+.DS_Store
+Thumbs.db

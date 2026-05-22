@@ -1,0 +1,21 @@
+---
+import Layout from "../layouts/Layout.astro";
+import StackCheck from "../components/StackCheck.tsx";
+---
+
+<Layout>
+  <main class="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6 py-16">
+    <p class="text-sm font-medium uppercase tracking-wide text-neutral-500">
+      Fase 3 &middot; esqueleto del repositorio
+    </p>
+    <h1 class="text-4xl font-semibold tracking-tight">Datos Pauta Oficial</h1>
+    <p class="text-lg text-neutral-600">
+      Esqueleto inicial &mdash; Astro + React islands + Tailwind. La home real
+      (hero de datos, rankings, tabla y generador de totales) se construye en
+      los proximos pasos de la Fase 3.
+    </p>
+    <div>
+      <StackCheck client:load />
+    </div>
+  </main>
+</Layout>
