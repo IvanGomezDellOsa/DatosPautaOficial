@@ -1,16 +1,28 @@
-jurisdiccion,name,role,date_from,date_to
-Nación,Eduardo Duhalde,Presidente,2002-01-02,2003-05-25
-Nación,Néstor Kirchner,Presidente,2003-05-25,2007-12-10
-Nación,Cristina Fernández de Kirchner,Presidente,2007-12-10,2015-12-10
-Nación,Mauricio Macri,Presidente,2015-12-10,2019-12-10
-Nación,Alberto Fernández,Presidente,2019-12-10,2023-12-10
-Nación,Javier Milei,Presidente,2023-12-10,
-CABA,Aníbal Ibarra,Jefe de Gobierno,2000-08-07,2006-03-06
-CABA,Jorge Telerman,Jefe de Gobierno,2006-03-06,2007-12-10
-CABA,Mauricio Macri,Jefe de Gobierno,2007-12-10,2015-12-10
-CABA,Horacio Rodríguez Larreta,Jefe de Gobierno,2015-12-10,2023-12-10
-CABA,Jorge Macri,Jefe de Gobierno,2023-12-10,
-PBA,Felipe Solá,Gobernador,2002-01-03,2007-12-10
-PBA,Daniel Scioli,Gobernador,2007-12-10,2015-12-10
-PBA,María Eugenia Vidal,Gobernador,2015-12-10,2019-12-10
-PBA,Axel Kicillof,Gobernador,2019-12-10,
+id,jurisdiccion,name,role,date_from,date_to
+1,Nación,Eduardo Duhalde,Presidente de la Nación,2002-01-02,2003-05-25
+2,Nación,Néstor Kirchner,Presidente de la Nación,2003-05-25,2007-12-10
+3,Nación,Cristina Fernández de Kirchner,Presidenta de la Nación,2007-12-10,2011-12-10
+4,Nación,Cristina Fernández de Kirchner,Presidenta de la Nación,2011-12-10,2015-12-10
+5,Nación,Mauricio Macri,Presidente de la Nación,2015-12-10,2019-12-10
+6,Nación,Alberto Fernández,Presidente de la Nación,2019-12-10,2023-12-10
+7,Nación,Javier Milei,Presidente de la Nación,2023-12-10,
+8,CABA,Aníbal Ibarra,Jefe de Gobierno,2000-08-07,2006-03-06
+9,CABA,Jorge Telerman,Jefe de Gobierno,2006-03-06,2007-12-10
+10,CABA,Mauricio Macri,Jefe de Gobierno,2007-12-10,2011-12-10
+11,CABA,Mauricio Macri,Jefe de Gobierno,2011-12-10,2015-12-10
+12,CABA,Horacio Rodríguez Larreta,Jefe de Gobierno,2015-12-10,2019-12-10
+13,CABA,Horacio Rodríguez Larreta,Jefe de Gobierno,2019-12-10,2023-12-10
+14,CABA,Jorge Macri,Jefe de Gobierno,2023-12-10,
+15,PBA,Felipe Solá,Gobernador,2002-01-03,2003-12-10
+16,PBA,Felipe Solá,Gobernador,2003-12-10,2007-12-10
+17,PBA,Daniel Scioli,Gobernador,2007-12-10,2011-12-10
+18,PBA,Daniel Scioli,Gobernador,2011-12-10,2015-12-10
+19,PBA,María Eugenia Vidal,Gobernadora,2015-12-10,2019-12-10
+20,PBA,Axel Kicillof,Gobernador,2019-12-10,2023-12-10
+21,PBA,Axel Kicillof,Gobernador,2023-12-10,
+22,Santa Fe,Jorge Obeid,Gobernador,2003-12-10,2007-12-10
+23,Santa Fe,Hermes Binner,Gobernador,2007-12-10,2011-12-10
+24,Santa Fe,Antonio Bonfatti,Gobernador,2011-12-10,2015-12-10
+25,Santa Fe,Miguel Lifschitz,Gobernador,2015-12-10,2019-12-10
+26,Santa Fe,Omar Perotti,Gobernador,2019-12-10,2023-12-10
+27,Santa Fe,Maximiliano Pullaro,Gobernador,2023-12-10,

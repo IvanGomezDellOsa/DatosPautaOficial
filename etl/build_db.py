@@ -243,6 +243,7 @@ def main():
     }
     prov_raw, prov_norm, medio_raw, medio_norm_set = set(), set(), set(), set()
     anios = set()
+    juris = set()
 
     def filas_orders():
         with CSV_ORDERS.open(newline="", encoding="utf-8") as f:
@@ -255,6 +256,7 @@ def main():
                 st["filas"] += 1
                 anio_i = int(anio)
                 anios.add(anio_i)
+                juris.add(jur)
 
                 fecha_iso, mes = parse_fecha_iso(fecha)
                 if fecha == "":
@@ -321,7 +323,7 @@ def main():
     meta = {
         "generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "filas_orders": st["filas"],
-        "jurisdicciones": "CABA, Nación, PBA",
+        "jurisdicciones": ", ".join(sorted(juris)),
         "anio_min": min(anios),
         "anio_max": max(anios),
         "monto_total_nominal": f"{st['monto_total']:.2f}",
