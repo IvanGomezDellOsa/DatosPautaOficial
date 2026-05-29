@@ -1,21 +1,1365 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import StackCheck from "../components/StackCheck.tsx";
+import "@fontsource-variable/space-grotesk";
 ---
 
-<Layout>
-  <main class="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6 py-16">
-    <p class="text-sm font-medium uppercase tracking-wide text-neutral-500">
-      Fase 3 &middot; esqueleto del repositorio
-    </p>
-    <h1 class="text-4xl font-semibold tracking-tight">Datos Pauta Oficial</h1>
-    <p class="text-lg text-neutral-600">
-      Esqueleto inicial &mdash; Astro + React islands + Tailwind. La home real
-      (hero de datos, rankings, tabla y generador de totales) se construye en
-      los proximos pasos de la Fase 3.
-    </p>
-    <div>
-      <StackCheck client:load />
+<Layout
+    title="Datos Pauta Oficial"
+    description="Todos los datos públicos de pauta oficial de la Argentina, en un solo lugar."
+>
+    {/* patrón hatched para huecos de cobertura */}
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <pattern
+                id="gap-pattern"
+                x="0"
+                y="0"
+                width="6"
+                height="6"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+            >
+                <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="6"
+                    stroke="#27272a"
+                    stroke-width="0.8"></line>
+            </pattern>
+        </defs>
+    </svg>
+
+    {/* ═══════ NAV ═══════ */}
+    <nav class="site-nav" id="site-nav" aria-label="Navegación">
+        <div class="container-wide nav-inner">
+            <div class="nav-brand-mobile">
+                <span class="wordmark">Datos Pauta Oficial</span>
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Abrir menú" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="nav-links" id="navLinks">
+                <a href="#inicio" class="nav-link" data-nav="inicio">Inicio</a>
+                <a href="#datos" class="nav-link" data-nav="datos">Datos</a>
+                <a href="#cobertura" class="nav-link" data-nav="cobertura">Cobertura</a>
+                <a href="#cuanto-recibio" class="nav-link" data-nav="cuanto-recibio">Cuánto recibió</a>
+                <a href="#receptores" class="nav-link" data-nav="receptores">Ranking</a>
+                <a href="#acerca" class="nav-link" data-nav="acerca">Acerca de</a>
+            </div>
+        </div>
+    </nav>
+
+    {/* ═══════ HERO ═══════ */}
+    <section class="hero" id="inicio">
+        <div class="container-wide">
+            <div class="hero-grid">
+                <div class="hero-text">
+                    <h1 class="hero-claim">
+                        <span class="line">Datos pauta oficial</span>
+                        <span class="line">Argentina.</span>
+                        <span class="line"><em>En un solo lugar.</em></span>
+                    </h1>
+
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <span class="number" data-count="504707">0</span>
+                            <span class="label">pautas asignadas</span>
+                        </div>
+                        <div class="stat">
+                            <span class="number" data-count="12260">0</span>
+                            <span class="label">medios</span>
+                        </div>
+                        <div class="stat">
+                            <span class="number" data-count="7178">0</span>
+                            <span class="label"
+                                >proveedores que recibieron dinero</span
+                            >
+                        </div>
+                        <div class="stat">
+                            <span class="number" data-count="4">0</span>
+                            <span class="label">jurisdicciones</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button
+            class="scroll-hint"
+            id="scrollHint"
+            aria-label="Bajar a los datos"
+            type="button"
+        >
+            <span>Explorar datos</span>
+            <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
+    </section>
+
+    {/* ═══════ TABLA ═══════ */}
+    <section class="table-section reveal" id="datos">
+        <div class="container-wide">
+            <div class="section-head">
+                <h2>Todos los datos</h2>
+                <p>504.707 órdenes — con sistema de filtros.</p>
+            </div>
+
+            <div class="filter-bar">
+                <div class="row1">
+                    <span class="lead">Estás viendo</span>
+                    <span class="chip-active">
+                        <span class="label">Jurisdicción:</span>
+                        <strong>PBA</strong>
+                        <button class="close" aria-label="Quitar">×</button>
+                    </span>
+                    <span class="chip-active">
+                        <span class="label">Año:</span>
+                        <strong>2025</strong>
+                        <button class="close" aria-label="Quitar">×</button>
+                    </span>
+                </div>
+
+                <div class="row2">
+                    <span class="totals"
+                        ><strong>18.420</strong> órdenes · <strong
+                            >AR$ 9.840.300.000</strong
+                        ></span
+                    >
+                    <div class="row2-right">
+                        <a href="#receptores" class="btn-ranking-inline" style="display:inline-flex; align-items:center; gap:6px; background:var(--color-bg-elev-2); border:1px solid var(--color-border-strong); padding:4px 10px; border-radius:6px; color:var(--color-fg); font-size:var(--text-micro); text-decoration:none; font-weight:600; margin-bottom:6px; transition:border-color 150ms ease, box-shadow 150ms ease;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+                            Ver Ranking
+                        </a>
+                        <span class="deflation-note"
+                            >· Montos deflactados con IPC INDEC mensual</span
+                        >
+                        <span class="approx"
+                            >· Los totales son aproximaciones inferiores: al
+                            haber huecos de cobertura, el monto real puede ser
+                            mayor.</span
+                        >
+                    </div>
+                </div>
+
+                <div class="row3">
+                    <span class="governance-tag">
+                        <span class="label">Gestión</span>
+                        <strong>Axel Kicillof</strong> — Gobernador de PBA
+                    </span>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-input-wrap">
+                    <svg
+                        class="search-icon"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input
+                        class="search-input"
+                        type="search"
+                        placeholder="Buscar proveedor o medio…"
+                        aria-label="Buscar"
+                    />
+                    <span class="search-kbd">/</span>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <div class="table-scroll" id="tableScroll">
+                    <table class="data">
+                        <thead>
+                            <tr>
+                                <th class="active"
+                                    >Fecha <span class="sort">▾</span></th
+                                >
+                                <th>Medio <span class="sort">▾</span></th>
+                                <th>Proveedor <span class="sort">▾</span></th>
+                                <th class="right"
+                                    >Monto (Deflactado) <span class="sort">▾</span
+                                    ></th
+                                >
+                                <th class="right">Resol.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody">
+                            <tr>
+                                <td>2025-03-15</td>
+                                <td>El Día</td>
+                                <td>Editorial El Día S.A.</td>
+                                <td class="monto">AR$ 12.450.000</td>
+                                <td class="resol"
+                                    ><a href="#" title="Ver resolución" aria-label="Ver resolución oficial">↗</a>
+                                    </td>
+                            </tr>
+                            <tr class="selected">
+                                <td>2025-03-12</td>
+                                <td>Canal 13</td>
+                                <td>Artear S.A.</td>
+                                <td class="monto">AR$ 8.200.000</td>
+                                <td class="resol"><a href="#" aria-label="Ver resolución oficial">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-03-08</td>
+                                <td>Radio Provincia</td>
+                                <td>RTA Sociedad del Estado</td>
+                                <td class="monto">AR$ 3.450.000</td>
+                                <td class="resol"><a href="#" aria-label="Ver resolución oficial">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-03-02</td>
+                                <td>infocielo.com</td>
+                                <td>Editorial Infocielo S.A.</td>
+                                <td class="monto">AR$ 2.910.000</td>
+                                <td class="resol"><a href="#" aria-label="Ver resolución oficial">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-29</td>
+                                <td>Cartelería ruta 2</td>
+                                <td>Vía Pública S.R.L.</td>
+                                <td class="monto">AR$ 6.700.000</td>
+                                <td class="resol"><a href="#" aria-label="Ver resolución oficial">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-21</td>
+                                <td>0221.com.ar</td>
+                                <td>Cero Doscientos Veintiuno</td>
+                                <td class="monto">AR$ 4.220.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-19</td>
+                                <td>El Día</td>
+                                <td>Editorial El Día S.A.</td>
+                                <td class="monto">AR$ 9.130.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-15</td>
+                                <td>Telefe</td>
+                                <td>Telefe S.A.</td>
+                                <td class="monto">AR$ 11.840.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-08</td>
+                                <td>Diario Conurbano</td>
+                                <td>Asoc. Editores Vecinales</td>
+                                <td class="monto">AR$ 415.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-02-04</td>
+                                <td>Radio La Plata</td>
+                                <td>Comunicaciones del Sur S.A.</td>
+                                <td class="monto">AR$ 1.880.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-01-28</td>
+                                <td>Canal 9</td>
+                                <td>Televisión Federal S.A.</td>
+                                <td class="monto">AR$ 7.190.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-01-22</td>
+                                <td>perfil.com</td>
+                                <td>Editorial Perfil S.A.</td>
+                                <td class="monto">AR$ 3.060.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-01-17</td>
+                                <td>Hoy</td>
+                                <td>Editorial Hoy</td>
+                                <td class="monto">AR$ 5.450.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-01-12</td>
+                                <td>Radio 10</td>
+                                <td>Cadena 3 S.R.L.</td>
+                                <td class="monto">AR$ 2.270.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                            <tr>
+                                <td>2025-01-08</td>
+                                <td>América TV</td>
+                                <td>América TV S.A.</td>
+                                <td class="monto">AR$ 14.610.000</td>
+                                <td class="resol"><a href="#">↗</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {/* ═══════ COBERTURA DE LA BASE ═══════ */}
+    <section class="coverage-section reveal" id="cobertura">
+        <div class="container-wide">
+            <div class="section-head">
+                <h2>Cobertura de nuestra base de datos</h2>
+            </div>
+
+            <div class="coverage-grid">
+                {/* ── NACIONAL ── */}
+                <div class="cov-card">
+                    <div class="cov-juris-name">Nacional</div>
+                    <div class="cov-period">2009 — 2022</div>
+                    <div class="cov-bar-wrap">
+                        <div
+                            class="cov-bar"
+                            title="Nacional: 2009–2022 (escala 2003–2027)"
+                        >
+                            <div class="cov-seg cov-empty" style="flex:6"></div>
+                            <div class="cov-seg cov-filled" style="flex:13">
+                            </div>
+                            <div class="cov-seg cov-empty" style="flex:5"></div>
+                        </div>
+                        <div class="cov-axis">
+                            <span style="left:0%">2003</span>
+                            <span style="left:29%">2010</span>
+                            <span style="left:50%">2015</span>
+                            <span style="left:71%">2020</span>
+                            <span style="left:100%">2027</span>
+                        </div>
+                    </div>
+                    <div class="cov-note">
+                        Desde 2024, presupuesto publicitario de la
+                        Administración Central bloqueado por decreto.
+                        <a
+                            href="https://www.boletinoficial.gob.ar/detalleAviso/primera/301352/20231227"
+                            target="_blank"
+                            rel="noopener"
+                            class="cov-note-link">Boletín Oficial ↗</a
+                        >
+                    </div>
+                </div>
+
+                {/* ── CABA ── */}
+                <div class="cov-card">
+                    <div class="cov-juris-name">CABA</div>
+                    <div class="cov-period">2003 — 2024</div>
+                    <div class="cov-bar-wrap">
+                        <div
+                            class="cov-bar"
+                            title="CABA: 2003–2024 (escala 2003–2027)"
+                        >
+                            <div class="cov-seg cov-filled" style="flex:21">
+                            </div>
+                            <div class="cov-seg cov-empty" style="flex:3"></div>
+                        </div>
+                        <div class="cov-axis">
+                            <span style="left:0%">2003</span>
+                            <span style="left:29%">2010</span>
+                            <span style="left:50%">2015</span>
+                            <span style="left:71%">2020</span>
+                            <span style="left:100%">2027</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── PBA ── */}
+                <div class="cov-card">
+                    <div class="cov-juris-name">
+                        PBA
+                        <span class="cov-excl-badge">exclusivo</span>
+                    </div>
+                    <div class="cov-period">2020 — 2025</div>
+                    <div class="cov-bar-wrap">
+                        <div
+                            class="cov-bar"
+                            title="PBA: 2020–2024 exclusivo (cyan) + 2025 fuente oficial (escala 2003–2027)"
+                        >
+                            <div class="cov-seg cov-empty" style="flex:17">
+                            </div>
+                            <div
+                                class="cov-seg cov-accent"
+                                style="flex:4"
+                                title="Exclusivo: datos armados resolución por resolución"
+                            >
+                            </div>
+                            <div
+                                class="cov-seg cov-filled-light"
+                                style="flex:1"
+                                title="2025: fuente oficial pública"
+                            >
+                            </div>
+                            <div class="cov-seg cov-empty" style="flex:2"></div>
+                        </div>
+                        <div class="cov-axis">
+                            <span style="left:0%">2003</span>
+                            <span style="left:29%">2010</span>
+                            <span style="left:50%">2015</span>
+                            <span style="left:71%">2020</span>
+                            <span style="left:100%">2027</span>
+                        </div>
+                    </div>
+                    <div class="cov-note cov-note-excl">
+                        2020–2024: unificado resolución por resolución
+                    </div>
+                </div>
+
+                {/* ── SANTA FE ── */}
+                <div class="cov-card">
+                    <div class="cov-juris-name">Santa Fe</div>
+                    <div class="cov-period">2019 — 2023</div>
+                    <div class="cov-bar-wrap">
+                        <div
+                            class="cov-bar"
+                            title="Santa Fe: 2019–2023 (escala 2003–2027)"
+                        >
+                            <div class="cov-seg cov-empty" style="flex:16">
+                            </div>
+                            <div class="cov-seg cov-filled" style="flex:5">
+                            </div>
+                            <div class="cov-seg cov-empty" style="flex:3"></div>
+                        </div>
+                        <div class="cov-axis">
+                            <span style="left:0%">2003</span>
+                            <span style="left:29%">2010</span>
+                            <span style="left:50%">2015</span>
+                            <span style="left:71%">2020</span>
+                            <span style="left:100%">2027</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="coverage-note-strip">
+                <strong>Sobre los datos ausentes.</strong>
+                Si un organismo o período no aparece, no es una decisión. Esa información
+                no está accesible ni transparentada por los organismos correspondientes.
+            </div>
+        </div>
+    </section>
+
+    {/* ═══════ CUÁNTO RECIBIÓ ═══════ */}
+    <section class="generator-section reveal" id="cuanto-recibio">
+        <div class="container-wide">
+            <div class="section-head">
+                <h2>Cuánto recibió</h2>
+                <p>
+                    Buscá cualquier medio o proveedor. Compartí el dato en tus
+                    redes sociales.
+                </p>
+            </div>
+
+            <div class="gen-card">
+                <div class="gen-search-row">
+                    <div class="segmented" role="tablist" aria-label="Tipo">
+                        <button class="on" type="button">Proveedor</button>
+                        <button type="button">Medio</button>
+                    </div>
+                    <div class="gen-search-input-wrap">
+                        <svg
+                            class="search-icon"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <circle cx="11" cy="11" r="7"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input
+                            class="gen-search-input"
+                            type="search"
+                            value="Clarín"
+                            placeholder="Buscar proveedor o medio…"
+                            aria-label="Buscar entidad"
+                        />
+                        <span class="chevron-icon">▾</span>
+                    </div>
+                </div>
+
+                <div class="gen-result">
+                    <div class="gen-entity-eyebrow" id="genEyebrow">
+                        Proveedor
+                    </div>
+                    <div class="gen-entity-name" id="genEntityName">Clarín</div>
+                    <div class="gen-said">recibió en pauta oficial</div>
+                    <div class="gen-narrative">
+                        <div class="monto" id="genMonto">
+                            <span class="currency-prefix">$</span>1.420.700.000
+                        </div>
+                        <div class="context">
+                            en <strong style="color:var(--color-fg)"
+                                >2003 — 2025</strong
+                            > (histórico)
+                        </div>
+                        <div class="meta">
+                            12.480 órdenes · 3 jurisdicciones
+                        </div>
+                        <p class="approx">
+                            <strong>* Aproximado.</strong> Al haber huecos de cobertura
+                            en los datos públicos, el monto real recibido puede ser
+                            mayor.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="gen-empty" id="genEmpty" style="display:none; text-align:center; padding:2.5rem 1rem; background:var(--color-bg-elev-1); border-radius:12px; border:1px dashed var(--color-border-strong);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-fg-subtle)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 1rem;">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <div style="color:var(--color-fg-strong); font-weight:600; margin-bottom:0.5rem; font-size:var(--text-body);">No encontramos registros</div>
+                    <div style="color:var(--color-fg-subtle); font-size:var(--text-small); max-width:400px; margin:0 auto; line-height:1.5;">Recordá que la base de datos oficial tiene baches de información. Verificá si el nombre está bien escrito o probá buscar por su razón social.</div>
+                </div>
+
+                <div class="gen-controls-row">
+                    <div class="year-pills" role="tablist" aria-label="Período">
+                        <button class="year-pill on" type="button"
+                            >Histórico</button
+                        >
+                        <button class="year-pill" type="button">2025</button>
+                        <button class="year-pill" type="button">2024</button>
+                        <button class="year-pill" type="button">2023</button>
+                        <button class="year-pill" type="button">2022</button>
+                        <button class="year-pill" type="button">2021</button>
+                        <button class="year-pill" type="button">…</button>
+                    </div>
+                </div>
+
+                <div class="share-block">
+                    <div class="share-buttons">
+                        <button
+                            class="share-btn"
+                            data-share="x"
+                            id="shareX"
+                            type="button"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+                                ></path>
+                            </svg>
+                            Compartir en X
+                        </button>
+                        <button
+                            class="share-btn"
+                            data-share="ig"
+                            id="shareIG"
+                            type="button"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="2"
+                                    y="2"
+                                    width="20"
+                                    height="20"
+                                    rx="5"
+                                    ry="5"></rect>
+                                <path
+                                    d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"
+                                ></path>
+                                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"
+                                ></line>
+                            </svg>
+                            Compartir en Instagram
+                        </button>
+                        <button
+                            class="share-btn"
+                            data-share="copy"
+                            id="shareCopy"
+                            type="button"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                                ></path>
+                                <path
+                                    d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                                ></path>
+                            </svg>
+                            Copiar link
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {/* ═══════ TOP RECEPTORES ═══════ */}
+    <section class="rankings-section reveal" id="receptores">
+        <div class="container-wide">
+            <div class="section-head">
+                <h2>Ranking</h2>
+            </div>
+
+            <div class="rankings">
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <div class="card-title">Top 5 — En PBA 2025</div>
+                            <div class="card-sub">Contextual · deflactado</div>
+                        </div>
+                        <div class="segmented">
+                            <button class="on" type="button">Proveedor</button>
+                            <button type="button">Medio</button>
+                        </div>
+                    </div>
+                    <div class="ranking-rows">
+                        <div class="ranking-row">
+                            <span class="name">Editorial El Día S.A.</span>
+                            <span class="monto">$ 1.420.700.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="96"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Editorial El Día S.A.: 96%"
+                            >
+                                <span data-w="96%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Artear S.A.</span>
+                            <span class="monto">$ 1.108.300.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="74"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Artear S.A.: 74%"
+                            >
+                                <span data-w="74%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Televisión Federal S.A.</span>
+                            <span class="monto">$ 921.450.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="62"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Televisión Federal S.A.: 62%"
+                            >
+                                <span data-w="62%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">América TV S.A.</span>
+                            <span class="monto">$ 760.220.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="50"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="América TV S.A.: 50%"
+                            >
+                                <span data-w="50%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">RTA Sociedad del Estado</span>
+                            <span class="monto">$ 588.700.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="38"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="RTA Sociedad del Estado: 38%"
+                            >
+                                <span data-w="38%"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="card-disclaimer">
+                        <strong>18.420 órdenes</strong> · basado en los filtros activos.<br
+                        />
+                        Los totales son aproximaciones inferiores: al haber huecos
+                        de cobertura, el monto real puede ser mayor.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <div class="card-title">Top 5 — Toda nuestra base de datos</div>
+                            <div class="card-sub">Global · deflactado</div>
+                        </div>
+                        <div class="segmented">
+                            <button type="button">Proveedor</button>
+                            <button class="on" type="button">Medio</button>
+                        </div>
+                    </div>
+                    <div class="ranking-rows">
+                        <div class="ranking-row">
+                            <span class="name">La Nación</span>
+                            <span class="monto">$ 3.108.420.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="98"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="La Nación: 98%"
+                            >
+                                <span data-w="98%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Clarín</span>
+                            <span class="monto">$ 2.910.610.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="92"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Clarín: 92%"
+                            >
+                                <span data-w="92%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Telefe (canal 11)</span>
+                            <span class="monto">$ 2.115.200.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="68"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Telefe (canal 11): 68%"
+                            >
+                                <span data-w="68%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Canal 13</span>
+                            <span class="monto">$ 1.770.330.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="57"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Canal 13: 57%"
+                            >
+                                <span data-w="57%"></span>
+                            </div>
+                        </div>
+                        <div class="ranking-row">
+                            <span class="name">Página/12</span>
+                            <span class="monto">$ 940.110.000</span>
+                            <div
+                                class="bar"
+                                role="progressbar"
+                                aria-valuenow="30"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-label="Página/12: 30%"
+                            >
+                                <span data-w="30%"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="card-disclaimer">
+                        Los totales son aproximaciones inferiores: al haber
+                        huecos de cobertura, el monto real puede ser mayor.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {/* ═══════ FOOTER ═══════ */}
+    <footer class="site-footer" id="acerca">
+        <div class="container-wide footer-topbar">
+            <a
+                class="brand"
+                href="#"
+                style="display:inline-flex; align-items:center; gap:10px;"
+            >
+                <svg
+                    viewBox="0 0 16 10"
+                    width="20"
+                    height="13"
+                    style="border-radius:2px"
+                >
+                    <rect width="16" height="3.33" y="0" fill="#74acdf"></rect>
+                    <rect width="16" height="3.34" y="3.33" fill="#ffffff"
+                    ></rect>
+                    <rect width="16" height="3.33" y="6.67" fill="#74acdf"
+                    ></rect>
+                </svg>
+                <span class="wordmark">Datos Pauta Oficial</span>
+            </a>
+            <div class="footer-links">
+                <a
+                    href="mailto:ivan.gdo@outlook.com?subject=Consulta%20sobre%20Datos%20Pauta%20Oficial"
+                    class="footer-contact-btn">Contacto</a
+                >
+            </div>
+        </div>
+
+        <div class="container-wide">
+            <div class="footer-about">
+                <div class="footer-about-title">Acerca de los datos</div>
+                <div class="footer-about-grid">
+                    <div class="footer-about-item">
+                        <div class="footer-about-item-label">Deflactación</div>
+                        <p>
+                            Todos los montos están expresados en pesos de marzo
+                            2026, deflactados contra el IPC INDEC mensual.
+                        </p>
+                    </div>
+                    <div class="footer-about-item">
+                        <div class="footer-about-item-label">PBA 2020–2024</div>
+                        <p>
+                            Datos recopilados resolución por resolución. No
+                            están disponibles en ninguna otra fuente unificada.
+                        </p>
+                    </div>
+                    <div class="footer-about-item">
+                        <div class="footer-about-item-label">
+                            Aproximaciones
+                        </div>
+                        <p>
+                            Los totales son <em>aproximaciones inferiores</em>:
+                            al haber huecos de cobertura, el monto real puede
+                            ser mayor.
+                        </p>
+                    </div>
+                    <div class="footer-about-item">
+                        <div class="footer-about-item-label">
+                            Datos ausentes
+                        </div>
+                        <p>
+                            Si un organismo o período no aparece, esa
+                            información no está accesible ni transparentada por
+                            los organismos correspondientes.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    {/* ═══════ BOTONES FLOTANTES ═══════ */}
+    <div class="fs-float" id="fsFloat">
+        <button
+            class="back-top-btn"
+            id="backTopBtn"
+            aria-label="Volver al inicio"
+            type="button"
+            style="display:none"
+        >
+            <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+            Inicio
+        </button>
+        <div class="fs-panel" id="fsPanel" hidden>
+            <button id="fsSm" type="button">Normal</button>
+            <button id="fsLg" type="button">Grande</button>
+            <button id="fsXl" type="button">Muy grande</button>
+        </div>
+        <button
+            class="fs-float-btn"
+            id="fsFloatBtn"
+            type="button"
+            aria-expanded="false"
+            aria-controls="fsPanel"
+        >
+            <span class="fs-ico">Aa</span>
+            Tamaño de letra
+        </button>
     </div>
-  </main>
 </Layout>
+
+<script is:inline>
+    // ─────────── Count-up de cifras del hero ───────────
+    (function () {
+        var nums = document.querySelectorAll(".hero-stats .number[data-count]");
+        var formatter = new Intl.NumberFormat("es-AR");
+        function ease(p) {
+            return 1 - Math.pow(1 - p, 3);
+        }
+        function animate(el, target, duration, delay) {
+            el.textContent = formatter.format(0);
+            var t0;
+            function frame(t) {
+                if (!t0) t0 = t;
+                var elapsed = t - t0;
+                if (elapsed < delay) {
+                    requestAnimationFrame(frame);
+                    return;
+                }
+                var p = Math.min(1, (elapsed - delay) / duration);
+                el.textContent = formatter.format(Math.round(target * ease(p)));
+                if (p < 1) requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+        }
+        function go() {
+            nums.forEach(function (el, i) {
+                animate(
+                    el,
+                    parseInt(el.dataset.count, 10),
+                    2200,
+                    900 + i * 150,
+                );
+            });
+        }
+        if (document.readyState === "complete") go();
+        else window.addEventListener("load", go);
+    })();
+
+    // ─────────── Scroll reveal de secciones ───────────
+    (function () {
+        var els = document.querySelectorAll(".reveal");
+        var io = new IntersectionObserver(
+            function (entries) {
+                entries.forEach(function (en) {
+                    if (en.isIntersecting) en.target.classList.add("in-view");
+                });
+            },
+            { threshold: 0.08 },
+        );
+        els.forEach(function (el) {
+            io.observe(el);
+        });
+    })();
+
+    // ─────────── Year pills del generador + animación de monto ───────────
+    (function () {
+        var pills = document.querySelectorAll(".year-pill");
+        var monto = document.getElementById("genMonto");
+        var eyebrow = document.getElementById("genEyebrow");
+
+        pills.forEach(function (pill) {
+            pill.addEventListener("click", function () {
+                pills.forEach(function (p) {
+                    p.classList.remove("on");
+                });
+                pill.classList.add("on");
+
+                // Animación fade-out + slide 6px → fade-in sobre el monto
+                if (monto) {
+                    monto.style.transition = "none";
+                    monto.style.opacity = "0";
+                    monto.style.transform = "translateY(6px)";
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () {
+                            monto.style.transition =
+                                "opacity 300ms ease, transform 300ms ease";
+                            monto.style.opacity = "";
+                            monto.style.transform = "";
+                        });
+                    });
+                }
+            });
+        });
+
+        // Toggle segmented Proveedor / Medio en el generador
+        var genSeg = document.querySelector(".gen-search-row .segmented");
+        if (genSeg) {
+            var segBtns = genSeg.querySelectorAll("button");
+            segBtns.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    segBtns.forEach(function (b) {
+                        b.classList.remove("on");
+                    });
+                    btn.classList.add("on");
+                    if (eyebrow) eyebrow.textContent = btn.textContent.trim();
+                });
+            });
+        }
+    })();
+
+    // ─────────── Barras de ranking al entrar en viewport ───────────
+    (function () {
+        var bars = document.querySelectorAll(".ranking-row .bar > span");
+        var seen = new WeakSet();
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (en.isIntersecting && !seen.has(en.target)) {
+                    seen.add(en.target);
+                    var idx = Array.prototype.indexOf.call(bars, en.target);
+                    setTimeout(
+                        function () {
+                            en.target.style.width = en.target.dataset.w;
+                        },
+                        150 + (idx % 6) * 70,
+                    );
+                }
+            });
+        });
+        bars.forEach(function (b) {
+            io.observe(b);
+        });
+    })();
+
+    // ─────────── Control tamaño de fuente (flotante) ───────────
+    (function () {
+        var sizes = ["", "lg", "xl"];
+        var current = localStorage.getItem("textSize") || "";
+        var panel = document.getElementById("fsPanel");
+        var floatBtn = document.getElementById("fsFloatBtn");
+        var btnSm = document.getElementById("fsSm");
+        var btnLg = document.getElementById("fsLg");
+        var btnXl = document.getElementById("fsXl");
+        function apply(size) {
+            current = size;
+            // Aplica al root (html) para escalar todas las medidas en 'rem' correctamente
+            document.documentElement.style.fontSize =
+                size === "lg" ? "110%" : size === "xl" ? "125%" : "";
+            localStorage.setItem("textSize", size);
+            [btnSm, btnLg, btnXl].forEach(function (b) {
+                b && b.classList.remove("on");
+            });
+            if (size === "") btnSm && btnSm.classList.add("on");
+            if (size === "lg") btnLg && btnLg.classList.add("on");
+            if (size === "xl") btnXl && btnXl.classList.add("on");
+        }
+        function togglePanel() {
+            var open = !panel.hidden;
+            panel.hidden = open;
+            floatBtn.setAttribute("aria-expanded", String(!open));
+        }
+        apply(current);
+        floatBtn &&
+            floatBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                togglePanel();
+            });
+        btnSm &&
+            btnSm.addEventListener("click", function () {
+                apply("");
+            });
+        btnLg &&
+            btnLg.addEventListener("click", function () {
+                apply("lg");
+            });
+        btnXl &&
+            btnXl.addEventListener("click", function () {
+                apply("xl");
+            });
+        document.addEventListener("click", function (e) {
+            var float = document.getElementById("fsFloat");
+            if (float && !float.contains(e.target) && !panel.hidden)
+                panel.hidden = true;
+        });
+    })();
+
+    // ─────────── Botones de compartir ───────────
+    (function () {
+        var toast = document.getElementById("toast");
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add("show");
+            clearTimeout(toast._t);
+            toast._t = setTimeout(function () {
+                toast.classList.remove("show");
+            }, 2200);
+        }
+
+        function getShareData() {
+            var entityName = document.getElementById("genEntityName");
+            var genMonto = document.getElementById("genMonto");
+            var name = entityName
+                ? entityName.textContent.trim()
+                : "un proveedor";
+            var amount = genMonto ? genMonto.textContent.trim() : "";
+            return {
+                title: "Datos Pauta Oficial",
+                text:
+                    name +
+                    " recibió " +
+                    amount +
+                    " en pauta oficial · datospautaoficial.com.ar",
+                url: "https://datospautaoficial.com.ar/?p=clarin&y=historico",
+            };
+        }
+
+        var shareX = document.getElementById("shareX");
+        var shareIG = document.getElementById("shareIG");
+        var shareCopy = document.getElementById("shareCopy");
+
+        if (shareX)
+            shareX.addEventListener("click", function () {
+                var d = getShareData();
+                var tweetText = encodeURIComponent(d.text + "\n" + d.url);
+                window.open(
+                    "https://twitter.com/intent/tweet?text=" + tweetText,
+                    "_blank",
+                    "noopener",
+                );
+            });
+
+        if (shareIG)
+            shareIG.addEventListener("click", function () {
+                if (navigator.share) {
+                    navigator.share(getShareData()).catch(function () {});
+                } else {
+                    var d = getShareData();
+                    navigator.clipboard
+                        .writeText(d.url)
+                        .then(function () {
+                            showToast(
+                                "Link copiado \u00b7 pegalo en Instagram",
+                            );
+                        })
+                        .catch(function () {
+                            showToast("Link: datospautaoficial.com.ar");
+                        });
+                }
+            });
+
+        if (shareCopy)
+            shareCopy.addEventListener("click", function () {
+                var url = getShareData().url;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard
+                        .writeText(url)
+                        .then(function () {
+                            showToast("Link copiado al portapapeles");
+                        })
+                        .catch(function () {
+                            showToast("Link: " + url);
+                        });
+                } else {
+                    showToast("Link: " + url);
+                }
+            });
+    })();
+
+    // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Scroll hint (flotante hero) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    (function () {
+        var hint = document.getElementById("scrollHint");
+        if (!hint) return;
+        hint.addEventListener("click", function () {
+            var target = document.querySelector(".table-section");
+            if (target) target.scrollIntoView({ behavior: "smooth" });
+        });
+        var hidden = false;
+        window.addEventListener(
+            "scroll",
+            function () {
+                var y = window.scrollY || window.pageYOffset;
+                if (!hidden && y > 80) {
+                    hint.classList.add("hidden");
+                    hidden = true;
+                } else if (hidden && y <= 80) {
+                    hint.classList.remove("hidden");
+                    hidden = false;
+                }
+            },
+            { passive: true },
+        );
+    })();
+
+    // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Volver al inicio \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    (function () {
+        var btn = document.getElementById("backTopBtn");
+        if (!btn) return;
+        window.addEventListener(
+            "scroll",
+            function () {
+                var y = window.scrollY || window.pageYOffset;
+                btn.style.display = y > 300 ? "" : "none";
+            },
+            { passive: true },
+        );
+        btn.addEventListener("click", function () {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    })();
+
+    // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Nav: link activo por scroll \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    (function () {
+        var links = document.querySelectorAll(".nav-link[data-nav]");
+        var sections = [];
+        links.forEach(function (l) {
+            var el = document.getElementById(l.dataset.nav);
+            if (el) sections.push({ el: el, link: l });
+        });
+        if (!sections.length) return;
+        var navH =
+            (document.getElementById("site-nav") || {}).offsetHeight || 44;
+        function update() {
+            var y = window.scrollY || window.pageYOffset;
+            var active = sections[0];
+            for (var i = 0; i < sections.length; i++) {
+                if (sections[i].el.getBoundingClientRect().top <= navH + 8) {
+                    active = sections[i];
+                }
+            }
+            links.forEach(function (l) {
+                l.classList.remove("active");
+            });
+            active.link.classList.add("active");
+        }
+        window.addEventListener("scroll", update, { passive: true });
+        update();
+    })();
+
+    // ─────────── Mobile Menu Toggle ───────────
+    (function () {
+        var btn = document.getElementById("mobileMenuBtn");
+        var links = document.getElementById("navLinks");
+        var nav = document.getElementById("site-nav");
+        if (btn && links && nav) {
+            btn.addEventListener("click", function () {
+                var expanded = btn.getAttribute("aria-expanded") === "true";
+                btn.setAttribute("aria-expanded", !expanded);
+                links.classList.toggle("open");
+            });
+            links.addEventListener("click", function (e) {
+                if (e.target.tagName.toLowerCase() === "a") {
+                    btn.setAttribute("aria-expanded", "false");
+                    links.classList.remove("open");
+                }
+            });
+            document.addEventListener("click", function (e) {
+                if (!nav.contains(e.target) && links.classList.contains("open")) {
+                    btn.setAttribute("aria-expanded", "false");
+                    links.classList.remove("open");
+                }
+            });
+        }
+    })();
+
+    // ─────────── Smart Sticky Header ───────────
+    (function() {
+        var lastScroll = 0;
+        var nav = document.getElementById("site-nav");
+        if (!nav) return;
+        window.addEventListener("scroll", function() {
+            var currentScroll = window.pageYOffset;
+            if (currentScroll <= 56) {
+                nav.classList.remove("scroll-up");
+                nav.classList.remove("scroll-down");
+                return;
+            }
+            if (currentScroll > lastScroll && !nav.classList.contains("scroll-down")) {
+                nav.classList.remove("scroll-up");
+                nav.classList.add("scroll-down");
+            } else if (currentScroll < lastScroll && nav.classList.contains("scroll-down")) {
+                nav.classList.remove("scroll-down");
+                nav.classList.add("scroll-up");
+            }
+            lastScroll = currentScroll;
+        }, { passive: true });
+    })();
+
+    // ─────────── Mock Buscador (Visual Feedback & Empty State) ───────────
+    (function() {
+        var input = document.querySelector(".gen-search-input");
+        var iconWrap = document.querySelector(".gen-search-input-wrap svg.search-icon");
+        var result = document.querySelector(".gen-result");
+        var empty = document.getElementById("genEmpty");
+        if (!input || !iconWrap || !result || !empty) return;
+        
+        var originalSVG = iconWrap.innerHTML;
+        var spinnerSVG = '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="31.4 31.4" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>';
+        
+        input.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                var val = input.value.trim().toLowerCase();
+                
+                // Loading state
+                iconWrap.innerHTML = spinnerSVG;
+                result.style.opacity = "0.3";
+                empty.style.opacity = "0.3";
+                
+                setTimeout(function() {
+                    iconWrap.innerHTML = originalSVG;
+                    result.style.opacity = "1";
+                    empty.style.opacity = "1";
+                    
+                    if (val === "vacio" || val === "nada" || val === "test") {
+                        result.style.display = "none";
+                        empty.style.display = "block";
+                    } else {
+                        result.style.display = "block";
+                        empty.style.display = "none";
+                    }
+                }, 600);
+            }
+        });
+    })();
+</script>
