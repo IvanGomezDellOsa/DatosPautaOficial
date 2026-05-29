@@ -5,13 +5,15 @@ Fase 3 del proyecto. Toma el CSV unificado de Fase 2 y produce la base que el
 navegador consulta con sql.js-httpvfs.
 
 Entradas (en etl/data/):
-  - pauta_oficial_unificado.csv  OBLIGATORIO  esquema canonico de 9 columnas
+  - pauta_oficial_unificado.csv  OBLIGATORIO  esquema canonico de 8 columnas
   - ipc_indec.csv                OBLIGATORIO  serie mensual de inflacion
   - governments.csv              OBLIGATORIO  vigencias de gestion (hardcoded)
   - aliases.csv                  OPCIONAL     normalizacion curada de nombres
 
 Salida:
   - public/data/pauta.sqlite     base read-only servida como archivo estatico
+  - public/data/search.json      entidades distintas (proveedor/medio) para
+                                 la busqueda client-side con MiniSearch
 
 El script es ADITIVO: las columnas derivadas existen siempre y mejoran cuando
 aparecen sus insumos. Si falta aliases.csv, proveedor_norm/medio_norm usan solo
@@ -22,6 +24,7 @@ Uso:  python3 etl/build_db.py
 """
 
 import csv
+import json
 import re
 import sqlite3
 import sys
@@ -159,13 +162,11 @@ def crear_esquema(con):
             jurisdiccion      TEXT NOT NULL,
             anio              INTEGER NOT NULL,
             fecha             TEXT,
-            tipo_de_medio     TEXT,
             medio             TEXT,
             proveedor         TEXT,
             monto             REAL,
             monto_deflactado  REAL,
             resolucion        TEXT,
-            archivo_origen    TEXT NOT NULL,
             proveedor_norm    TEXT,
             medio_norm        TEXT
         );
@@ -188,16 +189,34 @@ def crear_esquema(con):
 
 
 def crear_indices(con):
+    # Indices compuestos que mapean a las 3 funciones de la web. El prefijo
+    # izquierdo de cada compuesto cubre tambien las consultas mas simples:
+    #   - (jurisdiccion, anio, *) sirve para filtrar por jurisdiccion sola
+    #     y por jurisdiccion+anio (tabla con filtros, ranking).
+    #   - (proveedor_norm, anio) / (medio_norm, anio) sirven el caso
+    #     "Cuanto recibio" (proveedor/medio-first), y su prefijo cubre la
+    #     busqueda por proveedor/medio sin jurisdiccion.
+    # Se omite a proposito un indice por (anio) solo: agregarlo unicamente si
+    # el front termina permitiendo filtrar por anio sin jurisdiccion.
     con.executescript(
         """
-        CREATE INDEX idx_orders_jurisdiccion   ON orders(jurisdiccion);
-        CREATE INDEX idx_orders_anio           ON orders(anio);
-        CREATE INDEX idx_orders_proveedor_norm ON orders(proveedor_norm);
-        CREATE INDEX idx_orders_medio_norm     ON orders(medio_norm);
-        CREATE INDEX idx_orders_tipo           ON orders(tipo_de_medio);
-        CREATE INDEX idx_orders_juris_anio     ON orders(jurisdiccion, anio);
+        CREATE INDEX idx_orders_juris_anio_prov  ON orders(jurisdiccion, anio, proveedor_norm);
+        CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio_norm);
+        CREATE INDEX idx_orders_prov_anio        ON orders(proveedor_norm, anio);
+        CREATE INDEX idx_orders_medio_anio       ON orders(medio_norm, anio);
         """
     )
+    # FAST-FOLLOW (no implementar hasta tener el query layer escrito):
+    # sobre sql.js-httpvfs lo que duele son los round-trips HTTP, no el
+    # tamano. Cuando las queries reales de agregacion existan, medir con
+    # EXPLAIN QUERY PLAN y, si hacen saltos a la tabla, volver covering los
+    # indices de "Cuanto recibio" / ranking agregando monto y monto_deflactado
+    # para que la suma se resuelva leyendo solo el indice:
+    #   CREATE INDEX ix_prov_cover  ON orders(proveedor_norm, anio, jurisdiccion, monto, monto_deflactado);
+    #   CREATE INDEX ix_medio_cover ON orders(medio_norm, anio, jurisdiccion, monto, monto_deflactado);
+    #   CREATE INDEX ix_juris_anio_prov_cov  ON orders(jurisdiccion, anio, proveedor_norm, monto_deflactado);
+    #   CREATE INDEX ix_juris_anio_medio_cov ON orders(jurisdiccion, anio, medio_norm, monto_deflactado);
+    # (reemplazarian a los compuestos de arriba; pagan tamano por menos round-trips).
 
 
 def cargar_governments(con):
@@ -215,6 +234,37 @@ def cargar_governments(con):
         "INSERT INTO governments(jurisdiccion, name, role, date_from, date_to) "
         "VALUES (?,?,?,?,?)", filas)
     return len(filas)
+
+
+def escribir_busqueda(prov_disp, medio_disp):
+    """Emite public/data/search.json para la busqueda client-side (MiniSearch).
+
+    El buscador resuelve texto -> clave normalizada sobre el universo chico de
+    entidades distintas (no sobre las 504k ordenes): el front filtra orders por
+    proveedor_norm/medio_norm, que estan indexadas. Por eso esto vive como JSON
+    estatico y no como FTS5 dentro de la SQLite.
+
+    Cada item: {norm, nombre, n}. 'nombre' es la grafia cruda mas frecuente de
+    esa clave; 'n' es la cantidad de ordenes (util para ordenar sugerencias).
+    """
+    def entidades(disp):
+        items = []
+        for norm, grafias in disp.items():
+            nombre = max(grafias.items(), key=lambda kv: (kv[1], kv[0]))[0]
+            items.append({"norm": norm, "nombre": nombre,
+                          "n": sum(grafias.values())})
+        items.sort(key=lambda it: (-it["n"], it["norm"]))
+        return items
+
+    payload = {
+        "generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "proveedores": entidades(prov_disp),
+        "medios": entidades(medio_disp),
+    }
+    out = OUT_DIR / "search.json"
+    with out.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    return out, len(payload["proveedores"]), len(payload["medios"])
 
 
 def main():
@@ -244,15 +294,35 @@ def main():
     prov_raw, prov_norm, medio_raw, medio_norm_set = set(), set(), set(), set()
     anios = set()
     juris = set()
+    # Para search.json (MiniSearch client-side): por cada clave normalizada,
+    # cuenta de cada grafia cruda para elegir luego un nombre representativo.
+    prov_disp = {}   # proveedor_norm -> {nombre_crudo: count}
+    medio_disp = {}  # medio_norm -> {nombre_crudo: count}
+
+    # Columnas que necesita la base. Se leen por NOMBRE (DictReader), no por
+    # posicion: asi el script no depende de cuantas columnas trae el CSV ni de
+    # su orden. Columnas extra del CSV (p.ej. tipo_de_medio, archivo_origen)
+    # se ignoran sin romper. Evita el bug silencioso de descartar todas las
+    # filas por un conteo de columnas que no coincide.
+    REQUERIDAS = ("jurisdiccion", "anio", "fecha", "medio",
+                  "proveedor", "monto", "resolucion")
 
     def filas_orders():
         with CSV_ORDERS.open(newline="", encoding="utf-8") as f:
-            lector = csv.reader(f)
-            next(lector)  # header
-            for row in lector:
-                if len(row) != 9:
+            lector = csv.DictReader(f)
+            faltan = [c for c in REQUERIDAS if c not in (lector.fieldnames or [])]
+            if faltan:
+                sys.exit(f"ERROR: al CSV unificado le faltan columnas: {faltan}")
+            for d in lector:
+                jur = (d.get("jurisdiccion") or "").strip()
+                anio = (d.get("anio") or "").strip()
+                fecha = d.get("fecha") or ""
+                medio = d.get("medio") or ""
+                prov = d.get("proveedor") or ""
+                monto = d.get("monto") or ""
+                reso = d.get("resolucion") or ""
+                if not jur or not anio:
                     continue
-                jur, anio, fecha, tdm, medio, prov, monto, reso, orig = row
                 st["filas"] += 1
                 anio_i = int(anio)
                 anios.add(anio_i)
@@ -299,22 +369,33 @@ def main():
                         st["alias_aplicados"] += 1
                 if p_norm:
                     prov_norm.add(p_norm)
+                    if prov_v:
+                        d = prov_disp.setdefault(p_norm, {})
+                        d[prov_v] = d.get(prov_v, 0) + 1
                 if medio_v:
                     medio_raw.add(medio_v)
                 if m_norm:
                     medio_norm_set.add(m_norm)
+                    if medio_v:
+                        d = medio_disp.setdefault(m_norm, {})
+                        d[medio_v] = d.get(medio_v, 0) + 1
 
                 yield (
-                    jur, anio_i, fecha_iso, (tdm.strip() or None),
+                    jur, anio_i, fecha_iso,
                     medio_v, prov_v, monto_v, monto_def,
-                    (reso.strip() or None), orig, p_norm, m_norm,
+                    (reso.strip() or None), p_norm, m_norm,
                 )
 
     con.executemany(
-        "INSERT INTO orders(jurisdiccion, anio, fecha, tipo_de_medio, medio, "
-        "proveedor, monto, monto_deflactado, resolucion, archivo_origen, "
-        "proveedor_norm, medio_norm) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO orders(jurisdiccion, anio, fecha, medio, "
+        "proveedor, monto, monto_deflactado, resolucion, "
+        "proveedor_norm, medio_norm) VALUES (?,?,?,?,?,?,?,?,?,?)",
         filas_orders())
+
+    if st["filas"] == 0:
+        con.close()
+        sys.exit("ERROR: 0 filas insertadas; revisar el CSV unificado "
+                 "(columnas/encoding). No se genera una base vacia.")
 
     n_gov = cargar_governments(con)
     crear_indices(con)
@@ -351,9 +432,15 @@ def main():
     con.execute("VACUUM")
     con.close()
 
+    # --- indice de busqueda client-side -----------------------------------
+    out_busq, n_prov, n_medio = escribir_busqueda(prov_disp, medio_disp)
+    tam_busq_mb = out_busq.stat().st_size / (1024 * 1024)
+
     # --- reporte ----------------------------------------------------------
     tam_mb = OUT_DB.stat().st_size / (1024 * 1024)
     print(f"OK  {OUT_DB}  ({tam_mb:.1f} MB)")
+    print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
+          f"{n_prov} proveedores, {n_medio} medios)")
     for k, v in meta.items():
         print(f"  {k:32s} {v}")
 

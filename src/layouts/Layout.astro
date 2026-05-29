@@ -1,4 +1,5 @@
 ---
+import "@fontsource-variable/inter";
 import "../styles/global.css";
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
 
 const {
   title = "Datos Pauta Oficial",
-  description = "Datos publicos de pauta oficial en la Argentina.",
+  description = "Todos los datos publicos de pauta oficial de la Argentina, en un solo lugar.",
 } = Astro.props;
 ---
 
@@ -21,7 +22,7 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-white text-neutral-900 antialiased">
+  <body>
     <slot />
   </body>
 </html>
