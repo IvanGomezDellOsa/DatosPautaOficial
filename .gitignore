@@ -5,11 +5,14 @@ node_modules/
 dist/
 .astro/
 
-# base de datos generada — derivada de etl/data/*.csv via etl/build_db.py.
-# No se versiona: es un artefacto reproducible, no una fuente.
+# base de datos y artefactos generados — derivados de etl/data/*.csv via etl/build_db.py.
+# No se versionan: son artefactos reproducibles, no fuentes.
 public/data/*.sqlite
 public/data/*.sqlite3
 public/data/*.db
+public/data/pauta.sqlite.*
+public/data/config.json
+public/data/search.json
 
 # Python (ETL)
 __pycache__/
