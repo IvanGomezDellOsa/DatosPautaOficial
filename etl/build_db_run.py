@@ -11,9 +11,7 @@ Entradas (en etl/data/):
   - aliases.csv                  OPCIONAL     normalizacion curada de nombres
 
 Salida:
-  - public/data/pauta.sqlite     base read-only (archivo unico, para uso local)
-  - public/data/pauta.sqlite.N   chunks de 20 MiB para Cloudflare Pages
-  - public/data/config.json      config de sql.js-httpvfs (serverMode: chunked)
+  - public/data/pauta.sqlite     base read-only servida como archivo estatico
   - public/data/search.json      entidades distintas (proveedor/medio) para
                                  la busqueda client-side con MiniSearch
 
@@ -27,7 +25,6 @@ Uso:  python3 etl/build_db.py
 
 import csv
 import json
-import math
 import re
 import sqlite3
 import sys
@@ -239,49 +236,6 @@ def cargar_governments(con):
     return len(filas)
 
 
-def split_db():
-    """Parte la SQLite en chunks de CHUNK_SIZE bytes para Cloudflare Pages.
-
-    Cloudflare Pages rechaza archivos > 25 MiB. La DB de ~106 MB se parte en
-    pauta.sqlite.0, pauta.sqlite.1, ... + config.json.
-
-    El front carga los chunks con serverMode='chunked' de sql.js-httpvfs:
-      createDbWorker([{ from: 'jsonconfig', configUrl: '/data/config.json' }], ...)
-
-    Llama despues de que OUT_DB ya existe (al final de main()).
-    """
-    CHUNK_SIZE = 20 * 1024 * 1024  # 20 MiB — margen comodo bajo el limite de 25 MiB
-
-    data = OUT_DB.read_bytes()
-    db_size = len(data)
-    n_chunks = math.ceil(db_size / CHUNK_SIZE)
-    suffix_len = len(str(n_chunks - 1))  # digitos necesarios para el sufijo
-
-    # Limpiar chunks anteriores para evitar chunks huerfanos de una build previa
-    for old in OUT_DIR.glob("pauta.sqlite.*"):
-        old.unlink()
-
-    # Escribir chunks
-    for i in range(n_chunks):
-        chunk = data[i * CHUNK_SIZE: (i + 1) * CHUNK_SIZE]
-        (OUT_DIR / f"pauta.sqlite.{i}").write_bytes(chunk)
-
-    # Escribir config.json (lo lee el front con from: 'jsonconfig')
-    config = {
-        "requestChunkSize": 1024,       # page_size del SQLite (ver PRAGMA arriba)
-        "serverMode": "chunked",
-        "urlPrefix": "/data/pauta.sqlite.",
-        "serverChunkSize": CHUNK_SIZE,
-        "databaseLengthBytes": db_size,
-        "suffixLength": suffix_len,
-    }
-    config_path = OUT_DIR / "config.json"
-    with config_path.open("w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-
-    return n_chunks, suffix_len, db_size, config_path
-
-
 def escribir_busqueda(prov_disp, medio_disp):
     """Emite public/data/search.json para la busqueda client-side (MiniSearch).
 
@@ -478,9 +432,6 @@ def main():
     con.execute("VACUUM")
     con.close()
 
-    # --- split chunked para Cloudflare Pages ------------------------------
-    n_chunks, suffix_len, db_size, config_path = split_db()
-
     # --- indice de busqueda client-side -----------------------------------
     out_busq, n_prov, n_medio = escribir_busqueda(prov_disp, medio_disp)
     tam_busq_mb = out_busq.stat().st_size / (1024 * 1024)
@@ -488,9 +439,6 @@ def main():
     # --- reporte ----------------------------------------------------------
     tam_mb = OUT_DB.stat().st_size / (1024 * 1024)
     print(f"OK  {OUT_DB}  ({tam_mb:.1f} MB)")
-    print(f"OK  {config_path}  "
-          f"({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, "
-          f"{db_size:,} bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
     for k, v in meta.items():
