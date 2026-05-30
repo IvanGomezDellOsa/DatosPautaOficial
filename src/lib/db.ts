@@ -12,15 +12,14 @@ import { createDbWorker } from "sql.js-httpvfs";
 import type { WorkerHttpvfs } from "sql.js-httpvfs";
 
 // Vite resuelve new URL() en build time y copia los assets al dist/.
-// El worker y el WASM necesitan esta forma para quedar incluidos en el bundle.
+// El worker usa el patron recomendado; el WASM se sirve desde public/ para
+// garantizar que Cloudflare Pages lo encuentre sin depender de que Vite
+// resuelva bare specifiers de node_modules.
 const workerUrl = new URL(
   "sql.js-httpvfs/dist/sqlite.worker.js",
   import.meta.url,
 );
-const wasmUrl = new URL(
-  "sql.js-httpvfs/dist/sql-wasm.wasm",
-  import.meta.url,
-);
+const wasmUrl = "/sql-wasm.wasm";
 
 let _workerPromise: Promise<WorkerHttpvfs> | null = null;
 
@@ -33,7 +32,7 @@ export function getDb(): Promise<WorkerHttpvfs> {
     _workerPromise = createDbWorker(
       [{ from: "jsonconfig", configUrl: "/data/config.json" }],
       workerUrl.toString(),
-      wasmUrl.toString(),
+      wasmUrl,
     );
   }
   return _workerPromise;

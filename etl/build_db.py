@@ -39,7 +39,10 @@ from pathlib import Path
 ETL_DIR = Path(__file__).resolve().parent
 DATA_DIR = ETL_DIR / "data"
 OUT_DIR = ETL_DIR.parent / "public" / "data"
-OUT_DB = OUT_DIR / "pauta.sqlite"
+# La DB monolitica va fuera de public/ para no superar el limite de 25 MiB
+# de Cloudflare Pages. Los chunks (.0-.5) y config.json siguen en OUT_DIR.
+BUILD_DIR = ETL_DIR / "build"
+OUT_DB = BUILD_DIR / "pauta.sqlite"
 
 CSV_ORDERS = DATA_DIR / "pauta_oficial_unificado.csv"
 CSV_IPC = DATA_DIR / "ipc_indec.csv"
@@ -323,6 +326,7 @@ def main():
     indice_ref = indice_mes[tuple(int(x) for x in mes_ref.split("-"))]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
     if OUT_DB.exists():
         OUT_DB.unlink()
 

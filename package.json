@@ -15,7 +15,6 @@
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.13.25",
     "astro": "^6.3.7",
     "minisearch": "^7.2.0",
     "react": "^19.2.6",
