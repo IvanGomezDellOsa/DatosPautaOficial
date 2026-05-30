@@ -21,7 +21,7 @@ export interface EstadoTabla {
   entidadNorm: string | null;
   entidadTipo: "proveedor" | "medio";
   deflactado: boolean;
-  ordenPor: "fecha" | "monto";
+  ordenPor: "fecha" | "monto" | "id";
   desc: boolean;
 }
 
@@ -41,13 +41,19 @@ export function leerEstadoTabla(): EstadoTabla {
   const p = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : "",
   );
+  // Defaults: PBA + 2025 + orden por id (orden de la base).
+  // Si la URL trae el param, prevalece; si no, se usa el default.
+  // Para "sin filtro" (todas las jurisdicciones / todos los años),
+  // la URL debe traer juris=todas o anio=todos.
+  const jurisParam = p.get("juris");
+  const anioParam  = p.get("anio");
   return {
-    jurisdiccion: p.get("juris"),
-    anio: p.has("anio") ? Number(p.get("anio")) : null,
+    jurisdiccion: jurisParam === "todas" ? null : (jurisParam ?? "PBA"),
+    anio:         anioParam  === "todos" ? null : (anioParam != null ? Number(anioParam) : 2025),
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
     deflactado: p.get("def") !== "0",
-    ordenPor: p.get("orden") === "fecha" ? "fecha" : "monto",
+    ordenPor: p.get("orden") === "fecha" ? "fecha" : p.get("orden") === "monto" ? "monto" : "id",
     desc: p.get("desc") !== "0",
   };
 }
@@ -81,12 +87,25 @@ export function escribirEstadoTabla(estado: Partial<EstadoTabla>): void {
   if (typeof window === "undefined") return;
   const p = new URLSearchParams(window.location.search);
 
-  setOrDel(p, "juris", estado.jurisdiccion ?? null);
-  setOrDel(p, "anio", estado.anio != null ? String(estado.anio) : null);
+  // juris: "PBA" es default → no se escribe. null → "todas" (param explícito).
+  const jurisVal = estado.jurisdiccion === undefined ? undefined
+                 : estado.jurisdiccion === null        ? "todas"
+                 : estado.jurisdiccion === "PBA"       ? null   // default, no escribir
+                 : estado.jurisdiccion;
+  setOrDel(p, "juris", jurisVal ?? null);
+  // anio: 2025 es default → no se escribe. null → "todos" (param explícito).
+  const anioVal = estado.anio === undefined ? undefined
+                : estado.anio === null      ? "todos"
+                : estado.anio === 2025      ? null   // default, no escribir
+                : String(estado.anio);
+  setOrDel(p, "anio", anioVal ?? null);
   setOrDel(p, "norm", estado.entidadNorm ?? null);
   setOrDel(p, "tipo", estado.entidadTipo === "medio" ? "medio" : null); // proveedor es default
   setOrDel(p, "def", estado.deflactado === false ? "0" : null);         // deflactado es default
-  setOrDel(p, "orden", estado.ordenPor === "fecha" ? "fecha" : null);   // monto es default
+  // orden: "id" (orden de la base) es default → no se escribe.
+  setOrDel(p, "orden", estado.ordenPor === "fecha" ? "fecha"
+                      : estado.ordenPor === "monto" ? "monto"
+                      : null);                                           // "id" es default
   setOrDel(p, "desc", estado.desc === false ? "0" : null);              // desc es default
 
   const search = p.toString();

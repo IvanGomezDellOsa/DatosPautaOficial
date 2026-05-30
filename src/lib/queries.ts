@@ -76,7 +76,7 @@ export interface FiltrosTabla {
   entidadNorm?: string;
   entidadTipo?: "proveedor" | "medio";
   deflactado?: boolean;
-  ordenPor?: "fecha" | "monto";
+  ordenPor?: "fecha" | "monto" | "id";
   desc?: boolean;
   pagina?: number;
   porPagina?: number;
@@ -127,6 +127,8 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
   const montoCol = deflactado ? "monto_deflactado" : "monto";
   const orden = ordenPor === "fecha"
     ? `fecha ${desc ? "DESC" : "ASC"} NULLS LAST`
+    : ordenPor === "id"
+    ? `id ${desc ? "DESC" : "ASC"}`
     : `${montoCol} ${desc ? "DESC" : "ASC"} NULLS LAST`;
 
   // Count total para paginación (usa el mismo WHERE para ser consistente)
@@ -208,35 +210,20 @@ export interface FiltrosRanking {
 export async function getRanking(filtros: FiltrosRanking = {}): Promise<RankingItem[]> {
   const { jurisdiccion, anio, tipo = "proveedor", limite = 10 } = filtros;
 
-  const normCol = tipo === "proveedor" ? "proveedor_norm" : "medio_norm";
-  const crudoCol = tipo === "proveedor" ? "proveedor" : "medio";
-
-  const wheres: string[] = [];
-  const params: (string | number | null)[] = [];
-
-  if (jurisdiccion) {
-    wheres.push("jurisdiccion = ?");
-    params.push(jurisdiccion);
-  }
-  if (anio) {
-    wheres.push("anio = ?");
-    params.push(anio);
-  }
-  // Excluir filas sin clave normalizada (NULL = no identificado)
-  wheres.push(`${normCol} IS NOT NULL`);
-
-  const where = `WHERE ${wheres.join(" AND ")}`;
+  // Todos los rankings estan pre-computados en rankings_cache por el ETL.
+  // La data historica es inmutable, asi que el cache es siempre valido.
+  // La query es una lookup puntual de <=20 filas — sin scan, sin prefetch.
+  // Clave: jurisdiccion='*' = todas; anio=0 = todos.
+  const jurisKey = jurisdiccion ?? "*";
+  const anioKey  = anio ?? 0;
 
   return query<RankingItem>(
-    `SELECT ${normCol} as norm,
-            MAX(${crudoCol}) as nombre,
-            SUM(monto_deflactado) as total,
-            COUNT(*) as n
-     FROM orders ${where}
-     GROUP BY ${normCol}
-     ORDER BY total DESC
+    `SELECT norm, nombre, total, n
+     FROM rankings_cache
+     WHERE tipo = ? AND jurisdiccion = ? AND anio = ?
+     ORDER BY rank
      LIMIT ?`,
-    [...params, limite],
+    [tipo, jurisKey, anioKey, limite],
   );
 }
 

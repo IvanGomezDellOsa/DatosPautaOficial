@@ -119,6 +119,7 @@ function useGobierno(juris: string | null, anio: number | null) {
 
 const col = createColumnHelper<Orden>();
 const columns = [
+  col.accessor("id",       { header: "#",         enableSorting: true, meta: { align: "right" } }),
   col.accessor("fecha",    { header: "Fecha",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("medio",    { header: "Medio",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("proveedor",{ header: "Proveedor", cell: (i) => i.getValue() ?? "–" }),
@@ -196,7 +197,7 @@ export default function DataTable() {
   };
 
   // TanStack Table
-  const [sorting, setSorting] = useState([{ id: "monto_deflactado", desc: true }]);
+  const [sorting, setSorting] = useState([{ id: "id", desc: false }]);
   const table = useReactTable({
     data: rows,
     columns,
@@ -205,10 +206,10 @@ export default function DataTable() {
       const next = typeof upd === "function" ? upd(sorting) : upd;
       setSorting(next);
       if (next[0]) {
-        setFiltro({
-          ordenPor: next[0].id === "fecha" ? "fecha" : "monto",
-          desc: next[0].desc,
-        });
+        const op = next[0].id === "fecha" ? "fecha"
+                 : next[0].id === "id"    ? "id"
+                 : "monto";
+        setFiltro({ ordenPor: op, desc: next[0].desc });
       }
     },
     getCoreRowModel: getCoreRowModel(),

@@ -194,6 +194,99 @@ def crear_esquema(con):
     )
 
 
+
+def crear_rankings(con, top_n=5):
+    """Pre-computa todos los rankings posibles y los guarda en rankings_cache.
+
+    La data historica es inmutable: pre-calculamos el top N para cada
+    combinacion (tipo x jurisdiccion x anio) en el ETL. El front hace una
+    lookup puntual de <=20 filas — cero full-scan, cero prefetch exponencial.
+
+    Combinaciones: global (1) + por juris (4) + por anio (~22)
+                   + juris x anio (~88) = ~115 por tipo => ~4600 filas total.
+    Clave: jurisdiccion='*' = todas las jurisdicciones, anio=0 = todos los anios.
+    """
+    # Tabla intermedia auxiliar (se descarta al final)
+    con.executescript("""
+        CREATE TEMP TABLE _rprov AS
+            SELECT jurisdiccion, anio, proveedor_norm AS norm,
+                   MAX(proveedor) AS nombre,
+                   SUM(monto_deflactado) AS total,
+                   COUNT(*) AS n
+            FROM orders
+            WHERE proveedor_norm IS NOT NULL
+            GROUP BY jurisdiccion, anio, proveedor_norm;
+
+        CREATE TEMP TABLE _rmedio AS
+            SELECT jurisdiccion, anio, medio_norm AS norm,
+                   MAX(medio) AS nombre,
+                   SUM(monto_deflactado) AS total,
+                   COUNT(*) AS n
+            FROM orders
+            WHERE medio_norm IS NOT NULL
+            GROUP BY jurisdiccion, anio, medio_norm;
+    """)
+
+    con.executescript("""
+        CREATE TABLE rankings_cache (
+            tipo         TEXT    NOT NULL,
+            jurisdiccion TEXT    NOT NULL,  -- '*' = todas
+            anio         INTEGER NOT NULL,  -- 0   = todos
+            rank         INTEGER NOT NULL,
+            norm         TEXT    NOT NULL,
+            nombre       TEXT    NOT NULL,
+            total        REAL,
+            n            INTEGER NOT NULL
+        );
+        CREATE INDEX idx_rcache
+            ON rankings_cache(tipo, jurisdiccion, anio, rank);
+    """)
+
+    def insert_top(tipo, src, juris_key, anio_key, rows):
+        con.executemany(
+            "INSERT INTO rankings_cache VALUES (?,?,?,?,?,?,?,?)",
+            [(tipo, juris_key, anio_key, i + 1, r[0], r[1], r[2], r[3])
+             for i, r in enumerate(rows[:top_n])]
+        )
+
+    for tipo, tbl in [("proveedor", "_rprov"), ("medio", "_rmedio")]:
+        # --- global (todas las jurisdicciones, todos los anios) ---------------
+        rows = con.execute(f"""
+            SELECT norm, MAX(nombre), SUM(total), SUM(n)
+            FROM {tbl} GROUP BY norm ORDER BY 3 DESC LIMIT {top_n}
+        """).fetchall()
+        insert_top(tipo, tbl, "*", 0, rows)
+
+        # --- por jurisdiccion (todos los anios) --------------------------------
+        for (juris,) in con.execute(f"SELECT DISTINCT jurisdiccion FROM {tbl}").fetchall():
+            rows = con.execute(f"""
+                SELECT norm, MAX(nombre), SUM(total), SUM(n)
+                FROM {tbl} WHERE jurisdiccion=? GROUP BY norm ORDER BY 3 DESC LIMIT {top_n}
+            """, [juris]).fetchall()
+            insert_top(tipo, tbl, juris, 0, rows)
+
+        # --- por anio (todas las jurisdicciones) ------------------------------
+        for (anio,) in con.execute(f"SELECT DISTINCT anio FROM {tbl}").fetchall():
+            rows = con.execute(f"""
+                SELECT norm, MAX(nombre), SUM(total), SUM(n)
+                FROM {tbl} WHERE anio=? GROUP BY norm ORDER BY 3 DESC LIMIT {top_n}
+            """, [anio]).fetchall()
+            insert_top(tipo, tbl, "*", anio, rows)
+
+        # --- por jurisdiccion + anio ------------------------------------------
+        for (juris, anio) in con.execute(
+            f"SELECT DISTINCT jurisdiccion, anio FROM {tbl}"
+        ).fetchall():
+            rows = con.execute(f"""
+                SELECT norm, nombre, total, n
+                FROM {tbl} WHERE jurisdiccion=? AND anio=?
+                ORDER BY total DESC LIMIT {top_n}
+            """, [juris, anio]).fetchall()
+            insert_top(tipo, tbl, juris, anio, rows)
+
+    n = con.execute("SELECT COUNT(*) FROM rankings_cache").fetchone()[0]
+    print(f"  rankings_cache: {n} filas ({n // (top_n * 2)} combinaciones)")
+
 def crear_indices(con):
     # Indices compuestos que mapean a las 3 funciones de la web. El prefijo
     # izquierdo de cada compuesto cubre tambien las consultas mas simples:
@@ -271,7 +364,7 @@ def split_db():
 
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
-        "requestChunkSize": 1024,       # page_size del SQLite (ver PRAGMA arriba)
+        "requestChunkSize": 4096,       # page_size del SQLite (ver PRAGMA arriba)
         "serverMode": "chunked",
         "urlPrefix": "/data/pauta.sqlite.",
         "serverChunkSize": CHUNK_SIZE,
@@ -331,7 +424,7 @@ def main():
         OUT_DB.unlink()
 
     con = sqlite3.connect(OUT_DB)
-    con.execute("PRAGMA page_size = 1024")   # optimo para sql.js-httpvfs
+    con.execute("PRAGMA page_size = 4096")   # sql.js-httpvfs recomienda >= 4096
     con.execute("PRAGMA journal_mode = OFF")
     crear_esquema(con)
 
@@ -475,6 +568,9 @@ def main():
     }
     con.executemany("INSERT INTO meta(clave, valor) VALUES (?,?)",
                      [(k, str(v)) for k, v in meta.items()])
+
+    # --- tablas de rankings pre-computadas (evitan full-scan en el front) ---
+    crear_rankings(con)
 
     con.commit()
     con.execute("ANALYZE")
