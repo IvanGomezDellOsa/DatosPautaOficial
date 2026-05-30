@@ -13,6 +13,9 @@ public/data/*.db
 public/data/pauta.sqlite.*
 public/data/config.json
 public/data/search.json
+# SQLite monolitica generada en etl/build/ (fuera de public/ para no superar
+# el limite de 25 MiB de Cloudflare Pages; los chunks van a public/data/).
+etl/build/
 
 # Python (ETL)
 __pycache__/
