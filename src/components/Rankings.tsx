@@ -131,7 +131,7 @@ export default function Rankings() {
       const partes = [];
       if (jurisdiccion) partes.push(jurisdiccion);
       if (anio) partes.push(String(anio));
-      setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "toda la base"}`);
+      setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Toda nuestra base de datos"}`);
 
       const items = await getRanking({
         jurisdiccion: jurisdiccion ?? undefined,
@@ -185,7 +185,7 @@ export default function Rankings() {
         onTipoChange={setTipoCtx}
       />
       <RankingCard
-        titulo="Top 5 — toda la base"
+        titulo="Top 5 — Toda nuestra base de datos"
         subtitulo="Global · deflactado"
         items={itemsGlb}
         loading={loadingGlb}

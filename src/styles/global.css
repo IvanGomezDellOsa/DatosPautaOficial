@@ -720,6 +720,10 @@ body {
   border-color: var(--color-fg);
   color: var(--color-fg-strong);
 }
+.chip-add option {
+  background: var(--color-bg-elev-2);
+  color: var(--color-fg);
+}
 
 /* Toggle «Ver totales» (nuevo) */
 .totals-toggle {

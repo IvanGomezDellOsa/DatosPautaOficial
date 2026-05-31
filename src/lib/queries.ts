@@ -262,7 +262,15 @@ export async function getMeta(): Promise<MetaStats> {
  */
 export async function getTotalesFiltro(
   filtros: Omit<FiltrosTabla, "pagina" | "porPagina" | "ordenPor" | "desc">,
-): Promise<{ nOrdenes: number; montoTotal: number }> {
+): Promise<{ 
+  nOrdenes: number; 
+  montoTotal: number;
+  c_fecha: number;
+  c_medio: number;
+  c_proveedor: number;
+  c_monto: number;
+  c_resolucion: number;
+}> {
   const { jurisdiccion, anio, entidadNorm, entidadTipo } = filtros;
 
   const wheres: string[] = [];
@@ -278,9 +286,17 @@ export async function getTotalesFiltro(
   }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
-  const [row] = await query<{ n: number; total: number }>(
-    `SELECT COUNT(*) as n, SUM(monto_deflactado) as total FROM orders ${where}`,
+  const [row] = await query<{ n: number; total: number; c_fecha: number; c_medio: number; c_proveedor: number; c_monto: number; c_resolucion: number }>(
+    `SELECT COUNT(*) as n, SUM(monto_deflactado) as total, COUNT(fecha) as c_fecha, COUNT(medio) as c_medio, COUNT(proveedor) as c_proveedor, COUNT(monto_deflactado) as c_monto, COUNT(resolucion) as c_resolucion FROM orders ${where}`,
     params,
   );
-  return { nOrdenes: Number(row?.n ?? 0), montoTotal: Number(row?.total ?? 0) };
+  return { 
+    nOrdenes: Number(row?.n ?? 0), 
+    montoTotal: Number(row?.total ?? 0),
+    c_fecha: Number(row?.c_fecha ?? 0),
+    c_medio: Number(row?.c_medio ?? 0),
+    c_proveedor: Number(row?.c_proveedor ?? 0),
+    c_monto: Number(row?.c_monto ?? 0),
+    c_resolucion: Number(row?.c_resolucion ?? 0),
+  };
 }

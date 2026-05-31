@@ -430,7 +430,7 @@ def main():
 
     # --- estadisticas para la tabla meta y la verificacion ----------------
     st = {
-        "filas": 0, "monto_nulo": 0, "fecha_no_iso": 0, "fecha_nula": 0,
+        "filas": 0, "monto_nulo": 0, "monto_cero": 0, "fecha_no_iso": 0, "fecha_nula": 0,
         "deflactado_nulo": 0, "monto_total": 0.0, "monto_def_total": 0.0,
         "alias_aplicados": 0,
     }
@@ -486,6 +486,9 @@ def main():
                         monto_v = None
                 if monto_v is None:
                     st["monto_nulo"] += 1
+                elif monto_v == 0.0:
+                    st["monto_cero"] += 1
+                    continue  # descarta ordenes con monto = $0 (anulaciones/reservas)
                 else:
                     st["monto_total"] += monto_v
 
@@ -559,6 +562,7 @@ def main():
         "medios_distintos_crudo": len(medio_raw),
         "medios_distintos_norm": len(medio_norm_set),
         "filas_monto_nulo": st["monto_nulo"],
+        "filas_monto_cero": st["monto_cero"],
         "filas_fecha_nula": st["fecha_nula"],
         "filas_fecha_no_iso": st["fecha_no_iso"],
         "filas_deflactado_nulo": st["deflactado_nulo"],
@@ -588,9 +592,7 @@ def main():
     # --- reporte ----------------------------------------------------------
     tam_mb = OUT_DB.stat().st_size / (1024 * 1024)
     print(f"OK  {OUT_DB}  ({tam_mb:.1f} MB)")
-    print(f"OK  {config_path}  "
-          f"({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, "
-          f"{db_size:,} bytes)")
+    print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
     for k, v in meta.items():

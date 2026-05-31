@@ -39,6 +39,12 @@ import { query } from "../lib/db";
 
 const JURISDICCIONES = ["CABA", "Nación", "PBA", "Santa Fe"];
 const ANIOS = Array.from({ length: 23 }, (_, i) => 2025 - i); // 2025..2003
+const DISPONIBILIDAD: Record<string, [number, number]> = {
+  "Nación": [2009, 2022],
+  "CABA": [2003, 2024],
+  "PBA": [2020, 2025],
+  "Santa Fe": [2019, 2023],
+};
 const POR_PAGINA = 100;
 
 const fmtARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
@@ -59,6 +65,7 @@ function useTabla(filtros: FiltrosTabla) {
   const [totalMonto, setTotalMonto] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pagina, setPagina] = useState(0);
+  const [colCounts, setColCounts] = useState({ c_fecha: 1, c_medio: 1, c_proveedor: 1, c_monto: 1, c_resolucion: 1 });
 
   const cargar = useCallback(
     async (pag: number) => {
@@ -71,6 +78,13 @@ function useTabla(filtros: FiltrosTabla) {
         setRows((prev) => (pag === 0 ? filas : [...prev, ...filas]));
         setTotalFilas(total);
         setTotalMonto(tots.montoTotal);
+        setColCounts({
+          c_fecha: tots.c_fecha,
+          c_medio: tots.c_medio,
+          c_proveedor: tots.c_proveedor,
+          c_monto: tots.c_monto,
+          c_resolucion: tots.c_resolucion
+        });
       } finally {
         setLoading(false);
       }
@@ -90,7 +104,7 @@ function useTabla(filtros: FiltrosTabla) {
     cargar(sig);
   }, [pagina, cargar]);
 
-  return { rows, totalFilas, totalMonto, loading, cargarMas };
+  return { rows, totalFilas, totalMonto, loading, cargarMas, colCounts };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +133,7 @@ function useGobierno(juris: string | null, anio: number | null) {
 
 const col = createColumnHelper<Orden>();
 const columns = [
-  col.accessor("id",       { header: "#",         enableSorting: true, meta: { align: "right" } }),
+  col.accessor("id",       { header: "#ID",         enableSorting: true, meta: { align: "right" } }),
   col.accessor("fecha",    { header: "Fecha",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("medio",    { header: "Medio",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("proveedor",{ header: "Proveedor", cell: (i) => i.getValue() ?? "–" }),
@@ -149,6 +163,14 @@ export default function DataTable() {
   // Estado de filtros (sincronizado con URL)
   const [estado, setEstado] = useState<EstadoTabla>(() => leerEstadoTabla());
 
+  const jurisFiltradas = estado.anio
+    ? JURISDICCIONES.filter((j) => estado.anio! >= DISPONIBILIDAD[j][0] && estado.anio! <= DISPONIBILIDAD[j][1])
+    : JURISDICCIONES;
+
+  const aniosFiltrados = estado.jurisdiccion
+    ? ANIOS.filter((a) => a >= DISPONIBILIDAD[estado.jurisdiccion!][0] && a <= DISPONIBILIDAD[estado.jurisdiccion!][1])
+    : ANIOS;
+
   // Búsqueda con MiniSearch
   const [textoBusq, setTextoBusq] = useState("");
   const [sugerencias, setSugerencias] = useState<EntidadBusqueda[]>([]);
@@ -156,7 +178,8 @@ export default function DataTable() {
   const busqRef = useRef<HTMLDivElement>(null);
 
   const filtros = estadoAFiltros(estado);
-  const { rows, totalFilas, totalMonto, loading, cargarMas } = useTabla(filtros);
+  const { rows, totalFilas, totalMonto, loading, cargarMas, colCounts } = useTabla(filtros);
+  const hasNoFilters = !estado.jurisdiccion && !estado.anio && !estado.entidadNorm;
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio);
 
   // Actualiza estado + URL
@@ -201,7 +224,16 @@ export default function DataTable() {
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting },
+    state: { 
+      sorting,
+      columnVisibility: {
+        fecha: hasNoFilters || colCounts.c_fecha > 0,
+        medio: hasNoFilters || colCounts.c_medio > 0,
+        proveedor: hasNoFilters || colCounts.c_proveedor > 0,
+        monto_deflactado: hasNoFilters || colCounts.c_monto > 0,
+        resolucion: hasNoFilters || colCounts.c_resolucion > 0,
+      }
+    },
     onSortingChange: (upd) => {
       const next = typeof upd === "function" ? upd(sorting) : upd;
       setSorting(next);
@@ -241,7 +273,7 @@ export default function DataTable() {
               aria-label="Filtrar por jurisdicción"
             >
               <option value="">+ Jurisdicción</option>
-              {JURISDICCIONES.map((j) => <option key={j} value={j}>{j}</option>)}
+              {jurisFiltradas.map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
           )}
 
@@ -260,7 +292,7 @@ export default function DataTable() {
               aria-label="Filtrar por año"
             >
               <option value="">+ Año</option>
-              {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
+              {aniosFiltrados.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           )}
 
