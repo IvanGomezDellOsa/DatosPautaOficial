@@ -204,11 +204,9 @@ export interface FiltrosRanking {
  * Top N proveedores o medios por monto deflactado.
  * Sin filtros → ranking global (toda la base, cacheado en tabla meta).
  * Con jurisdiccion/anio → ranking contextual.
- *
- * Usa idx_orders_juris_anio_prov o idx_orders_juris_anio_medio.
  */
 export async function getRanking(filtros: FiltrosRanking = {}): Promise<RankingItem[]> {
-  const { jurisdiccion, anio, tipo = "proveedor", limite = 10 } = filtros;
+  const { jurisdiccion, anio, tipo = "proveedor", limite = 5 } = filtros;
 
   // Todos los rankings estan pre-computados en rankings_cache por el ETL.
   // La data historica es inmutable, asi que el cache es siempre valido.
@@ -233,7 +231,6 @@ export async function getRanking(filtros: FiltrosRanking = {}): Promise<RankingI
 
 /**
  * Lee las estadísticas de la tabla meta (generadas por build_db.py).
- * Se llama una vez al montar el hero; los valores se usan en el count-up.
  */
 export async function getMeta(): Promise<MetaStats> {
   const rows = await query<{ clave: string; valor: string }>(

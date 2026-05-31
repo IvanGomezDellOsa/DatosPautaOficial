@@ -195,7 +195,7 @@ def crear_esquema(con):
 
 
 
-def crear_rankings(con, top_n=5):
+def crear_rankings(con, prov_disp, medio_disp, top_n=5):
     """Pre-computa todos los rankings posibles y los guarda en rankings_cache.
 
     La data historica es inmutable: pre-calculamos el top N para cada
@@ -206,25 +206,41 @@ def crear_rankings(con, top_n=5):
                    + juris x anio (~88) = ~115 por tipo => ~4600 filas total.
     Clave: jurisdiccion='*' = todas las jurisdicciones, anio=0 = todos los anios.
     """
+    def get_best_names(disp):
+        res = []
+        for norm, grafias in disp.items():
+            nombre = max(grafias.items(), key=lambda kv: (kv[1], kv[0]))[0]
+            res.append((norm, nombre))
+        return res
+
+    con.executescript("""
+        CREATE TEMP TABLE _best_prov(norm TEXT PRIMARY KEY, nombre TEXT);
+        CREATE TEMP TABLE _best_medio(norm TEXT PRIMARY KEY, nombre TEXT);
+    """)
+    con.executemany("INSERT INTO _best_prov VALUES (?,?)", get_best_names(prov_disp))
+    con.executemany("INSERT INTO _best_medio VALUES (?,?)", get_best_names(medio_disp))
+
     # Tabla intermedia auxiliar (se descarta al final)
     con.executescript("""
         CREATE TEMP TABLE _rprov AS
-            SELECT jurisdiccion, anio, proveedor_norm AS norm,
-                   MAX(proveedor) AS nombre,
-                   SUM(monto_deflactado) AS total,
+            SELECT o.jurisdiccion, o.anio, o.proveedor_norm AS norm,
+                   b.nombre,
+                   SUM(o.monto_deflactado) AS total,
                    COUNT(*) AS n
-            FROM orders
-            WHERE proveedor_norm IS NOT NULL
-            GROUP BY jurisdiccion, anio, proveedor_norm;
+            FROM orders o
+            JOIN _best_prov b ON o.proveedor_norm = b.norm
+            WHERE o.proveedor_norm IS NOT NULL
+            GROUP BY o.jurisdiccion, o.anio, o.proveedor_norm;
 
         CREATE TEMP TABLE _rmedio AS
-            SELECT jurisdiccion, anio, medio_norm AS norm,
-                   MAX(medio) AS nombre,
-                   SUM(monto_deflactado) AS total,
+            SELECT o.jurisdiccion, o.anio, o.medio_norm AS norm,
+                   b.nombre,
+                   SUM(o.monto_deflactado) AS total,
                    COUNT(*) AS n
-            FROM orders
-            WHERE medio_norm IS NOT NULL
-            GROUP BY jurisdiccion, anio, medio_norm;
+            FROM orders o
+            JOIN _best_medio b ON o.medio_norm = b.norm
+            WHERE o.medio_norm IS NOT NULL
+            GROUP BY o.jurisdiccion, o.anio, o.medio_norm;
     """)
 
     con.executescript("""
@@ -466,7 +482,6 @@ def main():
                 reso = d.get("resolucion") or ""
                 if not jur or not anio:
                     continue
-                st["filas"] += 1
                 anio_i = int(anio)
                 anios.add(anio_i)
                 juris.add(jur)
@@ -491,6 +506,8 @@ def main():
                     continue  # descarta ordenes con monto = $0 (anulaciones/reservas)
                 else:
                     st["monto_total"] += monto_v
+                
+                st["filas"] += 1
 
                 # deflactor: por mes si hay fecha ISO, si no por anio
                 factor = None
@@ -574,7 +591,7 @@ def main():
                      [(k, str(v)) for k, v in meta.items()])
 
     # --- tablas de rankings pre-computadas (evitan full-scan en el front) ---
-    crear_rankings(con)
+    crear_rankings(con, prov_disp, medio_disp)
 
     con.commit()
     con.execute("ANALYZE")
