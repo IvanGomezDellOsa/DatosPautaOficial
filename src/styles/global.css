@@ -31,7 +31,7 @@
   --text-data: 1.0625rem;
   --text-small: 0.9375rem;
   --text-micro: 0.8125rem;
-  --text-monto-xl: clamp(3.25rem, 5.5vw, 5rem);
+  --text-monto-xl: clamp(1.8rem, 8vw, 5rem);
   --text-monto-lg: 1.625rem;
 
   --table-row-h: 48px;
@@ -952,7 +952,7 @@ table.data td:nth-child(5) { min-width: 100px; }
     grid-template-columns: 1fr auto auto;
     grid-template-areas: 
       "medio monto resol"
-      "proveedor fecha fecha";
+      "proveedor juris fecha";
     padding: 12px 16px;
     gap: 4px 12px;
     border-bottom: 1px solid var(--color-border-subtle);
@@ -980,41 +980,37 @@ table.data td:nth-child(5) { min-width: 100px; }
     padding-left: 13px;
   }
   
-  /* Fecha */
-  table.data tbody td:nth-child(1) {
+  /* Grid Area Mapping dinámico */
+  table.data tbody td.col-fecha {
     grid-area: fecha;
     font-size: var(--text-micro);
     color: var(--color-fg-subtle);
     text-align: right;
   }
-  /* Medio */
-  table.data tbody td:nth-child(2) {
+  table.data tbody td.col-medio {
     grid-area: medio;
     font-size: var(--text-body);
     font-weight: 600;
     color: var(--color-fg-strong);
   }
-  /* Proveedor */
-  table.data tbody td:nth-child(3) {
+  table.data tbody td.col-proveedor {
     grid-area: proveedor;
     font-size: var(--text-small);
     color: var(--color-fg-muted);
   }
-  /* Monto */
-  table.data tbody td:nth-child(4) {
+  table.data tbody td.col-monto_deflactado {
     grid-area: monto;
     font-size: var(--text-body);
     font-weight: 600;
     color: var(--color-accent);
     text-align: right;
   }
-  /* Resol */
-  table.data tbody td:nth-child(5) {
+  table.data tbody td.col-resolucion {
     grid-area: resol;
     display: flex;
     justify-content: flex-end;
   }
-  table.data tbody td:nth-child(5) a {
+  table.data tbody td.col-resolucion a {
     display: flex;
     align-items: center;
     justify-content: center;

@@ -414,6 +414,7 @@ export default function DataTable() {
                         <td key={cell.id} className={[
                           meta?.align === "right" ? "monto" : "",
                           cell.column.id === "resolucion" ? "resol" : "",
+                          `col-${cell.column.id}`
                         ].filter(Boolean).join(" ")}>
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
