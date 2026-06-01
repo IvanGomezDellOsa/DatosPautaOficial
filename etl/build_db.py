@@ -67,15 +67,86 @@ _SUFIJOS = [
     ["srl"], ["sas"], ["sca"], ["sa"], ["ltda"],
 ]
 
+# --- URL stripping --------------------------------------------------------
+# Muchos "medios" se cargan como dominios (WWW.FUTUROCK.FM, futurock.fm,
+# www.futurock.fm - Web), lo que fragmenta una misma entidad en varias claves.
+# Antes de la normalizacion general extraemos la parte semantica del dominio.
+#
+# Distinguimos dos clases de TLD:
+#   - _TLD_CRUFT: extensiones que NO son parte del nombre (com, com.ar, ar,
+#     org, net, info, gob.ar...). Se eliminan por completo. Mas largas primero
+#     para que "com.ar" gane sobre "ar".
+#   - _TLD_NOMBRE: fm / am / tv. Para radios y canales la sigla ES parte del
+#     nombre hablado ("Futurock FM"), asi que el punto se vuelve espacio y el
+#     token se conserva. Esto ademas fusiona la forma-dominio (futurock.fm) con
+#     la forma-nombre (FUTUROCK FM), que es exactamente lo que queremos.
+# Conservar fm/am/tv es la opcion conservadora: ante la duda no fusionamos
+# (futurock.fm no colapsa con un hipotetico futurock.com).
+_TLD_CRUFT = [
+    "com.ar", "org.ar", "net.ar", "gob.ar", "gov.ar", "edu.ar",
+    "com", "net", "org", "info", "ar",
+]
+_TLD_NOMBRE = ["fm", "am", "tv"]
+_TLD_TODOS = _TLD_NOMBRE + _TLD_CRUFT
+
+_DOMINIO_CHARS_RE = re.compile(r"^[a-z0-9.\-]+$")
+_PROTO_RE = re.compile(r"^https?://")
+_WWW_RE = re.compile(r"^www\d*\.")
+
+
+def _parece_dominio(tok):
+    """True si el token aislado parece efectivamente una URL/dominio: empieza
+    con protocolo o www., o tiene forma de dominio y termina en un TLD conocido."""
+    if _PROTO_RE.match(tok) or _WWW_RE.match(tok):
+        return True
+    core = re.split(r"[/?#]", tok, maxsplit=1)[0]
+    if not _DOMINIO_CHARS_RE.match(core) or "." not in core:
+        return False
+    return any(core.endswith("." + tld) for tld in _TLD_TODOS)
+
+
+def _strip_dominio(tok):
+    """Extrae la parte semantica de un token que parece dominio."""
+    tok = _PROTO_RE.sub("", tok)       # protocolo
+    tok = _WWW_RE.sub("", tok)         # www. / www2. / ...
+    tok = re.split(r"[/?#]", tok, maxsplit=1)[0]  # path / query / fragmento
+    if not tok or "." not in tok:
+        return tok
+    # fm / am / tv: el TLD es parte del nombre -> el punto se vuelve espacio
+    for tld in _TLD_NOMBRE:
+        if tok.endswith("." + tld):
+            tok = tok[: -(len(tld) + 1)] + " " + tld
+            return tok.replace(".", " ")
+    # cruft: se elimina el TLD por completo (mas largo primero)
+    for tld in _TLD_CRUFT:
+        if tok.endswith("." + tld):
+            tok = tok[: -(len(tld) + 1)]
+            break
+    return tok.replace(".", " ")  # subdominios restantes -> espacios
+
+
+def _strip_urls(s):
+    """Aplica el stripping de dominios token a token. Solo toca los tokens que
+    parecen dominios; el resto (incluidos descriptivos como 'web'/'caba' que
+    siguen al dominio) se conserva intacto."""
+    if "." not in s and not s.startswith("www"):
+        return s  # ningun token podria ser dominio: salida rapida
+    return " ".join(
+        _strip_dominio(t) if _parece_dominio(t) else t
+        for t in s.split()
+    )
+
 
 def _algo_norm(s):
-    """Normalizacion algoritmica: minusculas, sin tildes, sin puntuacion,
-    sin sufijos societarios, espacios colapsados. Devuelve "" si queda vacio."""
+    """Normalizacion algoritmica: minusculas, sin tildes, sin URLs, sin
+    puntuacion, sin sufijos societarios, espacios colapsados. Devuelve "" si
+    queda vacio."""
     if not s:
         return ""
     s = s.strip().lower()
     s = "".join(c for c in unicodedata.normalize("NFKD", s)
                 if not unicodedata.combining(c))
+    s = _strip_urls(s)  # extrae la parte semantica de dominios antes de limpiar
     s = re.sub(r"[^a-z0-9]+", " ", s).strip()
     if not s:
         return ""
@@ -302,6 +373,56 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
 
     n = con.execute("SELECT COUNT(*) FROM rankings_cache").fetchone()[0]
     print(f"  rankings_cache: {n} filas ({n // (top_n * 2)} combinaciones)")
+
+
+def crear_totals(con):
+    """Pre-computa totals_cache: para CADA entidad (no solo el top-5) los
+    totales por (anio, jurisdiccion), mas una fila global (anio=0,
+    jurisdiccion='*') con el total historico ya sumado.
+
+    Es el analogo a rankings_cache para la vista "Cuanto recibio": convierte
+    un GROUP BY sobre ~500k filas (un round-trip HTTP por page sobre
+    sql.js-httpvfs) en una lookup puntual indexada de pocas filas.
+
+    Misma fuente que rankings_cache (SUM(monto_deflactado), COUNT(*)) para que
+    los montos sean identicos a los que ya muestra el ranking. Las ordenes con
+    monto=0 no estan en orders (se descartan al cargar), asi que no cuentan.
+    """
+    con.executescript("""
+        CREATE TABLE totals_cache (
+            tipo         TEXT    NOT NULL,  -- 'proveedor' | 'medio'
+            norm         TEXT    NOT NULL,
+            anio         INTEGER NOT NULL,  -- 0 = todos (fila global)
+            jurisdiccion TEXT    NOT NULL,  -- '*' = todas (fila global)
+            total        REAL,
+            n_ordenes    INTEGER NOT NULL
+        );
+        CREATE INDEX idx_totals ON totals_cache(tipo, norm);
+    """)
+
+    for tipo, col in (("proveedor", "proveedor_norm"), ("medio", "medio_norm")):
+        # desglose por anio x jurisdiccion
+        con.execute(f"""
+            INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
+            SELECT '{tipo}', {col}, anio, jurisdiccion,
+                   SUM(monto_deflactado), COUNT(*)
+            FROM orders
+            WHERE {col} IS NOT NULL
+            GROUP BY {col}, anio, jurisdiccion
+        """)
+        # fila global por entidad (total historico, sin sumar en el cliente)
+        con.execute(f"""
+            INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
+            SELECT '{tipo}', {col}, 0, '*',
+                   SUM(monto_deflactado), COUNT(*)
+            FROM orders
+            WHERE {col} IS NOT NULL
+            GROUP BY {col}
+        """)
+
+    n = con.execute("SELECT COUNT(*) FROM totals_cache").fetchone()[0]
+    print(f"  totals_cache: {n} filas")
+
 
 def crear_indices(con):
     # Indices compuestos que mapean a las 3 funciones de la web. El prefijo
@@ -592,6 +713,9 @@ def main():
 
     # --- tablas de rankings pre-computadas (evitan full-scan en el front) ---
     crear_rankings(con, prov_disp, medio_disp)
+
+    # --- totales pre-computados por entidad (vista "Cuanto recibio") --------
+    crear_totals(con)
 
     con.commit()
     con.execute("ANALYZE")

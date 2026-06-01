@@ -62,5 +62,6 @@ export async function buscar(
   const resultados = idx.search(texto) as unknown as (EntidadBusqueda & { score: number })[];
   return resultados
     .filter((r) => !tipo || r.tipo === tipo)
+    .sort((a, b) => b.score - a.score || b.n - a.n)  // empate de score → más órdenes primero
     .slice(0, limite);
 }

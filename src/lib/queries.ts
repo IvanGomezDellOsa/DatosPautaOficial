@@ -156,28 +156,39 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 
 /**
  * Total recibido por un proveedor o medio, desglosado por año+jurisdicción.
- * Usa idx_orders_prov_anio o idx_orders_medio_anio.
+ *
+ * Lee totals_cache (pre-computado en el ETL) en lugar de hacer un GROUP BY
+ * sobre las ~500k filas de orders. Igual que rankings_cache: la data histórica
+ * es inmutable, así que el cache es siempre válido y la query es una lookup
+ * puntual indable (idx_totals) de pocas filas — sin full-scan ni round-trips
+ * HTTP por page. El total histórico viene en la fila global (anio=0,
+ * jurisdiccion='*'), así que no hay que sumar en el cliente.
  */
 export async function getCuantoRecibio(
   norm: string,
   tipo: "proveedor" | "medio",
   nombreDisplay: string,
 ): Promise<ResultadoCuantoRecibio> {
-  const col = tipo === "proveedor" ? "proveedor_norm" : "medio_norm";
-
-  const porAnio = await query<TotalPorAnioJuris>(
-    `SELECT anio, jurisdiccion,
-            SUM(monto_deflactado) as total,
-            COUNT(*) as n_ordenes
-     FROM orders
-     WHERE ${col} = ?
-     GROUP BY anio, jurisdiccion
+  const filas = await query<TotalPorAnioJuris>(
+    `SELECT anio, jurisdiccion, total, n_ordenes
+     FROM totals_cache
+     WHERE tipo = ? AND norm = ?
      ORDER BY anio DESC`,
-    [norm],
+    [tipo, norm],
   );
 
-  const totalHistorico = porAnio.reduce((acc, r) => acc + (r.total ?? 0), 0);
-  const nOrdenesHistorico = porAnio.reduce((acc, r) => acc + (r.n_ordenes ?? 0), 0);
+  // La fila global (anio=0, jurisdiccion='*') trae el total histórico ya sumado;
+  // el resto es el desglose por año+jurisdicción.
+  const esGlobal = (r: TotalPorAnioJuris) => r.anio === 0 && r.jurisdiccion === "*";
+  const global = filas.find(esGlobal);
+  const porAnio = filas.filter((r) => !esGlobal(r));
+
+  const totalHistorico = global
+    ? Number(global.total ?? 0)
+    : porAnio.reduce((acc, r) => acc + (r.total ?? 0), 0);
+  const nOrdenesHistorico = global
+    ? Number(global.n_ordenes ?? 0)
+    : porAnio.reduce((acc, r) => acc + (r.n_ordenes ?? 0), 0);
 
   return {
     nombre: nombreDisplay,
