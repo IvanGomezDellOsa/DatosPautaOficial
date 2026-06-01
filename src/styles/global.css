@@ -594,6 +594,10 @@ body {
 .filter-bar .row2[hidden] {
   display: none;
 }
+.filter-bar .row2 .totals {
+  font-size: var(--text-body);
+  color: var(--color-fg);
+}
 .filter-bar .row2 .totals strong {
   color: var(--color-fg-strong);
   font-weight: 600;
@@ -666,6 +670,8 @@ body {
   border-radius: 999px;
   font-size: var(--text-small);
   font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
@@ -682,11 +688,14 @@ body {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 4px var(--color-accent-glow);
 }
-.chip-active button.close {
+.chip-active:hover .close {
+  background: var(--color-border-strong);
+  color: var(--color-fg-strong);
+}
+.chip-active .close {
   background: transparent;
   border: none;
   color: var(--color-fg-muted);
-  cursor: pointer;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -698,10 +707,6 @@ body {
     color 150ms ease;
   font-size: 14px;
   line-height: 1;
-}
-.chip-active button.close:hover {
-  background: var(--color-border-strong);
-  color: var(--color-fg-strong);
 }
 .chip-add {
   background: transparent;
@@ -1914,4 +1919,30 @@ footer.site-footer .brand .wordmark {
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.5),
     0 0 0 4px var(--color-accent-glow);
+}
+
+/* Botón cargar más */
+.btn-load-more {
+  background: var(--color-bg-elev-2);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-fg);
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: var(--text-small);
+  font-weight: 500;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
+  will-change: transform;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: var(--color-bg-elev-3);
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+}
+.btn-load-more:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

@@ -43,11 +43,11 @@ const DISPONIBILIDAD: Record<string, [number, number]> = {
   "Nación": [2009, 2022],
   "CABA": [2003, 2024],
   "PBA": [2020, 2025],
-  "Santa Fe": [2019, 2023],
+  "Santa Fe": [2008, 2023],
 };
 const POR_PAGINA = 100;
 
-const fmtARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const fmtARS = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtNum = new Intl.NumberFormat("es-AR");
 
 function formatMonto(v: number | null): string {
@@ -134,6 +134,7 @@ function useGobierno(juris: string | null, anio: number | null) {
 const col = createColumnHelper<Orden>();
 const columns = [
   col.accessor("id",       { header: "#ID",         enableSorting: true, meta: { align: "right" } }),
+  col.accessor("jurisdiccion", { header: "Jurisdicción", cell: (i) => i.getValue() ?? "–" }),
   col.accessor("fecha",    { header: "Fecha",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("medio",    { header: "Medio",     cell: (i) => i.getValue() ?? "–" }),
   col.accessor("proveedor",{ header: "Proveedor", cell: (i) => i.getValue() ?? "–" }),
@@ -147,9 +148,11 @@ const columns = [
     enableSorting: false,
     cell: (i) => {
       const v = i.getValue();
-      return v ? (
-        <a href={v} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗</a>
-      ) : "–";
+      if (!v) return "–";
+      if (typeof v === "string" && v.startsWith("http")) {
+        return <a href={v} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗</a>;
+      }
+      return <span title={v} style={{ fontSize: "0.75em", color: "var(--color-fg-muted)" }}>{v}</span>;
     },
     meta: { align: "right" },
   }),
@@ -227,6 +230,7 @@ export default function DataTable() {
     state: { 
       sorting,
       columnVisibility: {
+        jurisdiccion: !estado.jurisdiccion,
         fecha: hasNoFilters || colCounts.c_fecha > 0,
         medio: hasNoFilters || colCounts.c_medio > 0,
         proveedor: hasNoFilters || colCounts.c_proveedor > 0,
@@ -260,11 +264,11 @@ export default function DataTable() {
 
           {/* Chip jurisdicción activa o select */}
           {estado.jurisdiccion ? (
-            <span className="chip-active">
+            <button className="chip-active" aria-label="Quitar Jurisdicción" onClick={() => setFiltro({ jurisdiccion: null })}>
               <span className="label">Jurisdicción:</span>
               <strong>{estado.jurisdiccion}</strong>
-              <button className="close" aria-label="Quitar" onClick={() => setFiltro({ jurisdiccion: null })}>×</button>
-            </span>
+              <span className="close" aria-hidden="true">×</span>
+            </button>
           ) : (
             <select
               className="chip-add"
@@ -279,11 +283,11 @@ export default function DataTable() {
 
           {/* Chip año activo o select */}
           {estado.anio ? (
-            <span className="chip-active">
+            <button className="chip-active" aria-label="Quitar Año" onClick={() => setFiltro({ anio: null })}>
               <span className="label">Año:</span>
               <strong>{estado.anio}</strong>
-              <button className="close" aria-label="Quitar" onClick={() => setFiltro({ anio: null })}>×</button>
-            </span>
+              <span className="close" aria-hidden="true">×</span>
+            </button>
           ) : (
             <select
               className="chip-add"
@@ -298,11 +302,11 @@ export default function DataTable() {
 
           {/* Chip entidad activa */}
           {estado.entidadNorm && (
-            <span className="chip-active">
+            <button className="chip-active" aria-label="Quitar Entidad" onClick={quitarEntidad}>
               <span className="label">{estado.entidadTipo === "medio" ? "Medio:" : "Proveedor:"}</span>
               <strong>{textoBusq || estado.entidadNorm}</strong>
-              <button className="close" aria-label="Quitar" onClick={quitarEntidad}>×</button>
-            </span>
+              <span className="close" aria-hidden="true">×</span>
+            </button>
           )}
         </div>
 
@@ -425,11 +429,11 @@ export default function DataTable() {
         {hayMas && (
           <div style={{ textAlign:"center", padding:"1.5rem 0" }}>
             <button
+              className="btn-load-more"
               onClick={cargarMas}
               disabled={loading}
-              style={{ background:"var(--color-bg-elev-2)", border:"1px solid var(--color-border-strong)", color:"var(--color-fg)", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontSize:"var(--text-small)", fontWeight:500 }}
             >
-              {loading ? "Cargando…" : `Cargar más (${fmtNum.format(totalFilas - rows.length)} restantes)`}
+              {loading ? "Cargando…" : `Cargar 100 más (${fmtNum.format(totalFilas - rows.length)} restantes)`}
             </button>
           </div>
         )}
