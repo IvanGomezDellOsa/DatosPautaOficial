@@ -11,5 +11,8 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
+    // Escape hatch para entornos (CI/sandbox) sin permiso de unlink en
+    // node_modules/.vite. En local/Cloudflare se deja sin setear (default).
+    cacheDir: process.env.VITE_CACHE_DIR || undefined,
   },
 });

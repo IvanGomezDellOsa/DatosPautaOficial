@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getRanking, type RankingItem } from "../lib/queries";
 import { leerEstadoTabla } from "../lib/url-state";
+import type { SeedRankings } from "../lib/home";
 
 const fmtARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
 
@@ -109,30 +110,50 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
 // Componente principal
 // ---------------------------------------------------------------------------
 
-export default function Rankings() {
+export default function Rankings({ initial }: { initial?: SeedRankings }) {
   // Ranking contextual (sigue los filtros de la tabla)
   const [tipoCtx, setTipoCtx] = useState<"proveedor" | "medio">("proveedor");
-  const [itemsCtx, setItemsCtx] = useState<RankingItem[]>([]);
-  const [loadingCtx, setLoadingCtx] = useState(true);
-  const [tituloCtx, setTituloCtx] = useState("Top 5 — filtros activos");
+  const [itemsCtx, setItemsCtx] = useState<RankingItem[]>(
+    initial ? initial.rankingContextual.proveedor : [],
+  );
+  const [loadingCtx, setLoadingCtx] = useState(!initial);
+  const [tituloCtx, setTituloCtx] = useState(
+    initial
+      ? `Top 5 — ${initial.filtroInicial.jurisdiccion} ${initial.filtroInicial.anio}`
+      : "Top 5 — filtros activos",
+  );
 
   // Ranking global (toda la base)
   const [tipoGlb, setTipoGlb] = useState<"proveedor" | "medio">("proveedor");
-  const [itemsGlb, setItemsGlb] = useState<RankingItem[]>([]);
-  const [loadingGlb, setLoadingGlb] = useState(true);
+  const [itemsGlb, setItemsGlb] = useState<RankingItem[]>(
+    initial ? initial.rankingGlobal.proveedor : [],
+  );
+  const [loadingGlb, setLoadingGlb] = useState(!initial);
 
   const cargarContextual = useCallback(async () => {
+    const estado = leerEstadoTabla();
+    const { jurisdiccion, anio } = estado;
+
+    // Título dinámico
+    const partes = [];
+    if (jurisdiccion) partes.push(jurisdiccion);
+    if (anio) partes.push(String(anio));
+    setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Toda nuestra base de datos"}`);
+
+    // Si los filtros coinciden con el seed de home.json, servimos desde ahí
+    // (sin inicializar sql.js). Funciona también al alternar proveedor/medio.
+    if (
+      initial &&
+      (jurisdiccion ?? null) === (initial.filtroInicial.jurisdiccion ?? null) &&
+      (anio ?? null) === (initial.filtroInicial.anio ?? null)
+    ) {
+      setItemsCtx(initial.rankingContextual[tipoCtx]);
+      setLoadingCtx(false);
+      return;
+    }
+
     setLoadingCtx(true);
     try {
-      const estado = leerEstadoTabla();
-      const { jurisdiccion, anio } = estado;
-
-      // Título dinámico
-      const partes = [];
-      if (jurisdiccion) partes.push(jurisdiccion);
-      if (anio) partes.push(String(anio));
-      setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Toda nuestra base de datos"}`);
-
       const items = await getRanking({
         jurisdiccion: jurisdiccion ?? undefined,
         anio: anio ?? undefined,
@@ -143,9 +164,15 @@ export default function Rankings() {
     } finally {
       setLoadingCtx(false);
     }
-  }, [tipoCtx]);
+  }, [tipoCtx, initial]);
 
   const cargarGlobal = useCallback(async () => {
+    // El ranking global es invariante: siempre sale del seed (sin sql.js).
+    if (initial) {
+      setItemsGlb(initial.rankingGlobal[tipoGlb]);
+      setLoadingGlb(false);
+      return;
+    }
     setLoadingGlb(true);
     try {
       const items = await getRanking({ tipo: tipoGlb, limite: 5 });
@@ -153,7 +180,7 @@ export default function Rankings() {
     } finally {
       setLoadingGlb(false);
     }
-  }, [tipoGlb]);
+  }, [tipoGlb, initial]);
 
   // Escucha cambios de URL para sincronizar el ranking contextual con la tabla
   useEffect(() => {

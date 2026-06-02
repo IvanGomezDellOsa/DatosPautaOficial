@@ -501,7 +501,9 @@ def split_db():
 
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
-        "requestChunkSize": 4096,       # page_size del SQLite (ver PRAGMA arriba)
+        "requestChunkSize": 8192,       # = page_size del SQLite (ver PRAGMA abajo).
+                                        # Mas grande = menos round-trips HTTP por
+                                        # query en el camino interactivo (sql.js).
         "serverMode": "chunked",
         "urlPrefix": "/data/pauta.sqlite.",
         "serverChunkSize": CHUNK_SIZE,
@@ -513,6 +515,107 @@ def split_db():
         json.dump(config, f, indent=2)
 
     return n_chunks, suffix_len, db_size, config_path
+
+
+def escribir_home(con, prov_disp):
+    """Emite public/data/home.json: el estado inicial de la portada precomputado.
+
+    La vista inicial (PBA + 2025, ordenada por fecha ascendente) es FIJA, igual
+    en cada carga. En vez de levantarla en vivo con sql.js-httpvfs --cientos de
+    range-requests HTTP encadenados, ~8 s de spinners-- la calculamos aca y la
+    servimos como JSON estatico que Astro inlinea como prop. Asi el primer paint
+    muestra datos reales sin WASM, sin worker y sin un solo round-trip a la DB;
+    sql.js solo arranca cuando el usuario toca un filtro, busca u ordena distinto.
+
+    Replica EXACTAMENTE las queries del front (getOrdenes / getTotalesFiltro /
+    useGobierno / getRanking / getCuantoRecibio) para que el seed coincida con lo
+    que devolveria la DB. Si cambias esas queries o el default, regenera esto.
+    """
+    JURIS, ANIO = "PBA", 2025
+    cur = con.cursor()
+
+    def rows(sql, prm=()):
+        cur.execute(sql, prm)
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    # 1. Tabla -- getOrdenes(PBA, 2025, ordenPor='fecha', desc=False)
+    total_filas = cur.execute(
+        "SELECT COUNT(*) FROM orders WHERE jurisdiccion=? AND anio=?",
+        (JURIS, ANIO)).fetchone()[0]
+    filas = rows(
+        """SELECT id, fecha, medio, proveedor, monto, monto_deflactado,
+                  resolucion, jurisdiccion, anio
+           FROM orders WHERE jurisdiccion=? AND anio=?
+           ORDER BY fecha ASC NULLS LAST LIMIT 100""", (JURIS, ANIO))
+
+    # 2. Totales -- getTotalesFiltro
+    t = cur.execute(
+        """SELECT COUNT(*) n, SUM(monto_deflactado) total, COUNT(fecha) c_fecha,
+                  COUNT(medio) c_medio, COUNT(proveedor) c_proveedor,
+                  COUNT(monto_deflactado) c_monto, COUNT(resolucion) c_resolucion
+           FROM orders WHERE jurisdiccion=? AND anio=?""", (JURIS, ANIO)).fetchone()
+    totales = {"nOrdenes": t[0], "montoTotal": t[1] or 0, "c_fecha": t[2],
+               "c_medio": t[3], "c_proveedor": t[4], "c_monto": t[5], "c_resolucion": t[6]}
+
+    # 3. Gobierno -- useGobierno
+    g = cur.execute(
+        """SELECT name, role FROM governments
+           WHERE jurisdiccion=? AND CAST(substr(date_from,1,4) AS INTEGER) <= ?
+             AND (date_to IS NULL OR CAST(substr(date_to,1,4) AS INTEGER) >= ?)
+           ORDER BY date_from DESC LIMIT 1""", (JURIS, ANIO, ANIO)).fetchone()
+    gobierno = {"name": g[0], "role": g[1]} if g else None
+
+    # 4/5. Rankings -- getRanking (contextual PBA/2025 y global */0), prov + medio
+    def ranking(juris_key, anio_key, tipo):
+        return rows(
+            """SELECT norm, nombre, total, n FROM rankings_cache
+               WHERE tipo=? AND jurisdiccion=? AND anio=? ORDER BY rank LIMIT 5""",
+            (tipo, juris_key, anio_key))
+    rankingContextual = {"proveedor": ranking(JURIS, ANIO, "proveedor"),
+                         "medio": ranking(JURIS, ANIO, "medio")}
+    rankingGlobal = {"proveedor": ranking("*", 0, "proveedor"),
+                     "medio": ranking("*", 0, "medio")}
+
+    # 6. Demo del Generador (Clarin) -- getCuantoRecibio. Evita el buscar("Clarin")
+    #    de montaje, que hoy fuerza la descarga de search.json (1,5 MB) al inicio.
+    norm = "clarin" if "clarin" in prov_disp else next(
+        (k for k in sorted(prov_disp, key=lambda kk: -sum(prov_disp[kk].values()))
+         if "clar" in k), None)
+    generadorDemo = None
+    if norm:
+        grafias = prov_disp[norm]
+        nombre = max(grafias.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        n_ent = sum(grafias.values())
+        fil = rows(
+            """SELECT anio, jurisdiccion, total, n_ordenes FROM totals_cache
+               WHERE tipo='proveedor' AND norm=? ORDER BY anio DESC""", (norm,))
+        glob = next((r for r in fil if r["anio"] == 0 and r["jurisdiccion"] == "*"), None)
+        por = [r for r in fil if not (r["anio"] == 0 and r["jurisdiccion"] == "*")]
+        total_hist = (glob["total"] if glob else sum((r["total"] or 0) for r in por)) or 0
+        n_hist = glob["n_ordenes"] if glob else sum(r["n_ordenes"] for r in por)
+        generadorDemo = {
+            "entidad": {"id": "p:" + norm, "norm": norm, "nombre": nombre,
+                        "n": n_ent, "tipo": "proveedor"},
+            "resultado": {"nombre": nombre, "norm": norm, "tipo": "proveedor",
+                          "totalHistorico": total_hist, "nOrdenesHistorico": n_hist,
+                          "porAnio": por},
+        }
+
+    home = {
+        "filtroInicial": {"jurisdiccion": JURIS, "anio": ANIO, "ordenPor": "fecha",
+                          "desc": False, "deflactado": True, "entidadTipo": "proveedor"},
+        "tabla": {"filas": filas, "totalFilas": total_filas},
+        "totales": totales,
+        "gobierno": gobierno,
+        "rankingContextual": rankingContextual,
+        "rankingGlobal": rankingGlobal,
+        "generadorDemo": generadorDemo,
+    }
+    out = OUT_DIR / "home.json"
+    with out.open("w", encoding="utf-8") as f:
+        json.dump(home, f, ensure_ascii=False, separators=(",", ":"))
+    return out, len(filas), total_filas
 
 
 def escribir_busqueda(prov_disp, medio_disp):
@@ -561,7 +664,9 @@ def main():
         OUT_DB.unlink()
 
     con = sqlite3.connect(OUT_DB)
-    con.execute("PRAGMA page_size = 4096")   # sql.js-httpvfs recomienda >= 4096
+    con.execute("PRAGMA page_size = 8192")   # = requestChunkSize (config.json).
+                                             # >=4096 lo recomienda sql.js-httpvfs;
+                                             # 8192 reduce profundidad del arbol B.
     con.execute("PRAGMA journal_mode = OFF")
     crear_esquema(con)
 
@@ -717,6 +822,9 @@ def main():
     # --- totales pre-computados por entidad (vista "Cuanto recibio") --------
     crear_totals(con)
 
+    # --- estado inicial de la portada precomputado (evita el waterfall HTTP) -
+    out_home, n_home, n_home_total = escribir_home(con, prov_disp)
+
     con.commit()
     con.execute("ANALYZE")
     con.commit()
@@ -736,6 +844,8 @@ def main():
     print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
+    print(f"OK  {out_home}  (estado inicial PBA 2025: {n_home}/{n_home_total} filas, "
+          f"{out_home.stat().st_size/1024:.1f} KB)")
     for k, v in meta.items():
         print(f"  {k:32s} {v}")
 

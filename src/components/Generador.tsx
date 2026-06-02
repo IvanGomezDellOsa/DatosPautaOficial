@@ -32,14 +32,18 @@ const ANIOS_PILLS = [2025, 2024, 2023, 2022, 2021];
 // Componente
 // ---------------------------------------------------------------------------
 
-export default function Generador() {
+interface GeneradorProps {
+  initial?: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio } | null;
+}
+
+export default function Generador({ initial }: GeneradorProps) {
   const [tipo, setTipo] = useState<"proveedor" | "medio">("proveedor");
-  const [textoBusq, setTextoBusq] = useState("Clarín");
+  const [textoBusq, setTextoBusq] = useState(initial ? initial.entidad.nombre : "Clarín");
   const [sugerencias, setSugerencias] = useState<EntidadBusqueda[]>([]);
   const [mostrarSugs, setMostrarSugs] = useState(false);
-  const [entidadActual, setEntidadActual] = useState<EntidadBusqueda | null>(null);
+  const [entidadActual, setEntidadActual] = useState<EntidadBusqueda | null>(initial ? initial.entidad : null);
   const [anioSel, setAnioSel] = useState<number | "historico">("historico");
-  const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(null);
+  const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(initial ? initial.resultado : null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
   const busqRef = useRef<HTMLDivElement>(null);
@@ -71,12 +75,21 @@ export default function Generador() {
     }
   }, []);
 
+  // En el primer render, si el demo viene sembrado desde home.json, NO se
+  // consulta sql.js (el resultado ya está). Solo consulta al cambiar de entidad.
+  const primeraConsulta = useRef(true);
   useEffect(() => {
+    if (primeraConsulta.current) {
+      primeraConsulta.current = false;
+      if (initial && entidadActual === initial.entidad) return; // sembrado
+    }
     if (entidadActual) consultar(entidadActual);
   }, [entidadActual, consultar]);
 
-  // Cargar "Clarín" al montar como demostración
+  // Demo "Clarín" al montar. Solo si NO hay seed; el buscar() de montaje es lo
+  // que disparaba la descarga de search.json (1,5 MB) en el primer paint.
   useEffect(() => {
+    if (initial) return;
     buscar("Clarín", "proveedor", 1).then((res) => {
       if (res[0]) {
         setEntidadActual(res[0]);

@@ -32,6 +32,7 @@ import {
 } from "../lib/url-state";
 import { buscar, type EntidadBusqueda } from "../lib/search";
 import { query } from "../lib/db";
+import type { SeedTabla } from "../lib/home";
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -59,13 +60,23 @@ function formatMonto(v: number | null): string {
 // Hook: datos de la tabla
 // ---------------------------------------------------------------------------
 
-function useTabla(filtros: FiltrosTabla) {
-  const [rows, setRows] = useState<Orden[]>([]);
-  const [totalFilas, setTotalFilas] = useState(0);
-  const [totalMonto, setTotalMonto] = useState(0);
-  const [loading, setLoading] = useState(true);
+function useTabla(filtros: FiltrosTabla, seed: SeedTabla | undefined, canSeed: boolean) {
+  const sembrar = canSeed && !!seed;
+  const [rows, setRows] = useState<Orden[]>(sembrar ? seed!.tabla.filas : []);
+  const [totalFilas, setTotalFilas] = useState(sembrar ? seed!.tabla.totalFilas : 0);
+  const [totalMonto, setTotalMonto] = useState(sembrar ? seed!.totales.montoTotal : 0);
+  const [loading, setLoading] = useState(!sembrar);
   const [pagina, setPagina] = useState(0);
-  const [colCounts, setColCounts] = useState({ c_fecha: 1, c_medio: 1, c_proveedor: 1, c_monto: 1, c_resolucion: 1 });
+  const [colCounts, setColCounts] = useState(
+    sembrar
+      ? {
+          c_fecha: seed!.totales.c_fecha, c_medio: seed!.totales.c_medio,
+          c_proveedor: seed!.totales.c_proveedor, c_monto: seed!.totales.c_monto,
+          c_resolucion: seed!.totales.c_resolucion,
+        }
+      : { c_fecha: 1, c_medio: 1, c_proveedor: 1, c_monto: 1, c_resolucion: 1 },
+  );
+  const firstLoad = useRef(true);
 
   const cargar = useCallback(
     async (pag: number) => {
@@ -94,8 +105,13 @@ function useTabla(filtros: FiltrosTabla) {
   );
 
   useEffect(() => {
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      if (sembrar) return; // estado inicial servido desde home.json — no se consulta sql.js
+    }
     setPagina(0);
     cargar(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargar]);
 
   const cargarMas = useCallback(() => {
@@ -111,9 +127,21 @@ function useTabla(filtros: FiltrosTabla) {
 // Hook: gobierno activo
 // ---------------------------------------------------------------------------
 
-function useGobierno(juris: string | null, anio: number | null) {
-  const [gov, setGov] = useState<{ name: string; role: string } | null>(null);
+type SeedGob =
+  | { juris: string | null; anio: number | null; value: { name: string; role: string } | null }
+  | null;
+
+function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob) {
+  const seedMatch = !!seedGob && seedGob.juris === juris && seedGob.anio === anio;
+  const [gov, setGov] = useState<{ name: string; role: string } | null>(
+    () => (seedMatch ? seedGob!.value : null),
+  );
+  const first = useRef(true);
   useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      if (seedMatch) return; // sembrado desde home.json — no se consulta sql.js
+    }
     if (!juris || !anio) { setGov(null); return; }
     query<{ name: string; role: string }>(
       `SELECT name, role FROM governments
@@ -123,6 +151,7 @@ function useGobierno(juris: string | null, anio: number | null) {
        ORDER BY date_from DESC LIMIT 1`,
       [juris, anio, anio],
     ).then((rows) => setGov(rows[0] ?? null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [juris, anio]);
   return gov;
 }
@@ -162,7 +191,7 @@ const columns = [
 // Componente principal
 // ---------------------------------------------------------------------------
 
-export default function DataTable() {
+export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // Estado de filtros (sincronizado con URL)
   const [estado, setEstado] = useState<EstadoTabla>(() => leerEstadoTabla());
 
@@ -181,9 +210,24 @@ export default function DataTable() {
   const busqRef = useRef<HTMLDivElement>(null);
 
   const filtros = estadoAFiltros(estado);
-  const { rows, totalFilas, totalMonto, loading, cargarMas, colCounts } = useTabla(filtros);
+  // ¿El estado inicial coincide con el seed de home.json? Si sí, pintamos desde
+  // el seed y NO se inicializa sql.js. Si la URL trae filtros distintos
+  // (permalink), canSeed=false y se consulta normal. Se evalúa una vez (montaje).
+  const canSeed = useRef(
+    !!initial &&
+      (filtros.jurisdiccion ?? null) === (initial.filtroInicial.jurisdiccion ?? null) &&
+      (filtros.anio ?? null) === (initial.filtroInicial.anio ?? null) &&
+      !filtros.entidadNorm &&
+      (filtros.deflactado ?? true) === initial.filtroInicial.deflactado &&
+      (filtros.ordenPor ?? "fecha") === initial.filtroInicial.ordenPor &&
+      (filtros.desc ?? false) === initial.filtroInicial.desc,
+  ).current;
+  const { rows, totalFilas, totalMonto, loading, cargarMas, colCounts } = useTabla(filtros, initial, canSeed);
   const hasNoFilters = !estado.jurisdiccion && !estado.anio && !estado.entidadNorm;
-  const gobierno = useGobierno(estado.jurisdiccion, estado.anio);
+  const seedGob: SeedGob = canSeed && initial
+    ? { juris: initial.filtroInicial.jurisdiccion, anio: initial.filtroInicial.anio, value: initial.gobierno }
+    : null;
+  const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
 
   // Actualiza estado + URL
   const setFiltro = useCallback((patch: Partial<EstadoTabla>) => {
@@ -222,8 +266,11 @@ export default function DataTable() {
     setTextoBusq("");
   };
 
-  // TanStack Table
-  const [sorting, setSorting] = useState([{ id: "id", desc: false }]);
+  // TanStack Table — sorting inicial derivado del estado (default: fecha asc).
+  const [sorting, setSorting] = useState(() => {
+    const id = estado.ordenPor === "monto" ? "monto_deflactado" : estado.ordenPor;
+    return [{ id, desc: estado.desc }];
+  });
   const table = useReactTable({
     data: rows,
     columns,

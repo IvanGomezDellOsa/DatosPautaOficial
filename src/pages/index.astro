@@ -1,9 +1,21 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import "@fontsource-variable/space-grotesk";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import DataTable from "../components/DataTable";
 import Rankings from "../components/Rankings";
 import Generador from "../components/Generador";
+import type { HomeSeed } from "../lib/home";
+
+// Estado inicial precomputado por el ETL (build_db.py → escribir_home).
+// Se lee en build time y se inlinea como prop de los islands: el primer paint
+// muestra datos reales (PBA 2025, fecha asc) sin inicializar sql.js-httpvfs.
+// Antes, la portada disparaba ~256 range-requests HTTP encadenados (~8 s de
+// spinners) para levantar lo que ahora es estático. Ver src/lib/home.ts.
+const home = JSON.parse(
+  readFileSync(join(process.cwd(), "public/data/home.json"), "utf-8"),
+) as HomeSeed;
 ---
 
 <Layout
@@ -125,7 +137,15 @@ import Generador from "../components/Generador";
                 <h2>Todos los datos</h2>
                 <p>504.497 órdenes — con sistema de filtros.</p>
             </div>
-            <DataTable client:only="react" />
+            <DataTable
+                client:only="react"
+                initial={{
+                    filtroInicial: home.filtroInicial,
+                    tabla: home.tabla,
+                    totales: home.totales,
+                    gobierno: home.gobierno,
+                }}
+            />
         </div>
     </section>
 
@@ -280,7 +300,7 @@ import Generador from "../components/Generador";
                 </p>
             </div>
 
-            <Generador client:only="react" />
+            <Generador client:only="react" initial={home.generadorDemo} />
         </div>
     </section>
 
@@ -291,7 +311,14 @@ import Generador from "../components/Generador";
                 <h2>Ranking</h2>
             </div>
 
-            <Rankings client:only="react" />
+            <Rankings
+                client:only="react"
+                initial={{
+                    filtroInicial: home.filtroInicial,
+                    rankingContextual: home.rankingContextual,
+                    rankingGlobal: home.rankingGlobal,
+                }}
+            />
         </div>
     </section>
 

@@ -53,8 +53,10 @@ export function leerEstadoTabla(): EstadoTabla {
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
     deflactado: p.get("def") !== "0",
-    ordenPor: p.get("orden") === "fecha" ? "fecha" : p.get("orden") === "monto" ? "monto" : "id",
-    desc: p.get("desc") !== "0",
+    // Default: fecha ascendente (la orden mas vieja primero). 'monto'/'id' via param.
+    ordenPor: p.get("orden") === "monto" ? "monto" : p.get("orden") === "id" ? "id" : "fecha",
+    // Default desc=false (ascendente). desc=1 en la URL activa el orden descendente.
+    desc: p.get("desc") === "1",
   };
 }
 
@@ -102,11 +104,11 @@ export function escribirEstadoTabla(estado: Partial<EstadoTabla>): void {
   setOrDel(p, "norm", estado.entidadNorm ?? null);
   setOrDel(p, "tipo", estado.entidadTipo === "medio" ? "medio" : null); // proveedor es default
   setOrDel(p, "def", estado.deflactado === false ? "0" : null);         // deflactado es default
-  // orden: "id" (orden de la base) es default → no se escribe.
-  setOrDel(p, "orden", estado.ordenPor === "fecha" ? "fecha"
-                      : estado.ordenPor === "monto" ? "monto"
-                      : null);                                           // "id" es default
-  setOrDel(p, "desc", estado.desc === false ? "0" : null);              // desc es default
+  // orden: "fecha" (orden por defecto) → no se escribe. "monto"/"id" sí.
+  setOrDel(p, "orden", estado.ordenPor === "monto" ? "monto"
+                      : estado.ordenPor === "id" ? "id"
+                      : null);                                           // "fecha" es default
+  setOrDel(p, "desc", estado.desc === true ? "1" : null);               // asc (false) es default
 
   const search = p.toString();
   const url = search ? `?${search}` : window.location.pathname;
