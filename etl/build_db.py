@@ -501,9 +501,7 @@ def split_db():
 
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
-        "requestChunkSize": 8192,       # = page_size del SQLite (ver PRAGMA abajo).
-                                        # Mas grande = menos round-trips HTTP por
-                                        # query en el camino interactivo (sql.js).
+        "requestChunkSize": 4096,       # page_size del SQLite (ver PRAGMA arriba)
         "serverMode": "chunked",
         "urlPrefix": "/data/pauta.sqlite.",
         "serverChunkSize": CHUNK_SIZE,
@@ -664,9 +662,7 @@ def main():
         OUT_DB.unlink()
 
     con = sqlite3.connect(OUT_DB)
-    con.execute("PRAGMA page_size = 8192")   # = requestChunkSize (config.json).
-                                             # >=4096 lo recomienda sql.js-httpvfs;
-                                             # 8192 reduce profundidad del arbol B.
+    con.execute("PRAGMA page_size = 4096")   # sql.js-httpvfs recomienda >= 4096
     con.execute("PRAGMA journal_mode = OFF")
     crear_esquema(con)
 
