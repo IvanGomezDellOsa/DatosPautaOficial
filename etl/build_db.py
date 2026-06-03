@@ -28,6 +28,7 @@ Uso:  python3 etl/build_db.py
 import csv
 import json
 import math
+import os
 import re
 import sqlite3
 import sys
@@ -517,11 +518,20 @@ def split_db():
         chunk = data[i * CHUNK_SIZE: (i + 1) * CHUNK_SIZE]
         (OUT_DIR / f"pauta.sqlite.{i}").write_bytes(chunk)
 
+    # urlPrefix: de donde el front baja los chunks de la SQLite.
+    # Cloudflare Pages NO soporta HTTP range requests (devuelve 200 con el archivo
+    # completo en vez de 206), lo que rompe sql.js-httpvfs con "database disk image
+    # is malformed". Por eso los chunks se sirven desde Cloudflare R2 (que SI
+    # devuelve 206). Si R2_PUBLIC_URL esta seteada (build de Cloudflare), apunta
+    # ahi; si no (build local), cae a /data/ para poder testear con http-server.
+    r2_base = os.environ.get("R2_PUBLIC_URL", "").strip().rstrip("/")
+    url_prefix = f"{r2_base}/pauta.sqlite." if r2_base else "/data/pauta.sqlite."
+
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
         "requestChunkSize": 4096,       # page_size del SQLite (ver PRAGMA arriba)
         "serverMode": "chunked",
-        "urlPrefix": "/data/pauta.sqlite.",
+        "urlPrefix": url_prefix,
         "serverChunkSize": CHUNK_SIZE,
         "databaseLengthBytes": db_size,
         "suffixLength": suffix_len,
