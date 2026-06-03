@@ -440,6 +440,24 @@ def crear_indices(con):
         CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio_norm);
         CREATE INDEX idx_orders_prov_anio        ON orders(proveedor_norm, anio);
         CREATE INDEX idx_orders_medio_anio       ON orders(medio_norm, anio);
+
+        -- Indices de ORDENAMIENTO de la tabla (getOrdenes). Sin estos, ORDER BY
+        -- fecha/monto hace "USE TEMP B-TREE FOR ORDER BY": SQLite materializa y
+        -- ordena en memoria el set filtrado leyendo filas dispersas por toda la
+        -- DB (106 MB). Sobre sql.js-httpvfs eso dispara el prefetch exponencial
+        -- que cruza el limite de 20 MiB entre archivos chunk -> "database disk
+        -- image is malformed" (mismo bug de modo chunked que ya evitan los
+        -- caches de rankings/totales). Con estos indices el ORDER BY se resuelve
+        -- recorriendo el indice en orden y cortando en LIMIT+OFFSET: pocas
+        -- lecturas, localizadas, sin sort. Cubren las 4 combinaciones de filtro
+        -- (ambos / solo juris / solo anio / ninguno) para fecha y monto.
+        -- 'id' no necesita indice: es la PK (orden secuencial nativo).
+        CREATE INDEX idx_orders_juris_anio_fecha ON orders(jurisdiccion, anio, fecha);
+        CREATE INDEX idx_orders_anio_fecha       ON orders(anio, fecha);
+        CREATE INDEX idx_orders_fecha            ON orders(fecha);
+        CREATE INDEX idx_orders_juris_anio_monto ON orders(jurisdiccion, anio, monto_deflactado);
+        CREATE INDEX idx_orders_anio_monto       ON orders(anio, monto_deflactado);
+        CREATE INDEX idx_orders_monto            ON orders(monto_deflactado);
         """
     )
     # FAST-FOLLOW (no implementar hasta tener el query layer escrito):
