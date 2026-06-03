@@ -529,7 +529,7 @@ def split_db():
 
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
-        "requestChunkSize": 4096,       # page_size del SQLite (ver PRAGMA arriba)
+        "requestChunkSize": 65536,      # = page_size del SQLite (ver PRAGMA arriba)
         "serverMode": "chunked",
         "urlPrefix": url_prefix,
         "serverChunkSize": CHUNK_SIZE,
@@ -690,7 +690,11 @@ def main():
         OUT_DB.unlink()
 
     con = sqlite3.connect(OUT_DB)
-    con.execute("PRAGMA page_size = 4096")   # sql.js-httpvfs recomienda >= 4096
+    # page_size grande = arbol B mas chato + lecturas mas grandes por request.
+    # Sobre R2 (que SI sirve range requests) esto reduce mucho la cantidad de
+    # round-trips HTTP por query, que es el cuello sobre r2.dev (~234 ms/request).
+    # 65536 es el maximo de SQLite. Debe coincidir con requestChunkSize.
+    con.execute("PRAGMA page_size = 65536")
     con.execute("PRAGMA journal_mode = OFF")
     crear_esquema(con)
 

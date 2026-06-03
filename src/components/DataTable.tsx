@@ -82,20 +82,30 @@ function useTabla(filtros: FiltrosTabla, seed: SeedTabla | undefined, canSeed: b
     async (pag: number) => {
       setLoading(true);
       try {
-        const [{ filas, totalFilas: total }, tots] = await Promise.all([
-          getOrdenes({ ...filtros, pagina: pag, porPagina: POR_PAGINA }),
-          getTotalesFiltro(filtros),
-        ]);
-        setRows((prev) => (pag === 0 ? filas : [...prev, ...filas]));
-        setTotalFilas(total);
-        setTotalMonto(tots.montoTotal);
-        setColCounts({
-          c_fecha: tots.c_fecha,
-          c_medio: tots.c_medio,
-          c_proveedor: tots.c_proveedor,
-          c_monto: tots.c_monto,
-          c_resolucion: tots.c_resolucion
-        });
+        const ordenesP = getOrdenes({ ...filtros, pagina: pag, porPagina: POR_PAGINA });
+        if (pag === 0) {
+          // Solo en la primera pagina pedimos los totales del filtro (conteo,
+          // suma y conteos por columna). En "Cargar mas" NO se re-piden: son
+          // identicos para todas las paginas del mismo filtro y la query es cara
+          // (escanea el set filtrado). Evita duplicar el trabajo al paginar.
+          const [{ filas, totalFilas: total }, tots] = await Promise.all([
+            ordenesP,
+            getTotalesFiltro(filtros),
+          ]);
+          setRows(filas);
+          setTotalFilas(total);
+          setTotalMonto(tots.montoTotal);
+          setColCounts({
+            c_fecha: tots.c_fecha,
+            c_medio: tots.c_medio,
+            c_proveedor: tots.c_proveedor,
+            c_monto: tots.c_monto,
+            c_resolucion: tots.c_resolucion,
+          });
+        } else {
+          const { filas } = await ordenesP;
+          setRows((prev) => [...prev, ...filas]);
+        }
       } finally {
         setLoading(false);
       }
