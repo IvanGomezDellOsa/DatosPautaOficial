@@ -465,7 +465,11 @@ def crear_indices(con):
         """
         CREATE INDEX idx_orders_juris_anio_prov  ON orders(jurisdiccion, anio, proveedor_norm);
         CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio_norm);
-        CREATE INDEX idx_orders_juris_anio_medio_prov ON orders(jurisdiccion, anio, medio_norm, proveedor_norm);
+        -- Covering index para getOrdenes(agrupado=true): incluye monto_deflactado
+        -- para que SUM() se resuelva sin saltar a la tabla principal.
+        -- Sin monto_deflactado cada fila del GROUP BY scan requiere un acceso
+        -- aleatorio a la tabla -> prefetch exponencial de sql.js-httpvfs.
+        CREATE INDEX idx_orders_juris_anio_medio_prov ON orders(jurisdiccion, anio, medio_norm, proveedor_norm, monto_deflactado);
         CREATE INDEX idx_orders_prov_anio        ON orders(proveedor_norm, anio);
         CREATE INDEX idx_orders_medio_anio       ON orders(medio_norm, anio);
 
@@ -880,11 +884,3 @@ def main():
     print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
-    print(f"OK  {out_home}  (estado inicial PBA 2025: {n_home}/{n_home_total} filas, "
-          f"{out_home.stat().st_size/1024:.1f} KB)")
-    for k, v in meta.items():
-        print(f"  {k:32s} {v}")
-
-
-if __name__ == "__main__":
-    main()
