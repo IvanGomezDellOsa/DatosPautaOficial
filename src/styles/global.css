@@ -1832,17 +1832,20 @@ footer.site-footer .brand .wordmark {
   display: flex;
   flex-direction: column;
 }
-.nav-brand-mobile {
+.nav-brand-area {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 56px;
   width: 100%;
 }
-.nav-brand-mobile .wordmark {
+.nav-brand-area .wordmark {
   font-weight: 700;
   color: var(--color-fg-strong);
   font-size: var(--text-data);
+}
+.nav-logo {
+  display: none;
 }
 .mobile-menu-btn {
   background: none;
@@ -1887,11 +1890,22 @@ footer.site-footer .brand .wordmark {
 @media (min-width: 768px) {
   .nav-inner {
     flex-direction: row;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     height: 56px;
   }
-  .nav-brand-mobile {
+  .nav-brand-area {
+    display: flex;
+    width: auto;
+  }
+  .nav-logo {
+    display: block;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: url('/logo.webp') center/contain no-repeat;
+  }
+  .mobile-menu-btn {
     display: none;
   }
   .nav-links {
