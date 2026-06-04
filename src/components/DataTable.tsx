@@ -13,15 +13,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper,
-} from "@tanstack/react-table";
-import {
   getOrdenes,
+  getDetalleGrupo,
   getTotalesFiltro,
   type Orden,
+  type OrdenAgrupada,
   type FiltrosTabla,
 } from "../lib/queries";
 import {
@@ -57,80 +53,32 @@ function formatMonto(v: number | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Hook: datos de la tabla
+// Hook: datos de la tabla (siempre agrupado)
 // ---------------------------------------------------------------------------
 
-function useTabla(filtros: FiltrosTabla, seed: SeedTabla | undefined, canSeed: boolean) {
-  const sembrar = canSeed && !!seed;
-  const [rows, setRows] = useState<Orden[]>(sembrar ? seed!.tabla.filas : []);
-  const [totalFilas, setTotalFilas] = useState(sembrar ? seed!.tabla.totalFilas : 0);
-  const [totalMonto, setTotalMonto] = useState(sembrar ? seed!.totales.montoTotal : 0);
-  const [loading, setLoading] = useState(!sembrar);
-  const [pagina, setPagina] = useState(0);
-  const [colCounts, setColCounts] = useState(
-    sembrar
-      ? {
-          c_fecha: seed!.totales.c_fecha, c_medio: seed!.totales.c_medio,
-          c_proveedor: seed!.totales.c_proveedor, c_monto: seed!.totales.c_monto,
-          c_resolucion: seed!.totales.c_resolucion,
-        }
-      : { c_fecha: 1, c_medio: 1, c_proveedor: 1, c_monto: 1, c_resolucion: 1 },
-  );
-  const firstLoad = useRef(true);
+function useTabla(filtros: FiltrosTabla) {
+  const [rows, setRows] = useState<OrdenAgrupada[]>([]);
+  const [totalMonto, setTotalMonto] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const cargar = useCallback(
-    async (pag: number) => {
-      setLoading(true);
-      try {
-        const ordenesP = getOrdenes({ ...filtros, pagina: pag, porPagina: POR_PAGINA });
-        if (pag === 0) {
-          // Solo en la primera pagina pedimos los totales del filtro (conteo,
-          // suma y conteos por columna). En "Cargar mas" NO se re-piden: son
-          // identicos para todas las paginas del mismo filtro y la query es cara
-          // (escanea el set filtrado). Evita duplicar el trabajo al paginar.
-          const [{ filas, totalFilas: total }, tots] = await Promise.all([
-            ordenesP,
-            getTotalesFiltro(filtros),
-          ]);
-          setRows(filas);
-          setTotalFilas(total);
-          setTotalMonto(tots.montoTotal);
-          setColCounts({
-            c_fecha: tots.c_fecha,
-            c_medio: tots.c_medio,
-            c_proveedor: tots.c_proveedor,
-            c_monto: tots.c_monto,
-            c_resolucion: tots.c_resolucion,
-          });
-        } else {
-          const { filas } = await ordenesP;
-          setRows((prev) => [...prev, ...filas]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(filtros)],
-  );
-
-  useEffect(() => {
-    if (firstLoad.current) {
-      firstLoad.current = false;
-      if (sembrar) return; // estado inicial servido desde home.json — no se consulta sql.js
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [{ filas }, tots] = await Promise.all([
+        getOrdenes({ ...filtros, agrupado: true }),
+        getTotalesFiltro(filtros),
+      ]);
+      setRows(filas as OrdenAgrupada[]);
+      setTotalMonto(tots.montoTotal);
+    } finally {
+      setLoading(false);
     }
-    setPagina(0);
-    cargar(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargar]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filtros)]);
 
-  const cargarMas = useCallback(() => {
-    const sig = pagina + 1;
-    setPagina(sig);
-    cargar(sig);
-  }, [pagina, cargar]);
+  useEffect(() => { cargar(); }, [cargar]);
 
-  return { rows, totalFilas, totalMonto, loading, cargarMas, colCounts };
+  return { rows, totalMonto, loading };
 }
 
 // ---------------------------------------------------------------------------
@@ -167,35 +115,12 @@ function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob
 }
 
 // ---------------------------------------------------------------------------
-// Columnas TanStack Table
+// Helpers para renderizado agrupado
 // ---------------------------------------------------------------------------
 
-const col = createColumnHelper<Orden>();
-const columns = [
-  col.accessor("id",       { header: "#ID",         enableSorting: true, meta: { align: "right" } }),
-  col.accessor("jurisdiccion", { header: "Jurisdicción", cell: (i) => i.getValue() ?? "–" }),
-  col.accessor("fecha",    { header: "Fecha",     cell: (i) => i.getValue() ?? "–" }),
-  col.accessor("medio",    { header: "Medio",     cell: (i) => i.getValue() ?? "–" }),
-  col.accessor("proveedor",{ header: "Proveedor", cell: (i) => i.getValue() ?? "–" }),
-  col.accessor("monto_deflactado", {
-    header: "Monto (deflactado)",
-    cell: (i) => formatMonto(i.getValue()),
-    meta: { align: "right" },
-  }),
-  col.accessor("resolucion", {
-    header: "Resol.",
-    enableSorting: false,
-    cell: (i) => {
-      const v = i.getValue();
-      if (!v) return "–";
-      if (typeof v === "string" && v.startsWith("http")) {
-        return <a href={v} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗</a>;
-      }
-      return <span title={v} style={{ fontSize: "0.75em", color: "var(--color-fg-muted)" }}>{v}</span>;
-    },
-    meta: { align: "right" },
-  }),
-];
+function groupKey(row: OrdenAgrupada): string {
+  return `${row.medio_norm ?? ""}|${row.proveedor_norm ?? ""}`;
+}
 
 // ---------------------------------------------------------------------------
 // Componente principal
@@ -220,24 +145,18 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   const busqRef = useRef<HTMLDivElement>(null);
 
   const filtros = estadoAFiltros(estado);
-  // ¿El estado inicial coincide con el seed de home.json? Si sí, pintamos desde
-  // el seed y NO se inicializa sql.js. Si la URL trae filtros distintos
-  // (permalink), canSeed=false y se consulta normal. Se evalúa una vez (montaje).
-  const canSeed = useRef(
-    !!initial &&
-      (filtros.jurisdiccion ?? null) === (initial.filtroInicial.jurisdiccion ?? null) &&
-      (filtros.anio ?? null) === (initial.filtroInicial.anio ?? null) &&
-      !filtros.entidadNorm &&
-      (filtros.deflactado ?? true) === initial.filtroInicial.deflactado &&
-      (filtros.ordenPor ?? "fecha") === initial.filtroInicial.ordenPor &&
-      (filtros.desc ?? false) === initial.filtroInicial.desc,
-  ).current;
-  const { rows, totalFilas, totalMonto, loading, cargarMas, colCounts } = useTabla(filtros, initial, canSeed);
-  const hasNoFilters = !estado.jurisdiccion && !estado.anio && !estado.entidadNorm;
-  const seedGob: SeedGob = canSeed && initial
+
+  // Gobierno activo (usa seed cuando coincide el filtro)
+  const seedGob: SeedGob = initial
     ? { juris: initial.filtroInicial.jurisdiccion, anio: initial.filtroInicial.anio, value: initial.gobierno }
     : null;
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
+
+  // Datos agrupados
+  const { rows, totalMonto, loading } = useTabla(filtros);
+
+  // Detalle expandido: key → Orden[] | "loading"
+  const [expandedMap, setExpandedMap] = useState<Map<string, Orden[] | "loading">>(new Map());
 
   // Actualiza estado + URL
   const setFiltro = useCallback((patch: Partial<EstadoTabla>) => {
@@ -246,6 +165,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
       escribirEstadoTabla(next);
       return next;
     });
+    // Colapsar todo al cambiar filtros
+    setExpandedMap(new Map());
   }, []);
 
   // MiniSearch: buscar mientras tipea
@@ -276,54 +197,38 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     setTextoBusq("");
   };
 
-  // TanStack Table — sorting inicial derivado del estado (default: fecha asc).
-  const [sorting, setSorting] = useState(() => {
-    const id = estado.ordenPor === "monto" ? "monto_deflactado" : estado.ordenPor;
-    return [{ id, desc: estado.desc }];
-  });
-  const table = useReactTable({
-    data: rows,
-    columns,
-    state: { 
-      sorting,
-      columnVisibility: {
-        jurisdiccion: !estado.jurisdiccion,
-        fecha: hasNoFilters || colCounts.c_fecha > 0,
-        medio: hasNoFilters || colCounts.c_medio > 0,
-        proveedor: hasNoFilters || colCounts.c_proveedor > 0,
-        monto_deflactado: hasNoFilters || colCounts.c_monto > 0,
-        resolucion: hasNoFilters || colCounts.c_resolucion > 0,
+  // Toggle expandir/colapsar grupo
+  const toggleGrupo = useCallback(async (row: OrdenAgrupada) => {
+    const key = groupKey(row);
+    setExpandedMap((prev) => {
+      const next = new Map(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        return next;
       }
-    },
-    onSortingChange: (upd) => {
-      const next = typeof upd === "function" ? upd(sorting) : upd;
-      setSorting(next);
-      if (next[0]) {
-        const op = next[0].id === "fecha" ? "fecha"
-                 : next[0].id === "id"    ? "id"
-                 : "monto";
-        setFiltro({ ordenPor: op, desc: next[0].desc });
-      }
-    },
-    getCoreRowModel: getCoreRowModel(),
-    manualSorting: true,
-    manualPagination: true,
-  });
+      next.set(key, "loading");
+      return next;
+    });
+    // Cargar detalle solo si no está cacheado
+    setExpandedMap((prev) => {
+      if (!prev.has(key) || prev.get(key) !== "loading") return prev;
+      // Lanzar carga async
+      getDetalleGrupo(row.medio_norm, row.proveedor_norm, {
+        jurisdiccion: filtros.jurisdiccion,
+        anio: filtros.anio,
+      }).then((filas) => {
+        setExpandedMap((p) => {
+          const n = new Map(p);
+          n.set(key, filas);
+          return n;
+        });
+      });
+      return prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.jurisdiccion, filtros.anio]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const prevRows = useRef(rows.length);
-
-  useEffect(() => {
-    if (rows.length > prevRows.current && prevRows.current >= 100) {
-      if (scrollRef.current) {
-        // Desplazar suavemente hacia abajo para indicar que cargaron más filas
-        scrollRef.current.scrollBy({ top: 400, behavior: "smooth" });
-      }
-    }
-    prevRows.current = rows.length;
-  }, [rows.length]);
-
-  const hayMas = rows.length < totalFilas;
+  const totalGrupos = rows.length;
 
   return (
     <>
@@ -332,7 +237,6 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
         <div className="row1">
           <span className="lead">Estás viendo</span>
 
-          {/* Chip jurisdicción activa o select */}
           {estado.jurisdiccion ? (
             <button className="chip-active" aria-label="Quitar Jurisdicción" onClick={() => setFiltro({ jurisdiccion: null })}>
               <span className="label">Jurisdicción:</span>
@@ -340,18 +244,12 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
               <span className="close" aria-hidden="true">×</span>
             </button>
           ) : (
-            <select
-              className="chip-add"
-              value=""
-              onChange={(e) => e.target.value && setFiltro({ jurisdiccion: e.target.value })}
-              aria-label="Filtrar por jurisdicción"
-            >
+            <select className="chip-add" value="" onChange={(e) => e.target.value && setFiltro({ jurisdiccion: e.target.value })} aria-label="Filtrar por jurisdicción">
               <option value="">+ Jurisdicción</option>
               {jurisFiltradas.map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
           )}
 
-          {/* Chip año activo o select */}
           {estado.anio ? (
             <button className="chip-active" aria-label="Quitar Año" onClick={() => setFiltro({ anio: null })}>
               <span className="label">Año:</span>
@@ -359,18 +257,12 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
               <span className="close" aria-hidden="true">×</span>
             </button>
           ) : (
-            <select
-              className="chip-add"
-              value=""
-              onChange={(e) => e.target.value && setFiltro({ anio: Number(e.target.value) })}
-              aria-label="Filtrar por año"
-            >
+            <select className="chip-add" value="" onChange={(e) => e.target.value && setFiltro({ anio: Number(e.target.value) })} aria-label="Filtrar por año">
               <option value="">+ Año</option>
               {aniosFiltrados.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           )}
 
-          {/* Chip entidad activa */}
           {estado.entidadNorm && (
             <button className="chip-active" aria-label="Quitar Entidad" onClick={quitarEntidad}>
               <span className="label">{estado.entidadTipo === "medio" ? "Medio:" : "Proveedor:"}</span>
@@ -382,7 +274,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
 
         <div className="row2">
           <span className="totals">
-            <strong>{fmtNum.format(totalFilas)}</strong> órdenes
+            <strong>{fmtNum.format(totalGrupos)}</strong> combinaciones
             {totalMonto > 0 && (
               <> · <strong>$ {fmtARS.format(Math.round(totalMonto))}</strong></>
             )}
@@ -424,7 +316,6 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
           />
           <span className="search-kbd">/</span>
 
-          {/* Dropdown de sugerencias */}
           {mostrarSugs && sugerencias.length > 0 && (
             <ul role="listbox" style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:50, background:"var(--color-bg-elev-2)", border:"1px solid var(--color-border-strong)", borderRadius:8, marginTop:4, padding:"4px 0", listStyle:"none", boxShadow:"0 8px 32px rgba(0,0,0,.4)" }}>
               {sugerencias.map((s) => (
@@ -443,71 +334,84 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
         </div>
       </div>
 
-      {/* ── TABLA ── */}
+      {/* ── TABLA AGRUPADA ── */}
       <div className="table-wrap">
-        <div className="table-scroll" ref={scrollRef}>
+        <div className="table-scroll">
           <table className="data">
             <thead>
-              {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id}>
-                  {hg.headers.map((header) => {
-                    const meta = header.column.columnDef.meta as { align?: string } | undefined;
-                    const isSorted = header.column.getIsSorted();
-                    return (
-                      <th
-                        key={header.id}
-                        className={[meta?.align === "right" ? "right" : "", isSorted ? "active" : ""].filter(Boolean).join(" ")}
-                        onClick={header.column.getToggleSortingHandler()}
-                        style={{ cursor: header.column.getCanSort() ? "pointer" : "default" }}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && (
-                          <span className="sort">{isSorted === "asc" ? "▴" : "▾"}</span>
-                        )}
-                      </th>
-                    );
-                  })}
-                </tr>
-              ))}
+              <tr>
+                <th style={{ width: 32 }} aria-label="Expandir" />
+                {!estado.jurisdiccion && <th>Jurisdicción</th>}
+                <th>Proveedor</th>
+                <th>Medio</th>
+                <th className="right">Monto (deflactado)</th>
+              </tr>
             </thead>
             <tbody>
-              {loading && rows.length === 0 ? (
+              {loading ? (
                 <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
               ) : (
-                table.getRowModel().rows.map((row) => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map((cell) => {
-                      const meta = cell.column.columnDef.meta as { align?: string } | undefined;
-                      return (
-                        <td key={cell.id} className={[
-                          meta?.align === "right" ? "monto" : "",
-                          cell.column.id === "resolucion" ? "resol" : "",
-                          `col-${cell.column.id}`
-                        ].filter(Boolean).join(" ")}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                rows.map((row) => {
+                  const key = groupKey(row);
+                  const detalle = expandedMap.get(key);
+                  const isExpanded = detalle !== undefined;
+                  const isLoading = detalle === "loading";
+                  const colSpanTotal = (!estado.jurisdiccion ? 5 : 4);
+                  return (
+                    <>
+                      {/* Fila agrupada */}
+                      <tr
+                        key={key}
+                        onClick={() => toggleGrupo(row)}
+                        style={{ cursor: "pointer" }}
+                        aria-expanded={isExpanded}
+                      >
+                        <td style={{ textAlign: "center", color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>
+                          {isExpanded ? "▾" : "▸"}
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))
+                        {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>—</td>}
+                        <td>{row.proveedor ?? row.proveedor_norm ?? "–"}</td>
+                        <td>{row.medio ?? row.medio_norm ?? "–"}</td>
+                        <td className="monto">
+                          <span style={{ marginRight: 8, color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)", fontWeight: 400 }}>
+                            {fmtNum.format(row.n)} órdenes
+                          </span>
+                          {formatMonto(row.total)}
+                        </td>
+                      </tr>
+
+                      {/* Filas hijas */}
+                      {isExpanded && isLoading && (
+                        <tr key={`${key}-loading`} style={{ background: "var(--color-bg-elev-2)" }}>
+                          <td colSpan={colSpanTotal} style={{ padding: "0.5rem 1rem 0.5rem 2.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>
+                            Cargando órdenes…
+                          </td>
+                        </tr>
+                      )}
+                      {isExpanded && !isLoading && (detalle as Orden[]).map((orden) => (
+                        <tr key={`${key}-${orden.id}`} style={{ background: "var(--color-bg-elev-2)" }}>
+                          <td style={{ paddingLeft: "1.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>#{orden.id}</td>
+                          {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.jurisdiccion}</td>}
+                          <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.anio}</td>
+                          <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.resolucion ? (
+                            orden.resolucion.startsWith("http")
+                              ? <a href={orden.resolucion} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗ {orden.anio}</a>
+                              : orden.resolucion
+                          ) : "–"}</td>
+                          <td className="monto" style={{ color: "var(--color-fg-subtle)" }}>
+                            {formatMonto(orden.monto_deflactado)}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-
-        {hayMas && (
-          <div style={{ textAlign:"center", padding:"1.5rem 0" }}>
-            <button
-              className="btn-load-more"
-              onClick={cargarMas}
-              disabled={loading}
-            >
-              {loading ? "Cargando…" : `Cargar 100 más (${fmtNum.format(totalFilas - rows.length)} restantes)`}
-            </button>
-          </div>
-        )}
       </div>
     </>
   );

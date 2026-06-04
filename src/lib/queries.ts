@@ -2,14 +2,16 @@
  * queries.ts — las 3 funciones de query de Datos Pauta Oficial.
  *
  * Cada función mapea a una de las 3 vistas de la home:
- *   1. getOrdenes()   → Tabla con filtros
+ *   1. getOrdenes()       → Tabla con filtros (modo agrupado por defecto)
+ *   1b. getDetalleGrupo() → Filas individuales de un grupo (lazy load)
  *   2. getCuantoRecibio() → Generador "Cuánto recibió"
- *   3. getRanking()   → Rankings (contextual y global)
+ *   3. getRanking()       → Rankings (contextual y global)
  *
  * Más getMeta() para el hero de datos.
  *
  * Todas usan los índices compuestos definidos en build_db.py:
  *   idx_orders_juris_anio_prov / idx_orders_juris_anio_medio
+ *   idx_orders_juris_anio_medio_prov
  *   idx_orders_prov_anio / idx_orders_medio_anio
  */
 
@@ -21,7 +23,6 @@ import { query } from "./db";
 
 export type Orden = {
   id: number;
-  fecha: string | null;
   medio: string | null;
   proveedor: string | null;
   monto_deflactado: number | null;
@@ -29,6 +30,16 @@ export type Orden = {
   resolucion: string | null;
   jurisdiccion: string;
   anio: number;
+};
+
+/** Fila devuelta por getOrdenes en modo agrupado (GROUP BY medio_norm, proveedor_norm). */
+export type OrdenAgrupada = {
+  medio_norm: string | null;
+  proveedor_norm: string | null;
+  medio: string | null;    // MAX(medio)
+  proveedor: string | null; // MAX(proveedor)
+  total: number | null;    // SUM(monto_deflactado)
+  n: number;               // COUNT(*)
 };
 
 export type RankingItem = {
@@ -76,19 +87,24 @@ export interface FiltrosTabla {
   entidadNorm?: string;
   entidadTipo?: "proveedor" | "medio";
   deflactado?: boolean;
-  ordenPor?: "fecha" | "monto" | "id";
+  ordenPor?: "monto" | "id";
   desc?: boolean;
   pagina?: number;
   porPagina?: number;
+  /** Modo agrupado: GROUP BY medio_norm, proveedor_norm. Ignora pagina/porPagina. */
+  agrupado?: boolean;
 }
 
 /**
  * Devuelve una página de órdenes aplicando los filtros activos.
- * Si no hay filtros específicos, ordena por monto_deflactado DESC para
- * mostrar las órdenes más significativas primero.
+ *
+ * Con agrupado=true (modo DataTable): devuelve hasta 100 filas agrupadas
+ * por (medio_norm, proveedor_norm) ordenadas por total DESC.
+ *
+ * Sin agrupado: devuelve filas individuales paginadas.
  */
 export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
-  filas: Orden[];
+  filas: Orden[] | OrdenAgrupada[];
   totalFilas: number;
 }> {
   const {
@@ -101,6 +117,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     desc = true,
     pagina = 0,
     porPagina = 100,
+    agrupado = false,
   } = filtros;
 
   const wheres: string[] = [];
@@ -124,10 +141,25 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
   }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
+
+  // ── Modo agrupado (B2) ───────────────────────────────────────────────────
+  if (agrupado) {
+    const filas = await query<OrdenAgrupada>(
+      `SELECT medio_norm, proveedor_norm,
+              MAX(medio) as medio, MAX(proveedor) as proveedor,
+              SUM(monto_deflactado) as total, COUNT(*) as n
+       FROM orders ${where}
+       GROUP BY medio_norm, proveedor_norm
+       ORDER BY total DESC
+       LIMIT 100`,
+      params,
+    );
+    return { filas, totalFilas: filas.length };
+  }
+
+  // ── Modo individual (original) ───────────────────────────────────────────
   const montoCol = deflactado ? "monto_deflactado" : "monto";
-  const orden = ordenPor === "fecha"
-    ? `fecha ${desc ? "DESC" : "ASC"} NULLS LAST`
-    : ordenPor === "id"
+  const orden = ordenPor === "id"
     ? `id ${desc ? "DESC" : "ASC"}`
     : `${montoCol} ${desc ? "DESC" : "ASC"} NULLS LAST`;
 
@@ -139,7 +171,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 
   // Filas de la página
   const filas = await query<Orden>(
-    `SELECT id, fecha, medio, proveedor, monto, monto_deflactado,
+    `SELECT id, medio, proveedor, monto, monto_deflactado,
             resolucion, jurisdiccion, anio
      FROM orders ${where}
      ORDER BY ${orden}
@@ -148,6 +180,40 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
   );
 
   return { filas, totalFilas: Number(total) };
+}
+
+// ---------------------------------------------------------------------------
+// 1b. Detalle de un grupo (lazy load al expandir en DataTable)
+// ---------------------------------------------------------------------------
+
+/**
+ * Devuelve las órdenes individuales de un par (medio_norm, proveedor_norm)
+ * con los filtros de jurisdicción/año activos. Solo se llama al expandir
+ * una fila agrupada; el resultado se cachea en el componente (Map).
+ */
+export async function getDetalleGrupo(
+  medio_norm: string | null,
+  proveedor_norm: string | null,
+  filtros: Pick<FiltrosTabla, "jurisdiccion" | "anio"> = {},
+): Promise<Orden[]> {
+  const { jurisdiccion, anio } = filtros;
+  const wheres: string[] = [];
+  const params: (string | number | null)[] = [];
+
+  if (jurisdiccion)   { wheres.push("jurisdiccion = ?");   params.push(jurisdiccion); }
+  if (anio)           { wheres.push("anio = ?");            params.push(anio); }
+  if (medio_norm)     { wheres.push("medio_norm = ?");      params.push(medio_norm); }
+  if (proveedor_norm) { wheres.push("proveedor_norm = ?");  params.push(proveedor_norm); }
+
+  const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
+  return query<Orden>(
+    `SELECT id, medio, proveedor, monto, monto_deflactado,
+            resolucion, jurisdiccion, anio
+     FROM orders ${where}
+     ORDER BY monto_deflactado DESC NULLS LAST
+     LIMIT 500`,
+    params,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -270,8 +336,8 @@ export async function getMeta(): Promise<MetaStats> {
  */
 export async function getTotalesFiltro(
   filtros: Omit<FiltrosTabla, "pagina" | "porPagina" | "ordenPor" | "desc">,
-): Promise<{ 
-  nOrdenes: number; 
+): Promise<{
+  nOrdenes: number;
   montoTotal: number;
   c_fecha: number;
   c_medio: number;
@@ -322,8 +388,8 @@ export async function getTotalesFiltro(
     `SELECT COUNT(*) as n, SUM(monto_deflactado) as total, COUNT(fecha) as c_fecha, COUNT(medio) as c_medio, COUNT(proveedor) as c_proveedor, COUNT(monto_deflactado) as c_monto, COUNT(resolucion) as c_resolucion FROM orders ${where}`,
     params,
   );
-  return { 
-    nOrdenes: Number(row?.n ?? 0), 
+  return {
+    nOrdenes: Number(row?.n ?? 0),
     montoTotal: Number(row?.total ?? 0),
     c_fecha: Number(row?.c_fecha ?? 0),
     c_medio: Number(row?.c_medio ?? 0),

@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getCuantoRecibio, type ResultadoCuantoRecibio } from "../lib/queries";
+import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris } from "../lib/queries";
 import { urlGenerador } from "../lib/url-state";
 import { buscar, type EntidadBusqueda } from "../lib/search";
 
@@ -20,6 +20,94 @@ const fmtNum = new Intl.NumberFormat("es-AR");
 
 function formatMontoGrande(v: number): string {
   return fmtARS.format(Math.round(v));
+}
+
+// ---------------------------------------------------------------------------
+// Desglose por jurisdicción para el resultado
+// ---------------------------------------------------------------------------
+
+interface FilaJuris {
+  juris: string;
+  total: number;
+  n: number;
+  anioMin: number;
+  anioMax: number;
+}
+
+function desglosePorJuris(
+  porAnio: TotalPorAnioJuris[],
+  anioSel: number | "historico",
+): FilaJuris[] {
+  const base = anioSel === "historico" ? porAnio : porAnio.filter((r) => r.anio === anioSel);
+  const map = new Map<string, { total: number; n: number; anios: number[] }>();
+  for (const r of base) {
+    const cur = map.get(r.jurisdiccion) ?? { total: 0, n: 0, anios: [] };
+    cur.total += r.total ?? 0;
+    cur.n += r.n_ordenes ?? 0;
+    cur.anios.push(r.anio);
+    map.set(r.jurisdiccion, cur);
+  }
+  return [...map.entries()]
+    .map(([juris, v]) => ({
+      juris,
+      total: v.total,
+      n: v.n,
+      anioMin: Math.min(...v.anios),
+      anioMax: Math.max(...v.anios),
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// ---------------------------------------------------------------------------
+// Sub-componente: tabla de desglose por jurisdicción
+// ---------------------------------------------------------------------------
+
+function DesgloseJuris({
+  porAnio,
+  anioSel,
+}: {
+  porAnio: TotalPorAnioJuris[];
+  anioSel: number | "historico";
+}) {
+  const filas = desglosePorJuris(porAnio, anioSel);
+  if (!filas.length) return null;
+  const maxTotal = Math.max(...filas.map((f) => f.total), 1);
+  return (
+    <div className="desglose-juris" style={{ marginTop:"1.25rem", width:"100%", maxWidth:480, marginLeft:"auto", marginRight:"auto" }}>
+      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"var(--text-small)" }}>
+        <thead>
+          <tr style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)" }}>
+            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6 }}>Jurisdicción</th>
+            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6 }}>Período</th>
+            <th style={{ textAlign:"right", fontWeight:500, paddingBottom:6 }}>Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr key={f.juris} style={{ borderTop:"1px solid var(--color-border)" }}>
+              <td style={{ padding:"6px 0", paddingRight:8, whiteSpace:"nowrap", color:"var(--color-fg)" }}>{f.juris}</td>
+              <td style={{ padding:"6px 0", paddingRight:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ color:"var(--color-fg-subtle)", whiteSpace:"nowrap", fontSize:"var(--text-micro)" }}>
+                    {f.anioMin === f.anioMax ? f.anioMin : `${f.anioMin}–${f.anioMax}`}
+                  </span>
+                  <div style={{ flexGrow:1, height:4, background:"var(--color-border)", borderRadius:2, minWidth:40 }}>
+                    <div style={{ height:"100%", background:"var(--color-accent)", borderRadius:2, width:`${Math.round((f.total / maxTotal) * 100)}%` }} />
+                  </div>
+                </div>
+              </td>
+              <td style={{ padding:"6px 0", textAlign:"right", color:"var(--color-fg)", whiteSpace:"nowrap" }}>
+                $ {fmtARS.format(Math.round(f.total))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p style={{ marginTop:"0.75rem", color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", lineHeight:1.5, textAlign:"left" }}>
+        Cada empresa se registra por separado en los datos oficiales. Este total corresponde solo a esta razón social.
+      </p>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -113,21 +201,6 @@ export default function Generador({ initial }: GeneradorProps) {
       .reduce((acc, r) => acc + (r.total ?? 0), 0);
   };
 
-  const ordenesContadas = (): number => {
-    if (!resultado) return 0;
-    if (anioSel === "historico") return resultado.nOrdenesHistorico;
-    return resultado.porAnio
-      .filter((r) => r.anio === anioSel)
-      .reduce((acc, r) => acc + (r.n_ordenes ?? 0), 0);
-  };
-
-  const jurisdiccionesContadas = (): number => {
-    if (!resultado || anioSel === "historico") {
-      return new Set(resultado?.porAnio.map((r) => r.jurisdiccion) ?? []).size;
-    }
-    return new Set(resultado.porAnio.filter((r) => r.anio === anioSel).map((r) => r.jurisdiccion)).size;
-  };
-
   const hayDatos = montoMostrado() > 0;
 
   // Compartir
@@ -198,11 +271,12 @@ export default function Generador({ initial }: GeneradorProps) {
               {sugerencias.map((s) => (
                 <li key={s.id} role="option" aria-selected={entidadActual?.norm === s.norm}
                   onClick={() => elegirEntidad(s)}
-                  style={{ padding:"8px 14px", cursor:"pointer", fontSize:"var(--text-small)" }}
+                  style={{ padding:"8px 14px", cursor:"pointer", fontSize:"var(--text-small)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bg-elev-3)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                 >
-                  {s.nombre}
+                  <span>{s.nombre}</span>
+                  <span style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", whiteSpace:"nowrap", flexShrink:0 }}>{fmtNum.format(s.n)} órdenes</span>
                 </li>
               ))}
             </ul>
@@ -234,10 +308,8 @@ export default function Generador({ initial }: GeneradorProps) {
             <div className="context">
               en <strong style={{ color:"var(--color-fg)" }}>{contextoAnio}</strong>
             </div>
-            {resultado && (
-              <div className="meta">
-                {fmtNum.format(ordenesContadas())} órdenes · {jurisdiccionesContadas()} jurisdicción{jurisdiccionesContadas() !== 1 ? "es" : ""}
-              </div>
+            {resultado && resultado.porAnio.length > 0 && (
+              <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} />
             )}
             <p className="approx">
               <strong>* Aproximado.</strong> Al haber huecos de cobertura en los datos públicos, el monto real recibido puede ser mayor.

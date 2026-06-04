@@ -21,7 +21,7 @@ export interface EstadoTabla {
   entidadNorm: string | null;
   entidadTipo: "proveedor" | "medio";
   deflactado: boolean;
-  ordenPor: "fecha" | "monto" | "id";
+  ordenPor: "monto" | "id";
   desc: boolean;
 }
 
@@ -53,8 +53,8 @@ export function leerEstadoTabla(): EstadoTabla {
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
     deflactado: p.get("def") !== "0",
-    // Default: fecha ascendente (la orden mas vieja primero). 'monto'/'id' via param.
-    ordenPor: p.get("orden") === "monto" ? "monto" : p.get("orden") === "id" ? "id" : "fecha",
+    // Default: id ascendente. 'monto' via param.
+    ordenPor: p.get("orden") === "monto" ? "monto" : "id",
     // Default desc=false (ascendente). desc=1 en la URL activa el orden descendente.
     desc: p.get("desc") === "1",
   };
@@ -104,10 +104,8 @@ export function escribirEstadoTabla(estado: Partial<EstadoTabla>): void {
   setOrDel(p, "norm", estado.entidadNorm ?? null);
   setOrDel(p, "tipo", estado.entidadTipo === "medio" ? "medio" : null); // proveedor es default
   setOrDel(p, "def", estado.deflactado === false ? "0" : null);         // deflactado es default
-  // orden: "fecha" (orden por defecto) → no se escribe. "monto"/"id" sí.
-  setOrDel(p, "orden", estado.ordenPor === "monto" ? "monto"
-                      : estado.ordenPor === "id" ? "id"
-                      : null);                                           // "fecha" es default
+  // orden: "id" (orden por defecto) → no se escribe. "monto" sí.
+  setOrDel(p, "orden", estado.ordenPor === "monto" ? "monto" : null);
   setOrDel(p, "desc", estado.desc === true ? "1" : null);               // asc (false) es default
 
   const search = p.toString();

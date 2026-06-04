@@ -16,7 +16,7 @@ import type { EntidadBusqueda } from "./search";
 export interface HomeFiltroInicial {
   jurisdiccion: string;
   anio: number;
-  ordenPor: "fecha" | "monto" | "id";
+  ordenPor: "monto" | "id";
   desc: boolean;
   deflactado: boolean;
   entidadTipo: "proveedor" | "medio";
@@ -25,7 +25,6 @@ export interface HomeFiltroInicial {
 export interface HomeTotales {
   nOrdenes: number;
   montoTotal: number;
-  c_fecha: number;
   c_medio: number;
   c_proveedor: number;
   c_monto: number;

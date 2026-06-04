@@ -33,7 +33,7 @@ import re
 import sqlite3
 import sys
 import unicodedata
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 # --- rutas (relativas a la ubicacion del script) -------------------------
@@ -49,8 +49,6 @@ CSV_ORDERS = DATA_DIR / "pauta_oficial_unificado.csv"
 CSV_IPC = DATA_DIR / "ipc_indec.csv"
 CSV_GOV = DATA_DIR / "governments.csv"
 CSV_ALIASES = DATA_DIR / "aliases.csv"
-
-ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # Secuencias de tokens de sufijos societarios a descartar al final de un
 # nombre. Tras sacar acentos y reemplazar puntuacion por espacios, "S.A."
@@ -220,18 +218,6 @@ def cargar_deflactor():
     return indice_mes, indice_anio, f"{anio_ref:04d}-{mes_ref:02d}"
 
 
-def parse_fecha_iso(valor):
-    """Devuelve (fecha_iso, mes) si el valor es una fecha ISO valida;
-    si no, (None, None). El esquema fija fecha = ISO 8601 o NULL."""
-    if not valor or not ISO_RE.match(valor):
-        return None, None
-    try:
-        d = date.fromisoformat(valor)
-    except ValueError:
-        return None, None
-    return valor, d.month
-
-
 def crear_esquema(con):
     con.executescript(
         """
@@ -239,7 +225,6 @@ def crear_esquema(con):
             id                INTEGER PRIMARY KEY,
             jurisdiccion      TEXT NOT NULL,
             anio              INTEGER NOT NULL,
-            fecha             TEXT,
             medio             TEXT,
             proveedor         TEXT,
             monto             REAL,
@@ -444,12 +429,12 @@ def crear_filtros(con):
             anio         INTEGER NOT NULL,  -- 0   = todos
             n_ordenes    INTEGER NOT NULL,
             monto_total  REAL,
-            c_fecha      INTEGER, c_medio INTEGER, c_proveedor INTEGER,
+            c_medio INTEGER, c_proveedor INTEGER,
             c_monto      INTEGER, c_resolucion INTEGER
         );
         CREATE INDEX idx_filtros ON filtros_cache(jurisdiccion, anio);
     """)
-    cols = ("COUNT(*), SUM(monto_deflactado), COUNT(fecha), COUNT(medio), "
+    cols = ("COUNT(*), SUM(monto_deflactado), COUNT(medio), "
             "COUNT(proveedor), COUNT(monto_deflactado), COUNT(resolucion)")
     # por (jurisdiccion, anio)
     con.execute(f"INSERT INTO filtros_cache "
@@ -480,23 +465,15 @@ def crear_indices(con):
         """
         CREATE INDEX idx_orders_juris_anio_prov  ON orders(jurisdiccion, anio, proveedor_norm);
         CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio_norm);
+        CREATE INDEX idx_orders_juris_anio_medio_prov ON orders(jurisdiccion, anio, medio_norm, proveedor_norm);
         CREATE INDEX idx_orders_prov_anio        ON orders(proveedor_norm, anio);
         CREATE INDEX idx_orders_medio_anio       ON orders(medio_norm, anio);
 
         -- Indices de ORDENAMIENTO de la tabla (getOrdenes). Sin estos, ORDER BY
-        -- fecha/monto hace "USE TEMP B-TREE FOR ORDER BY": SQLite materializa y
-        -- ordena en memoria el set filtrado leyendo filas dispersas por toda la
-        -- DB (106 MB). Sobre sql.js-httpvfs eso dispara el prefetch exponencial
-        -- que cruza el limite de 20 MiB entre archivos chunk -> "database disk
-        -- image is malformed" (mismo bug de modo chunked que ya evitan los
-        -- caches de rankings/totales). Con estos indices el ORDER BY se resuelve
-        -- recorriendo el indice en orden y cortando en LIMIT+OFFSET: pocas
-        -- lecturas, localizadas, sin sort. Cubren las 4 combinaciones de filtro
-        -- (ambos / solo juris / solo anio / ninguno) para fecha y monto.
+        -- monto hace "USE TEMP B-TREE FOR ORDER BY": SQLite materializa y
+        -- ordena en memoria el set filtrado. Sobre sql.js-httpvfs eso dispara
+        -- el prefetch exponencial -> "database disk image is malformed".
         -- 'id' no necesita indice: es la PK (orden secuencial nativo).
-        CREATE INDEX idx_orders_juris_anio_fecha ON orders(jurisdiccion, anio, fecha);
-        CREATE INDEX idx_orders_anio_fecha       ON orders(anio, fecha);
-        CREATE INDEX idx_orders_fecha            ON orders(fecha);
         CREATE INDEX idx_orders_juris_anio_monto ON orders(jurisdiccion, anio, monto_deflactado);
         CREATE INDEX idx_orders_anio_monto       ON orders(anio, monto_deflactado);
         CREATE INDEX idx_orders_monto            ON orders(monto_deflactado);
@@ -606,24 +583,24 @@ def escribir_home(con, prov_disp):
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    # 1. Tabla -- getOrdenes(PBA, 2025, ordenPor='fecha', desc=False)
+    # 1. Tabla -- getOrdenes(PBA, 2025, ordenPor='id', desc=False)
     total_filas = cur.execute(
         "SELECT COUNT(*) FROM orders WHERE jurisdiccion=? AND anio=?",
         (JURIS, ANIO)).fetchone()[0]
     filas = rows(
-        """SELECT id, fecha, medio, proveedor, monto, monto_deflactado,
+        """SELECT id, medio, proveedor, monto, monto_deflactado,
                   resolucion, jurisdiccion, anio
            FROM orders WHERE jurisdiccion=? AND anio=?
-           ORDER BY fecha ASC NULLS LAST LIMIT 100""", (JURIS, ANIO))
+           ORDER BY id ASC LIMIT 100""", (JURIS, ANIO))
 
     # 2. Totales -- getTotalesFiltro
     t = cur.execute(
-        """SELECT COUNT(*) n, SUM(monto_deflactado) total, COUNT(fecha) c_fecha,
+        """SELECT COUNT(*) n, SUM(monto_deflactado) total,
                   COUNT(medio) c_medio, COUNT(proveedor) c_proveedor,
                   COUNT(monto_deflactado) c_monto, COUNT(resolucion) c_resolucion
            FROM orders WHERE jurisdiccion=? AND anio=?""", (JURIS, ANIO)).fetchone()
-    totales = {"nOrdenes": t[0], "montoTotal": t[1] or 0, "c_fecha": t[2],
-               "c_medio": t[3], "c_proveedor": t[4], "c_monto": t[5], "c_resolucion": t[6]}
+    totales = {"nOrdenes": t[0], "montoTotal": t[1] or 0,
+               "c_medio": t[2], "c_proveedor": t[3], "c_monto": t[4], "c_resolucion": t[5]}
 
     # 3. Gobierno -- useGobierno
     g = cur.execute(
@@ -670,7 +647,7 @@ def escribir_home(con, prov_disp):
         }
 
     home = {
-        "filtroInicial": {"jurisdiccion": JURIS, "anio": ANIO, "ordenPor": "fecha",
+        "filtroInicial": {"jurisdiccion": JURIS, "anio": ANIO, "ordenPor": "id",
                           "desc": False, "deflactado": True, "entidadTipo": "proveedor"},
         "tabla": {"filas": filas, "totalFilas": total_filas},
         "totales": totales,
@@ -741,7 +718,7 @@ def main():
 
     # --- estadisticas para la tabla meta y la verificacion ----------------
     st = {
-        "filas": 0, "monto_nulo": 0, "monto_cero": 0, "fecha_no_iso": 0, "fecha_nula": 0,
+        "filas": 0, "monto_nulo": 0, "monto_cero": 0,
         "deflactado_nulo": 0, "monto_total": 0.0, "monto_def_total": 0.0,
         "alias_aplicados": 0,
     }
@@ -758,7 +735,7 @@ def main():
     # su orden. Columnas extra del CSV (p.ej. archivo_origen)
     # se ignoran sin romper. Evita el bug silencioso de descartar todas las
     # filas por un conteo de columnas que no coincide.
-    REQUERIDAS = ("jurisdiccion", "anio", "fecha", "medio",
+    REQUERIDAS = ("jurisdiccion", "anio", "medio",
                   "proveedor", "monto", "resolucion")
 
     def filas_orders():
@@ -770,7 +747,6 @@ def main():
             for d in lector:
                 jur = (d.get("jurisdiccion") or "").strip()
                 anio = (d.get("anio") or "").strip()
-                fecha = d.get("fecha") or ""
                 medio = d.get("medio") or ""
                 prov = d.get("proveedor") or ""
                 monto = d.get("monto") or ""
@@ -780,12 +756,6 @@ def main():
                 anio_i = int(anio)
                 anios.add(anio_i)
                 juris.add(jur)
-
-                fecha_iso, mes = parse_fecha_iso(fecha)
-                if fecha == "":
-                    st["fecha_nula"] += 1
-                elif fecha_iso is None:
-                    st["fecha_no_iso"] += 1
 
                 # monto nominal
                 monto_v = None
@@ -801,16 +771,12 @@ def main():
                     continue  # descarta ordenes con monto = $0 (anulaciones/reservas)
                 else:
                     st["monto_total"] += monto_v
-                
+
                 st["filas"] += 1
 
-                # deflactor: por mes si hay fecha ISO, si no por anio
-                factor = None
-                if mes is not None and (anio_i, mes) in indice_mes:
-                    factor = indice_ref / indice_mes[(anio_i, mes)]
-                elif anio_i in indice_anio:
-                    factor = indice_ref / indice_anio[anio_i]
-                monto_def = monto_v * factor if (monto_v is not None and factor) else None
+                # deflactor: siempre por anio (ya no hay columna fecha)
+                factor = indice_anio.get(anio_i)
+                monto_def = monto_v * (indice_ref / factor) if (monto_v is not None and factor) else None
                 if monto_def is None:
                     st["deflactado_nulo"] += 1
                 else:
@@ -839,15 +805,15 @@ def main():
                         d[medio_v] = d.get(medio_v, 0) + 1
 
                 yield (
-                    jur, anio_i, fecha_iso,
+                    jur, anio_i,
                     medio_v, prov_v, monto_v, monto_def,
                     (reso.strip() or None), p_norm, m_norm,
                 )
 
     con.executemany(
-        "INSERT INTO orders(jurisdiccion, anio, fecha, medio, "
+        "INSERT INTO orders(jurisdiccion, anio, medio, "
         "proveedor, monto, monto_deflactado, resolucion, "
-        "proveedor_norm, medio_norm) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "proveedor_norm, medio_norm) VALUES (?,?,?,?,?,?,?,?,?)",
         filas_orders())
 
     if st["filas"] == 0:
@@ -875,8 +841,6 @@ def main():
         "medios_distintos_norm": len(medio_norm_set),
         "filas_monto_nulo": st["monto_nulo"],
         "filas_monto_cero": st["monto_cero"],
-        "filas_fecha_nula": st["fecha_nula"],
-        "filas_fecha_no_iso": st["fecha_no_iso"],
         "filas_deflactado_nulo": st["deflactado_nulo"],
         "aliases_csv": ("presente" if CSV_ALIASES.exists() else "ausente"),
         "aliases_aplicados": st["alias_aplicados"],
