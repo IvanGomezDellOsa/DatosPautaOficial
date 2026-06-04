@@ -310,6 +310,19 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     manualPagination: true,
   });
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const prevRows = useRef(rows.length);
+
+  useEffect(() => {
+    if (rows.length > prevRows.current && prevRows.current >= 100) {
+      if (scrollRef.current) {
+        // Desplazar suavemente hacia abajo para indicar que cargaron más filas
+        scrollRef.current.scrollBy({ top: 400, behavior: "smooth" });
+      }
+    }
+    prevRows.current = rows.length;
+  }, [rows.length]);
+
   const hayMas = rows.length < totalFilas;
 
   return (
@@ -432,7 +445,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
 
       {/* ── TABLA ── */}
       <div className="table-wrap">
-        <div className="table-scroll">
+        <div className="table-scroll" ref={scrollRef}>
           <table className="data">
             <thead>
               {table.getHeaderGroups().map((hg) => (
