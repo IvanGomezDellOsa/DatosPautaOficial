@@ -884,3 +884,11 @@ def main():
     print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
+    print(f"OK  {out_home}  (estado inicial PBA 2025: {n_home}/{n_home_total} filas, "
+          f"{out_home.stat().st_size/1024:.1f} KB)")
+    for k, v in meta.items():
+        print(f"  {k:32s} {v}")
+
+
+if __name__ == "__main__":
+    main()
