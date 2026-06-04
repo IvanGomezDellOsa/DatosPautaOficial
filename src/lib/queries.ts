@@ -281,6 +281,30 @@ export async function getTotalesFiltro(
 }> {
   const { jurisdiccion, anio, entidadNorm, entidadTipo } = filtros;
 
+  // Caso comun (sin filtro de entidad): lookup puntual en filtros_cache, sin
+  // escanear orders. Es lo que hace rapido el cambio de filtro. filtros_cache
+  // tiene una fila por (jurisdiccion, anio) con '*'=todas y 0=todos.
+  if (!entidadNorm) {
+    const [c] = await query<{ n_ordenes: number; monto_total: number; c_fecha: number; c_medio: number; c_proveedor: number; c_monto: number; c_resolucion: number }>(
+      `SELECT n_ordenes, monto_total, c_fecha, c_medio, c_proveedor, c_monto, c_resolucion
+       FROM filtros_cache WHERE jurisdiccion = ? AND anio = ?`,
+      [jurisdiccion ?? "*", anio ?? 0],
+    );
+    if (c) {
+      return {
+        nOrdenes: Number(c.n_ordenes ?? 0),
+        montoTotal: Number(c.monto_total ?? 0),
+        c_fecha: Number(c.c_fecha ?? 0),
+        c_medio: Number(c.c_medio ?? 0),
+        c_proveedor: Number(c.c_proveedor ?? 0),
+        c_monto: Number(c.c_monto ?? 0),
+        c_resolucion: Number(c.c_resolucion ?? 0),
+      };
+    }
+    // Si no estuviera en cache (no deberia), cae al scan de abajo.
+  }
+
+  // Con filtro de entidad (proveedor/medio): el set es chico, se consulta en vivo.
   const wheres: string[] = [];
   const params: (string | number | null)[] = [];
 

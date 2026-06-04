@@ -425,6 +425,47 @@ def crear_totals(con):
     print(f"  totals_cache: {n} filas")
 
 
+def crear_filtros(con):
+    """Pre-computa filtros_cache: para CADA combinacion (jurisdiccion, anio) los
+    totales que muestra la filter-bar y los conteos por columna (para ocultar
+    columnas vacias). Convierte getTotalesFiltro() de un scan sobre el set
+    filtrado (lee fecha/medio/proveedor/resolucion de cada fila) en un lookup
+    puntual. Es el cuello del cambio de filtro: sin esto, cambiar a "PBA 2023"
+    escanea todas las ordenes de PBA 2023.
+
+    Claves: jurisdiccion='*' = todas, anio=0 = todos. Solo cubre el caso SIN
+    filtro de entidad; con proveedor/medio el set es chico y se consulta en vivo.
+    Mismas agregaciones que getTotalesFiltro (COUNT(*), SUM(monto_deflactado) y
+    COUNT por columna) para que los numeros sean identicos.
+    """
+    con.executescript("""
+        CREATE TABLE filtros_cache (
+            jurisdiccion TEXT    NOT NULL,  -- '*' = todas
+            anio         INTEGER NOT NULL,  -- 0   = todos
+            n_ordenes    INTEGER NOT NULL,
+            monto_total  REAL,
+            c_fecha      INTEGER, c_medio INTEGER, c_proveedor INTEGER,
+            c_monto      INTEGER, c_resolucion INTEGER
+        );
+        CREATE INDEX idx_filtros ON filtros_cache(jurisdiccion, anio);
+    """)
+    cols = ("COUNT(*), SUM(monto_deflactado), COUNT(fecha), COUNT(medio), "
+            "COUNT(proveedor), COUNT(monto_deflactado), COUNT(resolucion)")
+    # por (jurisdiccion, anio)
+    con.execute(f"INSERT INTO filtros_cache "
+                f"SELECT jurisdiccion, anio, {cols} FROM orders GROUP BY jurisdiccion, anio")
+    # por jurisdiccion (todos los anios)
+    con.execute(f"INSERT INTO filtros_cache "
+                f"SELECT jurisdiccion, 0, {cols} FROM orders GROUP BY jurisdiccion")
+    # por anio (todas las jurisdicciones)
+    con.execute(f"INSERT INTO filtros_cache "
+                f"SELECT '*', anio, {cols} FROM orders GROUP BY anio")
+    # global (todo)
+    con.execute(f"INSERT INTO filtros_cache SELECT '*', 0, {cols} FROM orders")
+    n = con.execute("SELECT COUNT(*) FROM filtros_cache").fetchone()[0]
+    print(f"  filtros_cache: {n} filas")
+
+
 def crear_indices(con):
     # Indices compuestos que mapean a las 3 funciones de la web. El prefijo
     # izquierdo de cada compuesto cubre tambien las consultas mas simples:
@@ -849,6 +890,9 @@ def main():
 
     # --- totales pre-computados por entidad (vista "Cuanto recibio") --------
     crear_totals(con)
+
+    # --- totales/conteos por (jurisdiccion, anio) para la filter-bar ---------
+    crear_filtros(con)
 
     # --- estado inicial de la portada precomputado (evita el waterfall HTTP) -
     out_home, n_home, n_home_total = escribir_home(con, prov_disp)
