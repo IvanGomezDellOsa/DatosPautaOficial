@@ -755,7 +755,7 @@ def main():
 
     # Columnas que necesita la base. Se leen por NOMBRE (DictReader), no por
     # posicion: asi el script no depende de cuantas columnas trae el CSV ni de
-    # su orden. Columnas extra del CSV (p.ej. tipo_de_medio, archivo_origen)
+    # su orden. Columnas extra del CSV (p.ej. archivo_origen)
     # se ignoran sin romper. Evita el bug silencioso de descartar todas las
     # filas por un conteo de columnas que no coincide.
     REQUERIDAS = ("jurisdiccion", "anio", "fecha", "medio",
@@ -924,3 +924,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+               
