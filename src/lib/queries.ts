@@ -142,8 +142,23 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
 
-  // ── Modo agrupado (B2) ───────────────────────────────────────────────────
+  // ── Modo agrupado ────────────────────────────────────────────────────────
   if (agrupado) {
+    // Sin entidad: lookup puntual en groups_cache (pre-computado en el ETL).
+    // Evita el GROUP BY sobre orders, que requiere escanear todo el set
+    // filtrado y dispara el prefetch exponencial de sql.js-httpvfs.
+    if (!entidadNorm) {
+      const filas = await query<OrdenAgrupada>(
+        `SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
+         FROM groups_cache
+         WHERE jurisdiccion = ? AND anio = ?
+         ORDER BY rank
+         LIMIT 100`,
+        [jurisdiccion ?? "*", anio ?? 0],
+      );
+      return { filas, totalFilas: filas.length };
+    }
+    // Con entidad: el set es chico, GROUP BY en vivo es rápido.
     const filas = await query<OrdenAgrupada>(
       `SELECT medio_norm, proveedor_norm,
               MAX(medio) as medio, MAX(proveedor) as proveedor,

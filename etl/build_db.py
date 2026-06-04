@@ -451,6 +451,105 @@ def crear_filtros(con):
     print(f"  filtros_cache: {n} filas")
 
 
+def crear_groups(con, top_n=100):
+    """Pre-computa groups_cache: top-N pares (medio_norm, proveedor_norm) por
+    monto_deflactado para cada combinacion (jurisdiccion, anio).
+
+    Analogo a rankings_cache pero agrupando por el par en lugar de por una
+    sola dimension. El DataTable hace un lookup puntual aqui en vez de correr
+    un GROUP BY sobre orders (que requiere escanear todo el set filtrado y
+    dispara el prefetch exponencial de sql.js-httpvfs).
+
+    Claves: jurisdiccion='*' = todas, anio=0 = todos. Solo cubre el caso SIN
+    filtro de entidad; con proveedor/medio el set es chico y se agrupa en vivo.
+    """
+    con.executescript("""
+        CREATE TABLE groups_cache (
+            jurisdiccion   TEXT    NOT NULL,
+            anio           INTEGER NOT NULL,
+            rank           INTEGER NOT NULL,
+            medio_norm     TEXT,
+            proveedor_norm TEXT,
+            medio          TEXT,
+            proveedor      TEXT,
+            total          REAL,
+            n              INTEGER NOT NULL
+        );
+        CREATE INDEX idx_gcache ON groups_cache(jurisdiccion, anio, rank);
+    """)
+
+    # Tabla temporal: todos los agregados por (juris, anio, medio_norm, prov_norm)
+    con.executescript("""
+        CREATE TEMP TABLE _groups AS
+            SELECT jurisdiccion, anio,
+                   medio_norm, proveedor_norm,
+                   MAX(medio)    AS medio,
+                   MAX(proveedor) AS proveedor,
+                   SUM(monto_deflactado) AS total,
+                   COUNT(*)      AS n
+            FROM orders
+            GROUP BY jurisdiccion, anio, medio_norm, proveedor_norm;
+    """)
+
+    def insert_top(juris_key, anio_key, rows):
+        con.executemany(
+            "INSERT INTO groups_cache VALUES (?,?,?,?,?,?,?,?,?)",
+            [(juris_key, anio_key, i + 1,
+              r[0], r[1], r[2], r[3], r[4], r[5])
+             for i, r in enumerate(rows[:top_n])]
+        )
+
+    # Global
+    rows = con.execute(f"""
+        SELECT medio_norm, proveedor_norm,
+               MAX(medio), MAX(proveedor),
+               SUM(total), SUM(n)
+        FROM _groups
+        GROUP BY medio_norm, proveedor_norm
+        ORDER BY 5 DESC LIMIT {top_n}
+    """).fetchall()
+    insert_top("*", 0, rows)
+
+    # Por jurisdiccion (todos los anios)
+    for (juris,) in con.execute(
+            "SELECT DISTINCT jurisdiccion FROM _groups").fetchall():
+        rows = con.execute(f"""
+            SELECT medio_norm, proveedor_norm,
+                   MAX(medio), MAX(proveedor),
+                   SUM(total), SUM(n)
+            FROM _groups WHERE jurisdiccion=?
+            GROUP BY medio_norm, proveedor_norm
+            ORDER BY 5 DESC LIMIT {top_n}
+        """, [juris]).fetchall()
+        insert_top(juris, 0, rows)
+
+    # Por anio (todas las jurisdicciones)
+    for (anio,) in con.execute(
+            "SELECT DISTINCT anio FROM _groups").fetchall():
+        rows = con.execute(f"""
+            SELECT medio_norm, proveedor_norm,
+                   MAX(medio), MAX(proveedor),
+                   SUM(total), SUM(n)
+            FROM _groups WHERE anio=?
+            GROUP BY medio_norm, proveedor_norm
+            ORDER BY 5 DESC LIMIT {top_n}
+        """, [anio]).fetchall()
+        insert_top("*", anio, rows)
+
+    # Por jurisdiccion + anio
+    for (juris, anio) in con.execute(
+            "SELECT DISTINCT jurisdiccion, anio FROM _groups").fetchall():
+        rows = con.execute(f"""
+            SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
+            FROM _groups WHERE jurisdiccion=? AND anio=?
+            ORDER BY total DESC LIMIT {top_n}
+        """, [juris, anio]).fetchall()
+        insert_top(juris, anio, rows)
+
+    n = con.execute("SELECT COUNT(*) FROM groups_cache").fetchone()[0]
+    print(f"  groups_cache: {n} filas")
+
+
 def crear_indices(con):
     # Indices compuestos que mapean a las 3 funciones de la web. El prefijo
     # izquierdo de cada compuesto cubre tambien las consultas mas simples:
@@ -861,6 +960,9 @@ def main():
 
     # --- totales/conteos por (jurisdiccion, anio) para la filter-bar ---------
     crear_filtros(con)
+
+    # --- top-100 grupos (medio_norm x proveedor_norm) para el DataTable ------
+    crear_groups(con)
 
     # --- estado inicial de la portada precomputado (evita el waterfall HTTP) -
     out_home, n_home, n_home_total = escribir_home(con, prov_disp)
