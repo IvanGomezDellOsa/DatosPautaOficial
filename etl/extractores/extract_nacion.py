@@ -33,8 +33,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    DIR_NACION, registro, normalizar_monto, normalizar_fecha, limpiar_str,
-    leer_dicts, leer_texto, anio_de_texto, Contador, log,
+    DIR_NACION, DIR_CURADO, registro, normalizar_monto, normalizar_fecha,
+    limpiar_str, leer_dicts, leer_texto, anio_de_texto, Contador, log,
 )
 
 JURIS = "Nación"
@@ -243,6 +243,34 @@ def _seleccionar_versiones(csvs):
 # Extractor principal
 # ---------------------------------------------------------------------------
 
+def _parse_curado(path, cont):
+    """Lee un CSV curado de Nación (cols: proveedor, semestre, importe, tipo_de_medio).
+    Usado como fallback para años sin fuente cruda en Datos crudos Pauta Oficial."""
+    out = []
+    for d in leer_dicts(path):
+        monto = normalizar_monto(d.get("importe") or d.get("total"))
+        if monto is None:
+            cont.descartar("monto_invalido")
+            continue
+        # semestre puede ser "2013-H1" → anio=2013
+        sem = str(d.get("semestre") or "")
+        anio = anio_de_texto(sem) or anio_de_texto(path.name)
+        if not anio:
+            cont.descartar("sin_anio")
+            continue
+        prov = limpiar_str(d.get("proveedor"))
+        medio = limpiar_str(d.get("medio"))
+        tipo = limpiar_str(d.get("tipo_de_medio"))
+        if prov is None and medio is None:
+            cont.descartar("sin_prov_ni_medio")
+            continue
+        out.append(registro(
+            JURIS, anio, monto, path.name,
+            proveedor=prov, medio=medio, tipo_de_medio=tipo))
+        cont.ok()
+    return out
+
+
 def extraer():
     log("[Nación] iniciando extraccion")
     registros = []
@@ -268,6 +296,16 @@ def extraer():
             continue
         for f in _seleccionar_versiones(csvs):
             registros += _parse_pivot(f, anio, cont)
+
+    # --- fallback: curado para años sin fuente cruda ---
+    anios_cubiertos = {r["anio"] for r in registros if r["anio"]}
+    dir_curado_nacion = DIR_CURADO / "Nacion"
+    if dir_curado_nacion.exists():
+        for f in sorted(dir_curado_nacion.glob("Nacion_*.csv")):
+            anio_f = anio_de_texto(f.name)
+            if anio_f and anio_f not in anios_cubiertos:
+                log(f"[Nación] leyendo curado (sin fuente cruda): {f.name}")
+                registros += _parse_curado(f, cont)
 
     cont.resumen()
     log(f"[Nación] total: {len(registros)} registros")

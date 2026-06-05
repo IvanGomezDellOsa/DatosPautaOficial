@@ -26,9 +26,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    DIR_PBA, DIR_PBA_NUEVOS, registro, normalizar_monto, normalizar_fecha,
-    limpiar_str, leer_filas, detectar_sep, MESES, Contador, log,
+    DIR_PBA, DIR_PBA_NUEVOS, DIR_CURADO, registro, normalizar_monto,
+    normalizar_fecha, limpiar_str, leer_dicts, leer_filas, detectar_sep,
+    MESES, Contador, log,
 )
+import comun as _comun
 
 JURIS = "PBA"
 
@@ -169,6 +171,39 @@ def _parse_excel_2025(path, cont):
     return out
 
 
+def _parse_curado(path, cont):
+    """Lee un CSV curado de PBA con esquema canónico del curador:
+    proveedor, medio, importe, mes_asignado_en_resumen_de_resolucion,
+    resolucion, link_a_resolucion, tipo_de_medio.
+    El anio se deriva de mes_asignado (no de fecha_documento_gedo)."""
+    out = []
+    for d in leer_dicts(path):
+        monto = normalizar_monto(d.get("importe"))
+        if monto is None:
+            cont.descartar("monto_invalido")
+            continue
+        prov = limpiar_str(d.get("proveedor"))
+        medio = limpiar_str(d.get("medio"))
+        tipo = limpiar_str(d.get("tipo_de_medio"))
+        if prov is None and medio is None:
+            cont.descartar("sin_prov_ni_medio")
+            continue
+        # mes_asignado define a qué año pertenece la pauta (ej: "2024-12-01" → 2024)
+        mes_raw = str(d.get("mes_asignado_en_resumen_de_resolucion") or "")
+        fecha = normalizar_fecha(mes_raw) or normalizar_fecha(d.get("fecha_documento_gedo"))
+        anio = _comun.anio_de_texto(mes_raw) or _comun.anio_de_texto(path.name)
+        if not anio:
+            cont.descartar("sin_anio")
+            continue
+        res = limpiar_str(d.get("link_a_resolucion") or d.get("resolucion"))
+        out.append(registro(
+            JURIS, anio, monto, path.name,
+            fecha=fecha, proveedor=prov, medio=medio,
+            tipo_de_medio=tipo, resolucion=res))
+        cont.ok()
+    return out
+
+
 def extraer():
     log("[PBA] iniciando extraccion")
     registros = []
@@ -182,10 +217,20 @@ def extraer():
     else:
         log(f"[PBA] ADVERTENCIA: no existe {DIR_PBA_NUEVOS}")
 
-    # B) excel 2025
+    # B) excel 2025 (crudos)
     if DIR_PBA.exists():
         for f in sorted(DIR_PBA.glob("*.xlsx")):
             registros += _parse_excel_2025(f, cont)
+
+    # C) curados PBA para años sin fuente cruda ni xlsx
+    anios_cubiertos = {r["anio"] for r in registros if r["anio"]}
+    dir_curado_pba = DIR_CURADO / "PBA"
+    if dir_curado_pba.exists():
+        for f in sorted(dir_curado_pba.glob("PBA_*.csv")):
+            anio_f = _comun.anio_de_texto(f.name)
+            if anio_f and anio_f not in anios_cubiertos:
+                log(f"[PBA] leyendo curado (sin fuente cruda): {f.name}")
+                registros += _parse_curado(f, cont)
 
     cont.resumen()
     log(f"[PBA] total: {len(registros)} registros")

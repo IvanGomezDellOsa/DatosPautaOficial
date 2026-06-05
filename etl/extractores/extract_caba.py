@@ -96,7 +96,7 @@ def _indices(header):
         hn = h.replace("Ó", "O").replace("Á", "A").replace("Í", "I")
         if idx["fecha"] is None and "FECHA" in hn:
             idx["fecha"] = i
-        if idx["importe"] is None and ("IMPORTE" in hn or hn in ("MONTO", "TOTAL")):
+        if idx["importe"] is None and ("IMPORTE" in hn or "MONTO" in hn or hn == "TOTAL"):
             idx["importe"] = i
         if idx["tipo"] is None and "TIPO" in hn:
             idx["tipo"] = i
