@@ -119,7 +119,7 @@ function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob
 // ---------------------------------------------------------------------------
 
 function groupKey(row: OrdenAgrupada): string {
-  return `${row.medio_norm ?? ""}|${row.proveedor_norm ?? ""}`;
+  return `${row.medio_norm ?? row.medio ?? ""}|${row.proveedor_norm ?? row.proveedor ?? ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -401,7 +401,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                               : orden.resolucion
                           ) : "–"}</td>
                           <td className="monto" style={{ color: "var(--color-fg-subtle)" }}>
-                            {formatMonto(orden.monto_deflactado)}
+                            {formatMonto(orden.monto)}
                           </td>
                         </tr>
                       ))}

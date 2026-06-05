@@ -25,20 +25,19 @@ export type Orden = {
   id: number;
   medio: string | null;
   proveedor: string | null;
-  monto_deflactado: number | null;
   monto: number | null;
   resolucion: string | null;
   jurisdiccion: string;
   anio: number;
 };
 
-/** Fila devuelta por getOrdenes en modo agrupado (GROUP BY medio_norm, proveedor_norm). */
+/** Fila devuelta por getOrdenes en modo agrupado (GROUP BY medio, proveedor). */
 export type OrdenAgrupada = {
   medio_norm: string | null;
   proveedor_norm: string | null;
-  medio: string | null;    // MAX(medio)
-  proveedor: string | null; // MAX(proveedor)
-  total: number | null;    // SUM(monto_deflactado)
+  medio: string | null;
+  proveedor: string | null;
+  total: number | null;    // SUM(monto)
   n: number;               // COUNT(*)
 };
 
@@ -132,11 +131,11 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     params.push(anio);
   }
   if (entidadNorm && entidadTipo === "proveedor") {
-    wheres.push("proveedor_norm = ?");
+    wheres.push("proveedor = ?");
     params.push(entidadNorm);
   }
   if (entidadNorm && entidadTipo === "medio") {
-    wheres.push("medio_norm = ?");
+    wheres.push("medio = ?");
     params.push(entidadNorm);
   }
 
@@ -161,12 +160,12 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     // Con entidad: el set es chico, GROUP BY en vivo es rapido.
     // HAVING excluye el grupo (null,null): ordenes sin proveedor ni medio.
     const filas = await query<OrdenAgrupada>(
-      `SELECT medio_norm, proveedor_norm,
-              MAX(medio) as medio, MAX(proveedor) as proveedor,
-              SUM(monto_deflactado) as total, COUNT(*) as n
+      `SELECT medio AS medio_norm, proveedor AS proveedor_norm,
+              medio, proveedor,
+              SUM(monto) as total, COUNT(*) as n
        FROM orders ${where}
-       GROUP BY medio_norm, proveedor_norm
-       HAVING medio_norm IS NOT NULL OR proveedor_norm IS NOT NULL
+       GROUP BY medio, proveedor
+       HAVING medio IS NOT NULL OR proveedor IS NOT NULL
        ORDER BY total DESC
        LIMIT 100`,
       params,
@@ -175,10 +174,9 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
   }
 
   // ── Modo individual (original) ───────────────────────────────────────────
-  const montoCol = deflactado ? "monto_deflactado" : "monto";
   const orden = ordenPor === "id"
     ? `id ${desc ? "DESC" : "ASC"}`
-    : `${montoCol} ${desc ? "DESC" : "ASC"} NULLS LAST`;
+    : `monto ${desc ? "DESC" : "ASC"} NULLS LAST`;
 
   // Count total para paginación (usa el mismo WHERE para ser consistente)
   const [{ total }] = await query<{ total: number }>(
@@ -188,7 +186,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 
   // Filas de la página
   const filas = await query<Orden>(
-    `SELECT id, medio, proveedor, monto, monto_deflactado,
+    `SELECT id, medio, proveedor, monto,
             resolucion, jurisdiccion, anio
      FROM orders ${where}
      ORDER BY ${orden}
@@ -219,15 +217,15 @@ export async function getDetalleGrupo(
 
   if (jurisdiccion)   { wheres.push("jurisdiccion = ?");   params.push(jurisdiccion); }
   if (anio)           { wheres.push("anio = ?");            params.push(anio); }
-  if (medio_norm)     { wheres.push("medio_norm = ?");      params.push(medio_norm); }
-  if (proveedor_norm) { wheres.push("proveedor_norm = ?");  params.push(proveedor_norm); }
+  if (medio_norm)     { wheres.push("medio = ?");      params.push(medio_norm); }
+  if (proveedor_norm) { wheres.push("proveedor = ?");  params.push(proveedor_norm); }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
   return query<Orden>(
-    `SELECT id, medio, proveedor, monto, monto_deflactado,
+    `SELECT id, medio, proveedor, monto,
             resolucion, jurisdiccion, anio
      FROM orders ${where}
-     ORDER BY monto_deflactado DESC NULLS LAST
+     ORDER BY monto DESC NULLS LAST
      LIMIT 500`,
     params,
   );
@@ -392,15 +390,15 @@ export async function getTotalesFiltro(
   if (jurisdiccion) { wheres.push("jurisdiccion = ?"); params.push(jurisdiccion); }
   if (anio)         { wheres.push("anio = ?");          params.push(anio); }
   if (entidadNorm && entidadTipo === "proveedor") {
-    wheres.push("proveedor_norm = ?"); params.push(entidadNorm);
+    wheres.push("proveedor = ?"); params.push(entidadNorm);
   }
   if (entidadNorm && entidadTipo === "medio") {
-    wheres.push("medio_norm = ?"); params.push(entidadNorm);
+    wheres.push("medio = ?"); params.push(entidadNorm);
   }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
   const [row] = await query<{ n: number; total: number; c_medio: number; c_proveedor: number; c_monto: number; c_resolucion: number }>(
-    `SELECT COUNT(*) as n, SUM(monto_deflactado) as total, COUNT(medio) as c_medio, COUNT(proveedor) as c_proveedor, COUNT(monto_deflactado) as c_monto, COUNT(resolucion) as c_resolucion FROM orders ${where}`,
+    `SELECT COUNT(*) as n, SUM(monto) as total, COUNT(medio) as c_medio, COUNT(proveedor) as c_proveedor, COUNT(monto) as c_monto, COUNT(resolucion) as c_resolucion FROM orders ${where}`,
     params,
   );
   return {
