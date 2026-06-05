@@ -158,13 +158,15 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
       );
       return { filas, totalFilas: filas.length };
     }
-    // Con entidad: el set es chico, GROUP BY en vivo es rápido.
+    // Con entidad: el set es chico, GROUP BY en vivo es rapido.
+    // HAVING excluye el grupo (null,null): ordenes sin proveedor ni medio.
     const filas = await query<OrdenAgrupada>(
       `SELECT medio_norm, proveedor_norm,
               MAX(medio) as medio, MAX(proveedor) as proveedor,
               SUM(monto_deflactado) as total, COUNT(*) as n
        FROM orders ${where}
        GROUP BY medio_norm, proveedor_norm
+       HAVING medio_norm IS NOT NULL OR proveedor_norm IS NOT NULL
        ORDER BY total DESC
        LIMIT 100`,
       params,

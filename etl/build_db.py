@@ -478,7 +478,9 @@ def crear_groups(con, top_n=100):
         CREATE INDEX idx_gcache ON groups_cache(jurisdiccion, anio, rank);
     """)
 
-    # Tabla temporal: todos los agregados por (juris, anio, medio_norm, prov_norm)
+    # Tabla temporal: todos los agregados por (juris, anio, medio_norm, prov_norm).
+    # Excluye el grupo (null, null): ordenes sin proveedor ni medio identificable,
+    # que no aportan informacion util al usuario y distorsionan el ranking.
     con.executescript("""
         CREATE TEMP TABLE _groups AS
             SELECT jurisdiccion, anio,
@@ -488,6 +490,7 @@ def crear_groups(con, top_n=100):
                    SUM(monto_deflactado) AS total,
                    COUNT(*)      AS n
             FROM orders
+            WHERE NOT (medio_norm IS NULL AND proveedor_norm IS NULL)
             GROUP BY jurisdiccion, anio, medio_norm, proveedor_norm;
     """)
 
@@ -808,7 +811,12 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     if OUT_DB.exists():
-        OUT_DB.unlink()
+        try:
+            OUT_DB.unlink()
+        except PermissionError:
+            # En Linux con mount CIFS/9p el archivo puede ser read-only;
+            # se sobreescribe truncando en lugar de borrar.
+            OUT_DB.write_bytes(b"")
 
     con = sqlite3.connect(OUT_DB)
     # page_size grande = arbol B mas chato + lecturas mas grandes por request.
