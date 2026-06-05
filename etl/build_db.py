@@ -670,8 +670,8 @@ def split_db():
 def escribir_home(con, prov_disp):
     """Emite public/data/home.json: el estado inicial de la portada precomputado.
 
-    La vista inicial (PBA + 2025, ordenada por fecha ascendente) es FIJA, igual
-    en cada carga. En vez de levantarla en vivo con sql.js-httpvfs --cientos de
+    La vista inicial (PBA + anio_mas_reciente, ordenada por id ascendente) es FIJA,
+    igual en cada carga. En vez de levantarla en vivo con sql.js-httpvfs --cientos de
     range-requests HTTP encadenados, ~8 s de spinners-- la calculamos aca y la
     servimos como JSON estatico que Astro inlinea como prop. Asi el primer paint
     muestra datos reales sin WASM, sin worker y sin un solo round-trip a la DB;
@@ -681,8 +681,14 @@ def escribir_home(con, prov_disp):
     useGobierno / getRanking / getCuantoRecibio) para que el seed coincida con lo
     que devolveria la DB. Si cambias esas queries o el default, regenera esto.
     """
-    JURIS, ANIO = "PBA", 2025
+    JURIS = "PBA"
     cur = con.cursor()
+    # Usar el anio mas reciente con datos reales para la jurisdiccion elegida,
+    # para que el seed nunca quede vacio si los datos no llegaron al anio actual.
+    row = cur.execute(
+        "SELECT MAX(anio) FROM orders WHERE jurisdiccion=?", (JURIS,)
+    ).fetchone()
+    ANIO = row[0] if (row and row[0]) else 2024
 
     def rows(sql, prm=()):
         cur.execute(sql, prm)
@@ -765,7 +771,7 @@ def escribir_home(con, prov_disp):
     out = OUT_DIR / "home.json"
     with out.open("w", encoding="utf-8") as f:
         json.dump(home, f, ensure_ascii=False, separators=(",", ":"))
-    return out, len(filas), total_filas
+    return out, len(filas), total_filas, JURIS, ANIO
 
 
 def escribir_busqueda(prov_disp, medio_disp):
@@ -972,7 +978,7 @@ def main():
     crear_groups(con)
 
     # --- estado inicial de la portada precomputado (evita el waterfall HTTP) -
-    out_home, n_home, n_home_total = escribir_home(con, prov_disp)
+    out_home, n_home, n_home_total, out_home_juris, out_home_anio = escribir_home(con, prov_disp)
 
     con.commit()
     con.execute("ANALYZE")
@@ -993,7 +999,7 @@ def main():
     print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
-    print(f"OK  {out_home}  (estado inicial PBA 2025: {n_home}/{n_home_total} filas, "
+    print(f"OK  {out_home}  (estado inicial {out_home_juris} {out_home_anio}: {n_home}/{n_home_total} filas, "
           f"{out_home.stat().st_size/1024:.1f} KB)")
     for k, v in meta.items():
         print(f"  {k:32s} {v}")
