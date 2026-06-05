@@ -345,6 +345,17 @@ def _parse_pertype(path, anio, cont):
     filas = leer_filas(path, sep)
     if len(filas) < 2:
         return out
+    # Algunos archivos (p.ej. medios-graficos-2022.csv, cine-2022.csv) tienen
+    # cada linea envuelta en comillas extra: '"FECHA,""MEDIO"",""IMPORTE"""'.
+    # El parser CSV los lee como UNA sola celda por fila con el contenido interno.
+    # Detectamos por: header de 1 columna que contiene comas, y re-parseamos.
+    if len(filas[0]) == 1 and "," in (filas[0][0] or ""):
+        import io as _io, csv as _csv_mod
+        filas = [
+            list(_csv_mod.reader([f[0]]))[0]
+            for f in filas
+            if f and (f[0] or "").strip()
+        ]
     idx = _indices(filas[0])
     if idx["importe"] is None:
         cont.descartar("sin_columna_importe")
