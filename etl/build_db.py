@@ -17,9 +17,9 @@ Salida:
   - public/data/search.json      entidades distintas (proveedor/medio) para
                                  la busqueda client-side con MiniSearch
 
-El script es ADITIVO: las columnas derivadas existen siempre y mejoran cuando
-aparecen sus insumos. Si falta aliases.csv, proveedor_norm/medio_norm usan solo
-la normalizacion algoritmica. monto_deflactado siempre se calcula con ipc_indec.csv.
+Tabla orders: id, jurisdiccion, anio, proveedor (norm), medio (norm), monto (deflactado), resolucion.
+Si falta aliases.csv, proveedor/medio usan solo la normalizacion algoritmica.
+monto siempre se deflacta con ipc_indec.csv.
 
 Solo usa la biblioteca estandar de Python: no requiere pip install.
 Uso:  python3 etl/build_db.py
@@ -222,16 +222,13 @@ def crear_esquema(con):
     con.executescript(
         """
         CREATE TABLE orders (
-            id                INTEGER PRIMARY KEY,
-            jurisdiccion      TEXT NOT NULL,
-            anio              INTEGER NOT NULL,
-            medio             TEXT,
-            proveedor         TEXT,
-            monto             REAL,
-            monto_deflactado  REAL,
-            resolucion        TEXT,
-            proveedor_norm    TEXT,
-            medio_norm        TEXT
+            id            INTEGER PRIMARY KEY,
+            jurisdiccion  TEXT NOT NULL,
+            anio          INTEGER NOT NULL,
+            proveedor     TEXT,
+            medio         TEXT,
+            monto         REAL,
+            resolucion    TEXT
         );
 
         CREATE TABLE governments (
@@ -280,24 +277,24 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
     # Tabla intermedia auxiliar (se descarta al final)
     con.executescript("""
         CREATE TEMP TABLE _rprov AS
-            SELECT o.jurisdiccion, o.anio, o.proveedor_norm AS norm,
+            SELECT o.jurisdiccion, o.anio, o.proveedor AS norm,
                    b.nombre,
-                   SUM(o.monto_deflactado) AS total,
+                   SUM(o.monto) AS total,
                    COUNT(*) AS n
             FROM orders o
-            JOIN _best_prov b ON o.proveedor_norm = b.norm
-            WHERE o.proveedor_norm IS NOT NULL
-            GROUP BY o.jurisdiccion, o.anio, o.proveedor_norm;
+            JOIN _best_prov b ON o.proveedor = b.norm
+            WHERE o.proveedor IS NOT NULL
+            GROUP BY o.jurisdiccion, o.anio, o.proveedor;
 
         CREATE TEMP TABLE _rmedio AS
-            SELECT o.jurisdiccion, o.anio, o.medio_norm AS norm,
+            SELECT o.jurisdiccion, o.anio, o.medio AS norm,
                    b.nombre,
-                   SUM(o.monto_deflactado) AS total,
+                   SUM(o.monto) AS total,
                    COUNT(*) AS n
             FROM orders o
-            JOIN _best_medio b ON o.medio_norm = b.norm
-            WHERE o.medio_norm IS NOT NULL
-            GROUP BY o.jurisdiccion, o.anio, o.medio_norm;
+            JOIN _best_medio b ON o.medio = b.norm
+            WHERE o.medio IS NOT NULL
+            GROUP BY o.jurisdiccion, o.anio, o.medio;
     """)
 
     con.executescript("""
@@ -386,12 +383,12 @@ def crear_totals(con):
         CREATE INDEX idx_totals ON totals_cache(tipo, norm);
     """)
 
-    for tipo, col in (("proveedor", "proveedor_norm"), ("medio", "medio_norm")):
+    for tipo, col in (("proveedor", "proveedor"), ("medio", "medio")):
         # desglose por anio x jurisdiccion
         con.execute(f"""
             INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
             SELECT '{tipo}', {col}, anio, jurisdiccion,
-                   SUM(monto_deflactado), COUNT(*)
+                   SUM(monto), COUNT(*)
             FROM orders
             WHERE {col} IS NOT NULL
             GROUP BY {col}, anio, jurisdiccion
@@ -400,7 +397,7 @@ def crear_totals(con):
         con.execute(f"""
             INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
             SELECT '{tipo}', {col}, 0, '*',
-                   SUM(monto_deflactado), COUNT(*)
+                   SUM(monto), COUNT(*)
             FROM orders
             WHERE {col} IS NOT NULL
             GROUP BY {col}
@@ -434,8 +431,8 @@ def crear_filtros(con):
         );
         CREATE INDEX idx_filtros ON filtros_cache(jurisdiccion, anio);
     """)
-    cols = ("COUNT(*), SUM(monto_deflactado), COUNT(medio), "
-            "COUNT(proveedor), COUNT(monto_deflactado), COUNT(resolucion)")
+    cols = ("COUNT(*), SUM(monto), COUNT(medio), "
+            "COUNT(proveedor), COUNT(monto), COUNT(resolucion)")
     # por (jurisdiccion, anio)
     con.execute(f"INSERT INTO filtros_cache "
                 f"SELECT jurisdiccion, anio, {cols} FROM orders GROUP BY jurisdiccion, anio")
@@ -483,15 +480,18 @@ def crear_groups(con, top_n=100):
     # que no aportan informacion util al usuario y distorsionan el ranking.
     con.executescript("""
         CREATE TEMP TABLE _groups AS
-            SELECT jurisdiccion, anio,
-                   medio_norm, proveedor_norm,
-                   MAX(medio)    AS medio,
-                   MAX(proveedor) AS proveedor,
-                   SUM(monto_deflactado) AS total,
-                   COUNT(*)      AS n
-            FROM orders
-            WHERE NOT (medio_norm IS NULL AND proveedor_norm IS NULL)
-            GROUP BY jurisdiccion, anio, medio_norm, proveedor_norm;
+            SELECT o.jurisdiccion, o.anio,
+                   o.medio    AS medio_norm,
+                   o.proveedor AS proveedor_norm,
+                   COALESCE(bm.nombre, o.medio)     AS medio,
+                   COALESCE(bp.nombre, o.proveedor) AS proveedor,
+                   SUM(o.monto) AS total,
+                   COUNT(*)     AS n
+            FROM orders o
+            LEFT JOIN _best_medio bm ON o.medio     = bm.norm
+            LEFT JOIN _best_prov  bp ON o.proveedor = bp.norm
+            WHERE NOT (o.medio IS NULL AND o.proveedor IS NULL)
+            GROUP BY o.jurisdiccion, o.anio, o.medio, o.proveedor;
     """)
 
     def insert_top(juris_key, anio_key, rows):
@@ -565,24 +565,24 @@ def crear_indices(con):
     # el front termina permitiendo filtrar por anio sin jurisdiccion.
     con.executescript(
         """
-        CREATE INDEX idx_orders_juris_anio_prov  ON orders(jurisdiccion, anio, proveedor_norm);
-        CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio_norm);
-        -- Covering index para getOrdenes(agrupado=true): incluye monto_deflactado
+        CREATE INDEX idx_orders_juris_anio_prov  ON orders(jurisdiccion, anio, proveedor);
+        CREATE INDEX idx_orders_juris_anio_medio ON orders(jurisdiccion, anio, medio);
+        -- Covering index para getOrdenes(agrupado=true): incluye monto
         -- para que SUM() se resuelva sin saltar a la tabla principal.
-        -- Sin monto_deflactado cada fila del GROUP BY scan requiere un acceso
+        -- Sin monto cada fila del GROUP BY scan requiere un acceso
         -- aleatorio a la tabla -> prefetch exponencial de sql.js-httpvfs.
-        CREATE INDEX idx_orders_juris_anio_medio_prov ON orders(jurisdiccion, anio, medio_norm, proveedor_norm, monto_deflactado);
-        CREATE INDEX idx_orders_prov_anio        ON orders(proveedor_norm, anio);
-        CREATE INDEX idx_orders_medio_anio       ON orders(medio_norm, anio);
+        CREATE INDEX idx_orders_juris_anio_medio_prov ON orders(jurisdiccion, anio, medio, proveedor, monto);
+        CREATE INDEX idx_orders_prov_anio        ON orders(proveedor, anio);
+        CREATE INDEX idx_orders_medio_anio       ON orders(medio, anio);
 
         -- Indices de ORDENAMIENTO de la tabla (getOrdenes). Sin estos, ORDER BY
         -- monto hace "USE TEMP B-TREE FOR ORDER BY": SQLite materializa y
         -- ordena en memoria el set filtrado. Sobre sql.js-httpvfs eso dispara
         -- el prefetch exponencial -> "database disk image is malformed".
         -- 'id' no necesita indice: es la PK (orden secuencial nativo).
-        CREATE INDEX idx_orders_juris_anio_monto ON orders(jurisdiccion, anio, monto_deflactado);
-        CREATE INDEX idx_orders_anio_monto       ON orders(anio, monto_deflactado);
-        CREATE INDEX idx_orders_monto            ON orders(monto_deflactado);
+        CREATE INDEX idx_orders_juris_anio_monto ON orders(jurisdiccion, anio, monto);
+        CREATE INDEX idx_orders_anio_monto       ON orders(anio, monto);
+        CREATE INDEX idx_orders_monto            ON orders(monto);
         """
     )
     # FAST-FOLLOW (no implementar hasta tener el query layer escrito):
@@ -694,16 +694,16 @@ def escribir_home(con, prov_disp):
         "SELECT COUNT(*) FROM orders WHERE jurisdiccion=? AND anio=?",
         (JURIS, ANIO)).fetchone()[0]
     filas = rows(
-        """SELECT id, medio, proveedor, monto, monto_deflactado,
+        """SELECT id, medio, proveedor, monto,
                   resolucion, jurisdiccion, anio
            FROM orders WHERE jurisdiccion=? AND anio=?
            ORDER BY id ASC LIMIT 100""", (JURIS, ANIO))
 
     # 2. Totales -- getTotalesFiltro
     t = cur.execute(
-        """SELECT COUNT(*) n, SUM(monto_deflactado) total,
+        """SELECT COUNT(*) n, SUM(monto) total,
                   COUNT(medio) c_medio, COUNT(proveedor) c_proveedor,
-                  COUNT(monto_deflactado) c_monto, COUNT(resolucion) c_resolucion
+                  COUNT(monto) c_monto, COUNT(resolucion) c_resolucion
            FROM orders WHERE jurisdiccion=? AND anio=?""", (JURIS, ANIO)).fetchone()
     totales = {"nOrdenes": t[0], "montoTotal": t[1] or 0,
                "c_medio": t[2], "c_proveedor": t[3], "c_monto": t[4], "c_resolucion": t[5]}
@@ -917,14 +917,13 @@ def main():
 
                 yield (
                     jur, anio_i,
-                    medio_v, prov_v, monto_v, monto_def,
-                    (reso.strip() or None), p_norm, m_norm,
+                    p_norm, m_norm, monto_def,
+                    (reso.strip() or None),
                 )
 
     con.executemany(
-        "INSERT INTO orders(jurisdiccion, anio, medio, "
-        "proveedor, monto, monto_deflactado, resolucion, "
-        "proveedor_norm, medio_norm) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO orders(jurisdiccion, anio, "
+        "proveedor, medio, monto, resolucion) VALUES (?,?,?,?,?,?)",
         filas_orders())
 
     if st["filas"] == 0:
@@ -998,6 +997,18 @@ def main():
           f"{out_home.stat().st_size/1024:.1f} KB)")
     for k, v in meta.items():
         print(f"  {k:32s} {v}")
+
+    # --- verificacion post-build ------------------------------------------
+    vcon = sqlite3.connect(OUT_DB)
+    print("\nSchema final de orders (PRAGMA table_info):")
+    for row in vcon.execute("PRAGMA table_info(orders)"):
+        print(f"  {row}")
+    total_v = vcon.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+    print(f"COUNT(*) FROM orders: {total_v}")
+    monto_null_v = vcon.execute("SELECT COUNT(*) FROM orders WHERE monto IS NULL").fetchone()[0]
+    print(f"Filas con monto IS NULL: {monto_null_v}"
+          + (" (deflactor ausente para esos anios)" if monto_null_v else " OK"))
+    vcon.close()
 
 
 if __name__ == "__main__":
