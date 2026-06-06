@@ -276,6 +276,77 @@ def _parse_curado(path, cont):
     return out
 
 
+# Nombre exacto del CSV que cubre enero 2013 – mayo 2014.
+# Se parsea con un lector dedicado (solo toma filas de 2013;
+# las de 2014 ya están cubiertas por pauta-oficial-2014.csv).
+_CSV_ENE2013 = "DatosPublicidadOficialEnero2013_Mayo2014.csv"
+
+
+def _parse_enero2013(path, cont):
+    """Parsea DatosPublicidadOficialEnero2013_Mayo2014.csv.
+
+    Columnas (separadas por ';'):
+      ORDEN DE PUBLICIDAD ; IMPORTE NETO ; ANUNCIANTE ; CAMPAÑA ;
+      RUBRO ; NOMBRE O RAZON SOCIAL DEL PROVEEDOR ; PREST.
+
+    'PREST.' tiene formato 'abr-13', 'ene-14', etc.
+    Solo se extraen filas de 2013 para evitar duplicados con pauta-oficial-2014.csv.
+    """
+    import csv as _csv
+    out = []
+    txt = None
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            with open(path, encoding=enc, newline="") as fh:
+                txt = fh.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not txt:
+        return out
+
+    rows = list(_csv.reader(__import__("io").StringIO(txt), delimiter=";"))
+    if not rows:
+        return out
+
+    # Mapear columnas por nombre (insensible a mayúsculas)
+    hdr = [c.strip().lower() for c in rows[0]]
+    def ci(name):
+        for i, h in enumerate(hdr):
+            if name in h:
+                return i
+        return None
+
+    i_res   = ci("orden")
+    i_monto = ci("importe")
+    i_rubro = ci("rubro")
+    i_prov  = ci("nombre") or ci("razon social")
+    i_fecha = ci("prest")
+
+    for row in rows[1:]:
+        if i_fecha is None or i_fecha >= len(row):
+            continue
+        fecha_raw = row[i_fecha].strip()
+        # normalizar_fecha convierte "abr-13" → "2013-04-01"
+        fecha = normalizar_fecha(fecha_raw)
+        if not fecha or not fecha.startswith("2013"):
+            cont.descartar("fila_no_2013")
+            continue
+        monto = normalizar_monto(row[i_monto] if i_monto is not None else None)
+        if monto is None:
+            cont.descartar("monto_invalido")
+            continue
+        prov = limpiar_str(row[i_prov] if i_prov is not None else None)
+        tipo = _canon_rubro(row[i_rubro].strip() if i_rubro is not None else None)
+        res  = limpiar_str(row[i_res] if i_res is not None else None)
+        out.append(registro(
+            JURIS, 2013, monto, path.name,
+            fecha=fecha, proveedor=prov, tipo_de_medio=tipo, resolucion=res,
+        ))
+        cont.ok()
+    return out
+
+
 def extraer():
     log("[Nación] iniciando extraccion")
     registros = []
@@ -285,9 +356,17 @@ def extraer():
         log(f"[Nación] ADVERTENCIA: no existe {DIR_NACION}")
         return registros
 
-    # --- archivos limpios en root ---
+    # --- archivos limpios en root (saltear el CSV mixto 2013-2014) ---
     for f in sorted(DIR_NACION.glob("*.csv")):
+        if f.name == _CSV_ENE2013:
+            continue   # se procesa por separado abajo
         registros += _parse_limpio(f, cont)
+
+    # --- CSV enero 2013 – mayo 2014: solo filas de 2013 ---
+    f_2013 = DIR_NACION / _CSV_ENE2013
+    if f_2013.exists():
+        log(f"[Nación] leyendo fuente cruda 2013: {_CSV_ENE2013}")
+        registros += _parse_enero2013(f_2013, cont)
 
     # --- subcarpetas de años pivot / 2011 ---
     for ydir in sorted(p for p in DIR_NACION.iterdir() if p.is_dir() and re.fullmatch(r"\d{4}", p.name)):
