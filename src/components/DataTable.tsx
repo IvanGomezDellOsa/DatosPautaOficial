@@ -310,6 +310,13 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   const loading = modoIndividual ? loadingIndividual : loadingAgrupado;
   const totalMonto = modoIndividual ? totalMontoIndividual : totalMontoAgrupado;
 
+  // Solo se permite expandir un grupo cuando hay jurisdicción Y año: ese es el
+  // caso que resuelve el covering index idx_orders_juris_anio_medio_prov (lookup
+  // rápido, sin temp B-tree). Sin ambos filtros, el detalle de un grupo cruzaría
+  // todas las jurisdicciones/años -> escaneo lento + datos redundantes; se guía
+  // al usuario a filtrar primero en vez de bajar miles de filas dispersas.
+  const puedeExpandir = estado.jurisdiccion != null && estado.anio != null;
+
   return (
     <>
       {/* ── FILTER BAR ── */}
@@ -495,6 +502,12 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
             </table>
           ) : (
             /* ── MODO AGRUPADO ── */
+            <>
+            {!puedeExpandir && rowsAgrupados.length > 0 && (
+              <p style={{ margin: "0 0 0.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>
+                Filtrá por jurisdicción y año para poder ver las órdenes individuales de cada grupo.
+              </p>
+            )}
             <table className="data">
               <thead>
                 <tr>
@@ -523,12 +536,13 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                         {/* Fila agrupada */}
                         <tr
                           key={key}
-                          onClick={() => toggleGrupo(row)}
-                          style={{ cursor: "pointer" }}
-                          aria-expanded={isExpanded}
+                          onClick={puedeExpandir ? () => toggleGrupo(row) : undefined}
+                          style={{ cursor: puedeExpandir ? "pointer" : "default" }}
+                          aria-expanded={puedeExpandir ? isExpanded : undefined}
+                          title={puedeExpandir ? undefined : "Filtrá por jurisdicción y año para ver las órdenes individuales"}
                         >
                           <td style={{ textAlign: "center", color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>
-                            {isExpanded ? "▾" : "▸"}
+                            {puedeExpandir ? (isExpanded ? "▾" : "▸") : ""}
                           </td>
                           {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>—</td>}
                           <td>{row.proveedor ?? row.proveedor_norm ?? "–"}</td>
@@ -595,6 +609,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                 )}
               </tbody>
             </table>
+            </>
           )}
         </div>
       </div>
