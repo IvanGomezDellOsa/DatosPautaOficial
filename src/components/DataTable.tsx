@@ -48,6 +48,9 @@ const DISPONIBILIDAD: Record<string, [number, number]> = {
   "Santa Fe": [2008, 2023],
 };
 const POR_PAGINA = 100;
+// Órdenes que se cargan por tanda al expandir un grupo. Pequeño a propósito:
+// un grupo grande (cientos de órdenes casi idénticas) cargaría lentísimo de una.
+const POR_TANDA_DETALLE = 15;
 
 const fmtARS = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtNum = new Intl.NumberFormat("es-AR");
@@ -158,6 +161,9 @@ function groupKey(row: OrdenAgrupada): string {
   return `${row.medio_norm ?? row.medio ?? ""}|${row.proveedor_norm ?? row.proveedor ?? ""}`;
 }
 
+/** Estado de un grupo expandido: órdenes cargadas + si hay una tanda en vuelo. */
+type DetalleGrupoState = { filas: Orden[]; cargando: boolean };
+
 // ---------------------------------------------------------------------------
 // Componente principal
 // ---------------------------------------------------------------------------
@@ -198,8 +204,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // Datos individuales (modo individual)
   const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual } = useTablaIndividual(filtros, paginaIndividual);
 
-  // Detalle expandido: key → Orden[] | "loading"
-  const [expandedMap, setExpandedMap] = useState<Map<string, Orden[] | "loading">>(new Map());
+  // Detalle expandido: key → { filas cargadas hasta ahora, si está cargando una tanda }
+  const [expandedMap, setExpandedMap] = useState<Map<string, DetalleGrupoState>>(new Map());
 
   // Actualiza estado + URL
   const setFiltro = useCallback((patch: Partial<EstadoTabla>) => {
@@ -249,34 +255,55 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     setTextoBusq("");
   };
 
-  // Toggle expandir/colapsar grupo (modo agrupado)
-  const toggleGrupo = useCallback(async (row: OrdenAgrupada) => {
-    const key = groupKey(row);
-    setExpandedMap((prev) => {
-      const next = new Map(prev);
-      if (next.has(key)) {
-        next.delete(key);
-        return next;
-      }
-      next.set(key, "loading");
-      return next;
-    });
-    setExpandedMap((prev) => {
-      if (!prev.has(key) || prev.get(key) !== "loading") return prev;
-      getDetalleGrupo(row.medio_norm, row.proveedor_norm, {
-        jurisdiccion: filtros.jurisdiccion,
-        anio: filtros.anio,
-      }).then((filas) => {
-        setExpandedMap((p) => {
-          const n = new Map(p);
-          n.set(key, filas);
-          return n;
-        });
+  // Carga una tanda de órdenes del grupo (la primera al expandir, o las
+  // siguientes al tocar "ver más"). Acumula sobre lo ya cargado.
+  const cargarTandaDetalle = useCallback((row: OrdenAgrupada, key: string, offset: number) => {
+    getDetalleGrupo(
+      row.medio_norm, row.proveedor_norm,
+      { jurisdiccion: filtros.jurisdiccion, anio: filtros.anio },
+      POR_TANDA_DETALLE, offset,
+    ).then((nuevas) => {
+      setExpandedMap((p) => {
+        const cur = p.get(key);
+        if (!cur) return p; // se colapsó mientras cargaba
+        const n = new Map(p);
+        // offset 0 = primera tanda (reemplaza); resto = append
+        n.set(key, { filas: offset === 0 ? nuevas : [...cur.filas, ...nuevas], cargando: false });
+        return n;
       });
-      return prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtros.jurisdiccion, filtros.anio]);
+
+  // Toggle expandir/colapsar grupo (modo agrupado). Lee expandedMap del closure
+  // (está en deps) para decidir SINCRÓNICAMENTE si abrir y disparar el fetch —
+  // no se puede usar una flag seteada dentro del updater de setState porque ese
+  // updater corre diferido (la flag seguiría en false al lanzar la tanda).
+  const toggleGrupo = useCallback((row: OrdenAgrupada) => {
+    const key = groupKey(row);
+    if (expandedMap.has(key)) {
+      setExpandedMap((prev) => { const n = new Map(prev); n.delete(key); return n; });
+    } else {
+      setExpandedMap((prev) => { const n = new Map(prev); n.set(key, { filas: [], cargando: true }); return n; });
+      cargarTandaDetalle(row, key, 0);
+    }
+  }, [expandedMap, cargarTandaDetalle]);
+
+  // "Ver más": carga la siguiente tanda a partir de lo ya mostrado.
+  const verMasDetalle = useCallback((row: OrdenAgrupada) => {
+    const key = groupKey(row);
+    const cur = expandedMap.get(key);
+    if (!cur || cur.cargando) return; // ya cargando o colapsado
+    const offset = cur.filas.length;
+    setExpandedMap((prev) => {
+      const c = prev.get(key);
+      if (!c) return prev;
+      const n = new Map(prev);
+      n.set(key, { ...c, cargando: true });
+      return n;
+    });
+    cargarTandaDetalle(row, key, offset);
+  }, [expandedMap, cargarTandaDetalle]);
 
   // Paginación modo individual
   const totalPaginas = Math.ceil(totalFilas / POR_PAGINA);
@@ -488,7 +515,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                     const key = groupKey(row);
                     const detalle = expandedMap.get(key);
                     const isExpanded = detalle !== undefined;
-                    const isLoading = detalle === "loading";
+                    const cargandoPrimera = detalle?.cargando && detalle.filas.length === 0;
+                    const hayMas = isExpanded && detalle.filas.length < row.n;
                     const colSpanTotal = (!estado.jurisdiccion ? 5 : 4);
                     return (
                       <>
@@ -514,14 +542,14 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                         </tr>
 
                         {/* Filas hijas */}
-                        {isExpanded && isLoading && (
+                        {cargandoPrimera && (
                           <tr key={`${key}-loading`} style={{ background: "var(--color-bg-elev-2)" }}>
                             <td colSpan={colSpanTotal} style={{ padding: "0.5rem 1rem 0.5rem 2.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>
                               Cargando órdenes…
                             </td>
                           </tr>
                         )}
-                        {isExpanded && !isLoading && (detalle as Orden[]).map((orden) => (
+                        {isExpanded && detalle.filas.map((orden) => (
                           <tr key={`${key}-${orden.id}`} style={{ background: "var(--color-bg-elev-2)" }}>
                             <td style={{ paddingLeft: "1.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>#{orden.id}</td>
                             {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.jurisdiccion}</td>}
@@ -536,6 +564,31 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
                             </td>
                           </tr>
                         ))}
+
+                        {/* Footer "ver más": carga la siguiente tanda sin traer todo de golpe */}
+                        {isExpanded && detalle.filas.length > 0 && hayMas && (
+                          <tr key={`${key}-mas`} style={{ background: "var(--color-bg-elev-2)" }}>
+                            <td colSpan={colSpanTotal} style={{ padding: "0.4rem 1rem 0.6rem 2.5rem" }}>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); verMasDetalle(row); }}
+                                disabled={detalle.cargando}
+                                style={{
+                                  background: "none", border: "1px solid var(--color-border-strong)",
+                                  borderRadius: 6, padding: "4px 12px", cursor: detalle.cargando ? "default" : "pointer",
+                                  color: "var(--color-fg)", fontSize: "var(--text-small)",
+                                }}
+                              >
+                                {detalle.cargando
+                                  ? "Cargando…"
+                                  : `Ver ${Math.min(POR_TANDA_DETALLE, row.n - detalle.filas.length)} más`}
+                              </button>
+                              <span style={{ marginLeft: 10, color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>
+                                mostrando {fmtNum.format(detalle.filas.length)} de {fmtNum.format(row.n)}
+                              </span>
+                            </td>
+                          </tr>
+                        )}
                       </>
                     );
                   })

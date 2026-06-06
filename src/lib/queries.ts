@@ -206,14 +206,22 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 // ---------------------------------------------------------------------------
 
 /**
- * Devuelve las órdenes individuales de un par (medio_norm, proveedor_norm)
- * con los filtros de jurisdicción/año activos. Solo se llama al expandir
- * una fila agrupada; el resultado se cachea en el componente (Map).
+ * Devuelve una página de órdenes individuales de un par (medio_norm,
+ * proveedor_norm) con los filtros de jurisdicción/año activos. Solo se llama al
+ * expandir una fila agrupada; el resultado se cachea/acumula en el componente.
+ *
+ * Paginado (limite/offset) para no bajar de golpe todas las órdenes de un grupo
+ * grande (p.ej. 1366 casi idénticas): el front carga de a `limite` y ofrece
+ * "ver más". El índice idx_orders_juris_anio_medio_prov incluye `monto`, así que
+ * con jurisdicción+año filtrados el ORDER BY monto + LIMIT/OFFSET se resuelve por
+ * índice, sin temp B-tree ni prefetch exponencial sobre sql.js-httpvfs.
  */
 export async function getDetalleGrupo(
   medio_norm: string | null,
   proveedor_norm: string | null,
   filtros: Pick<FiltrosTabla, "jurisdiccion" | "anio"> = {},
+  limite = 500,
+  offset = 0,
 ): Promise<Orden[]> {
   const { jurisdiccion, anio } = filtros;
   const wheres: string[] = [];
@@ -229,9 +237,9 @@ export async function getDetalleGrupo(
     `SELECT id, medio, proveedor, monto,
             resolucion, jurisdiccion, anio
      FROM orders ${where}
-     ORDER BY monto DESC NULLS LAST
-     LIMIT 500`,
-    params,
+     ORDER BY monto DESC NULLS LAST, id DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limite, offset],
   );
 }
 
