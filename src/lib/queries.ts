@@ -55,10 +55,14 @@ export type TotalPorAnioJuris = {
   n_ordenes: number;
 };
 
+/** Proveedor/medio son entidades sueltas; 'grupo' es un holding pre-agregado
+ *  en el ETL (totals_cache tipo='grupo'). El lookup es idéntico para los tres. */
+export type TipoEntidad = "proveedor" | "medio" | "grupo";
+
 export type ResultadoCuantoRecibio = {
   nombre: string;
   norm: string;
-  tipo: "proveedor" | "medio";
+  tipo: TipoEntidad;
   totalHistorico: number;
   nOrdenesHistorico: number;
   porAnio: TotalPorAnioJuris[];
@@ -236,7 +240,12 @@ export async function getDetalleGrupo(
 // ---------------------------------------------------------------------------
 
 /**
- * Total recibido por un proveedor o medio, desglosado por año+jurisdicción.
+ * Total recibido por un proveedor, medio o grupo mediático, desglosado por
+ * año+jurisdicción.
+ *
+ * Para tipo='grupo' el lookup es idéntico: el ETL pre-agrega el holding en
+ * totals_cache (tipo='grupo', norm=grupo_slug) sumando sus medios/proveedores,
+ * así que el front nunca hace scan/GROUP BY sobre orders.
  *
  * Lee totals_cache (pre-computado en el ETL) en lugar de hacer un GROUP BY
  * sobre las ~500k filas de orders. Igual que rankings_cache: la data histórica
@@ -247,7 +256,7 @@ export async function getDetalleGrupo(
  */
 export async function getCuantoRecibio(
   norm: string,
-  tipo: "proveedor" | "medio",
+  tipo: TipoEntidad,
   nombreDisplay: string,
 ): Promise<ResultadoCuantoRecibio> {
   const filas = await query<TotalPorAnioJuris>(

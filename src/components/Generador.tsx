@@ -7,9 +7,9 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris } from "../lib/queries";
+import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris, type TipoEntidad } from "../lib/queries";
 import { urlGenerador } from "../lib/url-state";
-import { buscar, type EntidadBusqueda } from "../lib/search";
+import { buscar, buscarGrupos, getGrupoPorNorm, type EntidadBusqueda, type GrupoInfo } from "../lib/search";
 
 // ---------------------------------------------------------------------------
 // Helpers de formato
@@ -65,9 +65,11 @@ function desglosePorJuris(
 function DesgloseJuris({
   porAnio,
   anioSel,
+  tipo,
 }: {
   porAnio: TotalPorAnioJuris[];
   anioSel: number | "historico";
+  tipo: TipoEntidad;
 }) {
   const filas = desglosePorJuris(porAnio, anioSel);
   if (!filas.length) return null;
@@ -103,8 +105,70 @@ function DesgloseJuris({
           ))}
         </tbody>
       </table>
-      <p style={{ marginTop:"0.75rem", color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", lineHeight:1.5, textAlign:"left" }}>
-        Cada empresa se registra por separado en los datos oficiales. Este total corresponde solo a esta razón social.
+      {tipo !== "grupo" && (
+        <p style={{ marginTop:"0.75rem", color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", lineHeight:1.5, textAlign:"left" }}>
+          Cada empresa se registra por separado en los datos oficiales. Este total corresponde solo a esta razón social.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-componente: panel de transparencia + disclaimer (solo modo grupo)
+// ---------------------------------------------------------------------------
+
+function PanelGrupo({
+  grupo,
+  abierto,
+  onToggle,
+}: {
+  grupo: GrupoInfo;
+  abierto: boolean;
+  onToggle: () => void;
+}) {
+  const conDatos = grupo.miembros.filter((m) => m.total > 0).length;
+  return (
+    <div
+      className="gen-grupo-panel"
+      style={{ marginTop: "1.25rem", width: "100%", maxWidth: 480, marginLeft: "auto", marginRight: "auto", textAlign: "left" }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={abierto}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, width: "100%",
+          background: "none", border: "none", cursor: "pointer", padding: "6px 0",
+          color: "var(--color-fg)", fontSize: "var(--text-small)", fontWeight: 600, textAlign: "left",
+        }}
+      >
+        <span style={{ color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>{abierto ? "▼" : "▶"}</span>
+        Qué medios y empresas se suman ({conDatos})
+      </button>
+
+      {abierto && (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-small)", marginTop: 6 }}>
+          <tbody>
+            {grupo.miembros.map((m) => (
+              <tr key={`${m.eje}:${m.norm}`} style={{ borderTop: "1px solid var(--color-border)", opacity: m.total > 0 ? 1 : 0.45 }}>
+                <td style={{ padding: "6px 0", paddingRight: 8, color: "var(--color-fg)" }}>
+                  {m.nombre}
+                  <span style={{ marginLeft: 6, color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                    {m.eje === "medio" ? "medio" : "empresa"}
+                  </span>
+                </td>
+                <td style={{ padding: "6px 0", textAlign: "right", whiteSpace: "nowrap", color: "var(--color-fg)" }}>
+                  {m.total > 0 ? `$ ${fmtARS.format(Math.round(m.total))}` : "sin registros"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <p style={{ marginTop: "0.9rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)", lineHeight: 1.5 }}>
+        Agrupación según el <a href="https://argentina.mom-gmr.org/es/propietarios/grupos-mediaticos/" target="_blank" rel="noopener" style={{ color: "var(--color-fg-subtle)", textDecoration: "underline" }}>Media Ownership Monitor Argentina</a> (2018), CC BY-ND 4.0. La pauta se asigna por medio, no al holding.
       </p>
     </div>
   );
@@ -125,7 +189,7 @@ interface GeneradorProps {
 }
 
 export default function Generador({ initial }: GeneradorProps) {
-  const [tipo, setTipo] = useState<"proveedor" | "medio">("proveedor");
+  const [tipo, setTipo] = useState<TipoEntidad>("proveedor");
   const [textoBusq, setTextoBusq] = useState(initial ? initial.entidad.nombre : "Clarín");
   const [sugerencias, setSugerencias] = useState<EntidadBusqueda[]>([]);
   const [mostrarSugs, setMostrarSugs] = useState(false);
@@ -134,13 +198,32 @@ export default function Generador({ initial }: GeneradorProps) {
   const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(initial ? initial.resultado : null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
+  // Modo grupo: detalle del holding seleccionado (miembros que se suman).
+  const [grupoInfo, setGrupoInfo] = useState<GrupoInfo | null>(null);
+  const [mostrarMiembros, setMostrarMiembros] = useState(false);
   const busqRef = useRef<HTMLDivElement>(null);
 
-  // Búsqueda MiniSearch al tipear
+  // Búsqueda al tipear: proveedor/medio van por MiniSearch; grupo filtra
+  // grupos.json en cliente (son pocos). Con texto vacío en modo grupo igual
+  // listamos los grupos con datos para poblar el desplegable.
   useEffect(() => {
+    if (tipo === "grupo") {
+      buscarGrupos(textoBusq).then(setSugerencias);
+      return;
+    }
     if (!textoBusq.trim()) { setSugerencias([]); return; }
     buscar(textoBusq, tipo).then(setSugerencias);
   }, [textoBusq, tipo]);
+
+  // Cargar el detalle (miembros) del grupo seleccionado para el panel de
+  // transparencia. Sólo aplica en modo grupo.
+  useEffect(() => {
+    if (entidadActual && entidadActual.tipo === "grupo") {
+      getGrupoPorNorm(entidadActual.norm).then(setGrupoInfo);
+    } else {
+      setGrupoInfo(null);
+    }
+  }, [entidadActual]);
 
   // Cerrar sugerencias al click fuera
   useEffect(() => {
@@ -190,6 +273,25 @@ export default function Generador({ initial }: GeneradorProps) {
     setEntidadActual(e);
     setTextoBusq(e.nombre);
     setMostrarSugs(false);
+  };
+
+  // Cambio de toggle Proveedor / Medio / Grupo mediático. Limpia la selección;
+  // en modo grupo precarga el grupo más grande para que la vista no quede vacía.
+  const cambiarTipo = (t: TipoEntidad) => {
+    if (t === tipo) return;
+    setTipo(t);
+    setEntidadActual(null);
+    setResultado(null);
+    setGrupoInfo(null);
+    setMostrarMiembros(false);
+    setMostrarSugs(false);
+    if (t === "grupo") {
+      buscarGrupos("", 1).then((res) => {
+        if (res[0]) { setEntidadActual(res[0]); setTextoBusq(res[0].nombre); }
+      });
+    } else {
+      setTextoBusq("");
+    }
   };
 
   // Calcular monto para el año/período seleccionado
@@ -247,8 +349,9 @@ export default function Generador({ initial }: GeneradorProps) {
       {/* ── Búsqueda ── */}
       <div className="gen-search-row">
         <div className="segmented" role="tablist" aria-label="Tipo">
-          <button className={tipo === "proveedor" ? "on" : ""} type="button" onClick={() => { setTipo("proveedor"); setEntidadActual(null); setResultado(null); }}>Proveedor</button>
-          <button className={tipo === "medio" ? "on" : ""} type="button" onClick={() => { setTipo("medio"); setEntidadActual(null); setResultado(null); }}>Medio</button>
+          <button className={tipo === "proveedor" ? "on" : ""} type="button" onClick={() => cambiarTipo("proveedor")}>Proveedor</button>
+          <button className={tipo === "medio" ? "on" : ""} type="button" onClick={() => cambiarTipo("medio")}>Medio</button>
+          <button className={tipo === "grupo" ? "on" : ""} type="button" onClick={() => cambiarTipo("grupo")}>Grupo mediático</button>
         </div>
 
         <div className="gen-search-input-wrap" ref={busqRef} style={{ position: "relative" }}>
@@ -259,7 +362,7 @@ export default function Generador({ initial }: GeneradorProps) {
             className="gen-search-input"
             type="search"
             value={textoBusq}
-            placeholder="Buscar proveedor o medio…"
+            placeholder={tipo === "grupo" ? "Buscar grupo mediático…" : "Buscar proveedor o medio…"}
             aria-label="Buscar entidad"
             onChange={(e) => { setTextoBusq(e.target.value); setMostrarSugs(true); }}
             onFocus={() => setMostrarSugs(true)}
@@ -297,7 +400,6 @@ export default function Generador({ initial }: GeneradorProps) {
         </div>
       ) : (
         <div className="gen-result">
-          <div className="gen-entity-eyebrow">{tipo === "medio" ? "Medio" : "Proveedor"}</div>
           <div className="gen-entity-name">{entidadActual?.nombre ?? "—"}</div>
           <div className="gen-said">recibió en pauta oficial</div>
           <div className="gen-narrative">
@@ -309,7 +411,14 @@ export default function Generador({ initial }: GeneradorProps) {
               en <strong style={{ color:"var(--color-fg)" }}>{contextoAnio}</strong>
             </div>
             {resultado && resultado.porAnio.length > 0 && (
-              <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} />
+              <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} tipo={tipo} />
+            )}
+            {tipo === "grupo" && grupoInfo && (
+              <PanelGrupo
+                grupo={grupoInfo}
+                abierto={mostrarMiembros}
+                onToggle={() => setMostrarMiembros((v) => !v)}
+              />
             )}
             <p className="approx">
               <strong>* Aproximado.</strong> Al haber huecos de cobertura en los datos públicos, el monto real recibido puede ser mayor.

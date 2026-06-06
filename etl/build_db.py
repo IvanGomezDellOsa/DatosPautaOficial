@@ -53,6 +53,11 @@ CSV_ORDERS = _CSV_V2 if _CSV_V2.exists() else _CSV_V1
 CSV_IPC = DATA_DIR / "ipc_indec.csv"
 CSV_GOV = DATA_DIR / "governments.csv"
 CSV_ALIASES = DATA_DIR / "aliases.csv"
+# Mapeo de grupos mediaticos (holdings) -> medios/proveedores. Archivo curado,
+# separado de aliases.csv: aliases NUNCA consolida por propiedad. Cada fila es
+# (grupo_slug, grupo_nombre, eje, valor); 'valor' es texto crudo que el ETL pasa
+# por normalizar() para matchear contra orders.medio / orders.proveedor.
+CSV_GRUPOS = DATA_DIR / "grupos_mom.csv"
 
 # Secuencias de tokens de sufijos societarios a descartar al final de un
 # nombre. Tras sacar acentos y reemplazar puntuacion por espacios, "S.A."
@@ -191,6 +196,35 @@ def cargar_aliases():
             if crudo and canon:
                 aliases[_algo_norm(crudo)] = canon
     return aliases
+
+
+def cargar_grupos(aliases):
+    """Lee grupos_mom.csv si existe. Devuelve [{slug, nombre, miembros}], donde
+    cada miembro es {eje, valor, norm} con norm = normalizar(valor).
+
+    El mapeo de grupos mediaticos (holdings) vive en su propio CSV, separado de
+    aliases.csv: aliases solo colapsa grafias de la MISMA razon social, nunca
+    consolida por propiedad. Un grupo puede sumar sobre dos ejes (medio y/o
+    proveedor); cada fila de orders tiene un solo medio y un solo proveedor, asi
+    que el OR a nivel orden (medio IN (...) OR proveedor IN (...)) no duplica.
+    """
+    if not CSV_GRUPOS.exists():
+        return []
+    grupos = {}  # slug -> {slug, nombre, miembros: [...]}
+    with CSV_GRUPOS.open(newline="", encoding="utf-8") as f:
+        for fila in csv.DictReader(f):
+            slug = (fila.get("grupo_slug") or "").strip()
+            nombre = (fila.get("grupo_nombre") or "").strip()
+            eje = (fila.get("eje") or "").strip().lower()
+            valor = (fila.get("valor") or "").strip()
+            if not slug or not nombre or eje not in ("medio", "proveedor") or not valor:
+                continue
+            norm = normalizar(valor, aliases)
+            if not norm:
+                continue
+            g = grupos.setdefault(slug, {"slug": slug, "nombre": nombre, "miembros": []})
+            g["miembros"].append({"eje": eje, "valor": valor, "norm": norm})
+    return list(grupos.values())
 
 
 def cargar_deflactor():
@@ -362,7 +396,7 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
     print(f"  rankings_cache: {n} filas ({n // (top_n * 2)} combinaciones)")
 
 
-def crear_totals(con):
+def crear_totals(con, grupos):
     """Pre-computa totals_cache: para CADA entidad (no solo el top-5) los
     totales por (anio, jurisdiccion), mas una fila global (anio=0,
     jurisdiccion='*') con el total historico ya sumado.
@@ -374,10 +408,14 @@ def crear_totals(con):
     Misma fuente que rankings_cache (SUM(monto_deflactado), COUNT(*)) para que
     los montos sean identicos a los que ya muestra el ranking. Las ordenes con
     monto=0 no estan en orders (se descartan al cargar), asi que no cuentan.
+
+    Ademas de 'proveedor' y 'medio', emite tipo='grupo' (mismo esquema): por
+    cada grupo mediatico (holding) los totales sumando sus medios/proveedores.
+    norm = grupo_slug. El front hace el mismo lookup que para una entidad suelta.
     """
     con.executescript("""
         CREATE TABLE totals_cache (
-            tipo         TEXT    NOT NULL,  -- 'proveedor' | 'medio'
+            tipo         TEXT    NOT NULL,  -- 'proveedor' | 'medio' | 'grupo'
             norm         TEXT    NOT NULL,
             anio         INTEGER NOT NULL,  -- 0 = todos (fila global)
             jurisdiccion TEXT    NOT NULL,  -- '*' = todas (fila global)
@@ -407,8 +445,47 @@ def crear_totals(con):
             GROUP BY {col}
         """)
 
+    # --- tipo='grupo': holdings que suman varios medios/proveedores ----------
+    # El sumatorio usa IN sobre el conjunto de norms (deduplicado), asi que dos
+    # grafias que normalizan al mismo norm (p.ej. "Clarin" y "Clarin.com" ->
+    # 'clarin') NO se cuentan dos veces. El OR entre ejes tampoco duplica: cada
+    # orden tiene un solo medio y un solo proveedor.
+    n_grupos_cubiertos = 0
+    for g in grupos:
+        medios = sorted({m["norm"] for m in g["miembros"] if m["eje"] == "medio"})
+        provs = sorted({m["norm"] for m in g["miembros"] if m["eje"] == "proveedor"})
+        conds, params = [], []
+        if medios:
+            conds.append(f"medio IN ({','.join('?' * len(medios))})")
+            params += medios
+        if provs:
+            conds.append(f"proveedor IN ({','.join('?' * len(provs))})")
+            params += provs
+        if not conds:
+            continue
+        where = " OR ".join(conds)
+        # Si el grupo no matchea ninguna orden, no se inserta (mantiene el cache
+        # limpio: getCuantoRecibio devolveria vacio y el front muestra "sin datos").
+        n_match = con.execute(
+            f"SELECT COUNT(*) FROM orders WHERE {where}", params).fetchone()[0]
+        if n_match == 0:
+            continue
+        n_grupos_cubiertos += 1
+        con.execute(f"""
+            INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
+            SELECT 'grupo', ?, anio, jurisdiccion, SUM(monto), COUNT(*)
+            FROM orders WHERE {where}
+            GROUP BY anio, jurisdiccion
+        """, [g["slug"], *params])
+        con.execute(f"""
+            INSERT INTO totals_cache(tipo, norm, anio, jurisdiccion, total, n_ordenes)
+            SELECT 'grupo', ?, 0, '*', SUM(monto), COUNT(*)
+            FROM orders WHERE {where}
+        """, [g["slug"], *params])
+
     n = con.execute("SELECT COUNT(*) FROM totals_cache").fetchone()[0]
-    print(f"  totals_cache: {n} filas")
+    print(f"  totals_cache: {n} filas "
+          f"({n_grupos_cubiertos}/{len(grupos)} grupos con datos)")
 
 
 def crear_filtros(con):
@@ -809,12 +886,70 @@ def escribir_busqueda(prov_disp, medio_disp):
     return out, len(payload["proveedores"]), len(payload["medios"])
 
 
+def escribir_grupos(con, grupos):
+    """Emite public/data/grupos.json: para cada grupo mediatico su total
+    historico y la lista de miembros con su monto individual.
+
+    En modo 'grupo' el buscador del Generador filtra este JSON en cliente (son
+    ~25 grupos, busqueda lineal) en vez de usar MiniSearch. El panel de
+    transparencia del Generador muestra `miembros` (que medios/razones sociales
+    se suman y cuanto aporta cada uno). Los totales salen de totals_cache (misma
+    fuente que el resto del sitio), asi que coinciden con "Cuanto recibio".
+
+    Miembros deduplicados por (eje, norm): varias grafias que normalizan al
+    mismo norm (Clarin / Clarin.com) colapsan en una sola fila, igual que en el
+    sumatorio del grupo. Se conserva la primera grafia como nombre de display.
+    """
+    def total_global(tipo, norm):
+        r = con.execute(
+            "SELECT total, n_ordenes FROM totals_cache "
+            "WHERE tipo=? AND norm=? AND anio=0 AND jurisdiccion='*'",
+            (tipo, norm)).fetchone()
+        return (r[0] or 0, r[1] or 0) if r else (0, 0)
+
+    salida = []
+    cubiertos = 0
+    for g in grupos:
+        # dedup miembros por (eje, norm), conservando la primera grafia
+        vistos = {}
+        for m in g["miembros"]:
+            clave = (m["eje"], m["norm"])
+            if clave not in vistos:
+                t, n = total_global(m["eje"], m["norm"])
+                vistos[clave] = {"eje": m["eje"], "nombre": m["valor"],
+                                 "norm": m["norm"], "total": t, "n": n}
+        miembros = sorted(vistos.values(), key=lambda x: -x["total"])
+        gt, gn = total_global("grupo", g["slug"])
+        cubierto = gt > 0
+        if cubierto:
+            cubiertos += 1
+        salida.append({
+            "slug": g["slug"], "nombre": g["nombre"], "norm": g["slug"],
+            "total": gt, "n": gn, "cubierto": cubierto, "miembros": miembros,
+        })
+    salida.sort(key=lambda x: -x["total"])
+
+    payload = {
+        "generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fuente": ("Media Ownership Monitor Argentina (2018) - Global Media "
+                   "Registry, CC BY-ND 4.0"),
+        "totalGrupos": len(salida),
+        "cubiertos": cubiertos,
+        "grupos": salida,
+    }
+    out = OUT_DIR / "grupos.json"
+    with out.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    return out, len(salida), cubiertos
+
+
 def main():
     for ruta in (CSV_ORDERS, CSV_IPC, CSV_GOV):
         if not ruta.exists():
             sys.exit(f"ERROR: falta el archivo obligatorio {ruta}")
 
     aliases = cargar_aliases()
+    grupos = cargar_grupos(aliases)
     indice_mes, indice_anio, mes_ref = cargar_deflactor()
     indice_ref = indice_mes[tuple(int(x) for x in mes_ref.split("-"))]
 
@@ -973,13 +1108,17 @@ def main():
     crear_rankings(con, prov_disp, medio_disp)
 
     # --- totales pre-computados por entidad (vista "Cuanto recibio") --------
-    crear_totals(con)
+    #     incluye tipo='grupo' (holdings) computado desde grupos_mom.csv
+    crear_totals(con, grupos)
 
     # --- totales/conteos por (jurisdiccion, anio) para la filter-bar ---------
     crear_filtros(con)
 
     # --- top-100 grupos (medio_norm x proveedor_norm) para el DataTable ------
     crear_groups(con)
+
+    # --- grupos mediaticos (holdings) para el toggle "Grupo mediatico" -------
+    out_grupos, n_grupos, n_grupos_cub = escribir_grupos(con, grupos)
 
     # --- estado inicial de la portada precomputado (evita el waterfall HTTP) -
     out_home, n_home, n_home_total, out_home_juris, out_home_anio = escribir_home(con, prov_disp)
@@ -1003,6 +1142,8 @@ def main():
     print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
+    print(f"OK  {out_grupos}  ({n_grupos} grupos, {n_grupos_cub} con datos, "
+          f"{out_grupos.stat().st_size/1024:.1f} KB)")
     print(f"OK  {out_home}  (estado inicial {out_home_juris} {out_home_anio}: {n_home}/{n_home_total} filas, "
           f"{out_home.stat().st_size/1024:.1f} KB)")
     for k, v in meta.items():

@@ -7,13 +7,34 @@
  */
 
 import MiniSearch from "minisearch";
+import type { TipoEntidad } from "./queries";
 
 export interface EntidadBusqueda {
   id: string;
   norm: string;
   nombre: string;
   n: number;
-  tipo: "proveedor" | "medio";
+  tipo: TipoEntidad;
+}
+
+/** Un miembro de un grupo mediático (medio o razón social que se suma). */
+export interface GrupoMiembro {
+  eje: "medio" | "proveedor";
+  nombre: string;
+  norm: string;
+  total: number;
+  n: number;
+}
+
+/** Un grupo mediático (holding) — proviene de grupos.json (ETL). */
+export interface GrupoInfo {
+  slug: string;
+  nombre: string;
+  norm: string;     // = slug; es la clave de lookup en totals_cache (tipo='grupo')
+  total: number;
+  n: number;
+  cubierto: boolean;
+  miembros: GrupoMiembro[];
 }
 
 let _indexPromise: Promise<MiniSearch<EntidadBusqueda>> | null = null;
@@ -64,4 +85,64 @@ export async function buscar(
     .filter((r) => !tipo || r.tipo === tipo)
     .sort((a, b) => b.score - a.score || b.n - a.n)  // empate de score → más órdenes primero
     .slice(0, limite);
+}
+
+// ---------------------------------------------------------------------------
+// Grupos mediáticos
+// ---------------------------------------------------------------------------
+//
+// Son ~25 entidades: no van por MiniSearch sino por un filtro lineal sobre
+// grupos.json (cargado una sola vez, sólo al usar el modo "Grupo mediático").
+
+let _gruposPromise: Promise<GrupoInfo[]> | null = null;
+
+export function getGrupos(): Promise<GrupoInfo[]> {
+  if (!_gruposPromise) {
+    _gruposPromise = fetch("/data/grupos.json")
+      .then((r) => r.json())
+      .then((data) => data.grupos as GrupoInfo[]);
+  }
+  return _gruposPromise;
+}
+
+/** Devuelve un GrupoInfo por su norm (=slug), o null. */
+export async function getGrupoPorNorm(norm: string): Promise<GrupoInfo | null> {
+  const grupos = await getGrupos();
+  return grupos.find((g) => g.norm === norm) ?? null;
+}
+
+/** Convierte un GrupoInfo en una EntidadBusqueda (tipo='grupo'). */
+function grupoAEntidad(g: GrupoInfo): EntidadBusqueda {
+  return { id: `g:${g.norm}`, norm: g.norm, nombre: g.nombre, n: g.n, tipo: "grupo" };
+}
+
+/**
+ * Busca grupos por nombre del holding O por nombre de cualquiera de sus
+ * miembros (filtro lineal, sin acentos): así "telefe" encuentra "Viacom" y
+ * "c5n" encuentra "Grupo Indalo". Sin texto devuelve los grupos con datos
+ * ordenados por monto, para poblar la lista al abrir el modo.
+ */
+export async function buscarGrupos(
+  texto: string,
+  limite = 8,
+): Promise<EntidadBusqueda[]> {
+  const grupos = await getGrupos();
+  const q = norm(texto);
+  const filtrados = q
+    ? grupos.filter(
+        (g) =>
+          norm(g.nombre).includes(q) ||
+          g.miembros.some((m) => norm(m.nombre).includes(q)),
+      )
+    : grupos.filter((g) => g.cubierto);
+  return filtrados.slice(0, limite).map(grupoAEntidad);
+}
+
+/** Normaliza para comparar: minúsculas, sin tildes. */
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
 }

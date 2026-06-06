@@ -237,7 +237,9 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   }, []);
 
   const elegirEntidad = (e: EntidadBusqueda) => {
-    setFiltro({ entidadNorm: e.norm, entidadTipo: e.tipo });
+    // La tabla sólo busca proveedores/medios (MiniSearch); nunca grupos.
+    const entidadTipo = e.tipo === "medio" ? "medio" : "proveedor";
+    setFiltro({ entidadNorm: e.norm, entidadTipo });
     setTextoBusq(e.nombre);
     setMostrarSugs(false);
   };

@@ -6,10 +6,10 @@
  *
  * Parámetros soportados:
  *   Tabla:      juris, anio, norm, tipo, def, orden, desc
- *   Generador:  p (norm), modo (proveedor|medio), y (anio|historico)
+ *   Generador:  p (norm), modo (proveedor|medio|grupo), y (anio|historico)
  */
 
-import type { FiltrosTabla } from "./queries";
+import type { FiltrosTabla, TipoEntidad } from "./queries";
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -27,7 +27,7 @@ export interface EstadoTabla {
 
 export interface EstadoGenerador {
   norm: string | null;
-  tipo: "proveedor" | "medio";
+  tipo: TipoEntidad;
   /** número de año, o "historico" */
   anio: number | "historico";
 }
@@ -69,9 +69,10 @@ export function leerEstadoGenerador(): EstadoGenerador {
   const anio = yRaw && yRaw !== "historico" && !isNaN(Number(yRaw))
     ? Number(yRaw)
     : "historico";
+  const modo = p.get("modo");
   return {
     norm: p.get("p"),
-    tipo: p.get("modo") === "medio" ? "medio" : "proveedor",
+    tipo: modo === "medio" ? "medio" : modo === "grupo" ? "grupo" : "proveedor",
     anio,
   };
 }
@@ -119,7 +120,8 @@ export function escribirEstadoGenerador(estado: Partial<EstadoGenerador>): void 
   const p = new URLSearchParams(window.location.search);
 
   setOrDel(p, "p", estado.norm ?? null);
-  setOrDel(p, "modo", estado.tipo === "medio" ? "medio" : null); // proveedor es default
+  // proveedor es default (no se escribe); medio y grupo van como modo=...
+  setOrDel(p, "modo", estado.tipo && estado.tipo !== "proveedor" ? estado.tipo : null);
   setOrDel(p, "y",
     estado.anio != null && estado.anio !== "historico"
       ? String(estado.anio)
@@ -155,7 +157,7 @@ export function estadoAFiltros(estado: EstadoTabla): FiltrosTabla {
 export function urlGenerador(estado: EstadoGenerador): string {
   const p = new URLSearchParams();
   if (estado.norm) p.set("p", estado.norm);
-  if (estado.tipo === "medio") p.set("modo", "medio");
+  if (estado.tipo && estado.tipo !== "proveedor") p.set("modo", estado.tipo);
   if (estado.anio !== "historico") p.set("y", String(estado.anio));
   const base =
     typeof window !== "undefined"
