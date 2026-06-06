@@ -97,7 +97,7 @@ export interface FiltrosTabla {
 /**
  * Devuelve una página de órdenes aplicando los filtros activos.
  *
- * Con agrupado=true (modo DataTable): devuelve hasta 100 filas agrupadas
+ * Con agrupado=true (modo DataTable): devuelve hasta 2000 filas agrupadas
  * por (medio_norm, proveedor_norm) ordenadas por total DESC.
  *
  * Sin agrupado: devuelve filas individuales paginadas.
@@ -152,7 +152,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
          FROM groups_cache
          WHERE jurisdiccion = ? AND anio = ?
          ORDER BY rank
-         LIMIT 100`,
+         LIMIT 2000`,
         [jurisdiccion ?? "*", anio ?? 0],
       );
       return { filas, totalFilas: filas.length };
@@ -167,7 +167,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
        GROUP BY medio, proveedor
        HAVING medio IS NOT NULL OR proveedor IS NOT NULL
        ORDER BY total DESC
-       LIMIT 100`,
+       LIMIT 2000`,
       params,
     );
     return { filas, totalFilas: filas.length };

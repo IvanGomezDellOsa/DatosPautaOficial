@@ -9,6 +9,11 @@
  *  - getOrdenes() + getTotalesFiltro() traen los datos via sql.js-httpvfs.
  *  - MiniSearch (search.ts) resuelve texto → norm para el filtro SQL.
  *  - TanStack Table maneja columnas y sorting declarativo.
+ *
+ * Modos de vista:
+ *  - Agrupado (default): muestra pares únicos (proveedor+medio) por monto,
+ *    expandibles para ver órdenes individuales. Lee de groups_cache.
+ *  - Individual: órdenes una a una, paginadas de a 100, mostrando TODOS los datos.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -53,7 +58,7 @@ function formatMonto(v: number | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Hook: datos de la tabla (siempre agrupado)
+// Hook: datos agrupados
 // ---------------------------------------------------------------------------
 
 function useTabla(filtros: FiltrosTabla) {
@@ -82,6 +87,37 @@ function useTabla(filtros: FiltrosTabla) {
 }
 
 // ---------------------------------------------------------------------------
+// Hook: datos individuales con paginación
+// ---------------------------------------------------------------------------
+
+function useTablaIndividual(filtros: FiltrosTabla, pagina: number) {
+  const [rows, setRows] = useState<Orden[]>([]);
+  const [totalFilas, setTotalFilas] = useState(0);
+  const [totalMonto, setTotalMonto] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [{ filas, totalFilas: total }, tots] = await Promise.all([
+        getOrdenes({ ...filtros, agrupado: false, pagina, porPagina: POR_PAGINA, ordenPor: "monto", desc: true }),
+        getTotalesFiltro(filtros),
+      ]);
+      setRows(filas as Orden[]);
+      setTotalFilas(Number(total));
+      setTotalMonto(tots.montoTotal);
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filtros), pagina]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  return { rows, totalFilas, totalMonto, loading };
+}
+
+// ---------------------------------------------------------------------------
 // Hook: gobierno activo
 // ---------------------------------------------------------------------------
 
@@ -98,7 +134,7 @@ function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob
   useEffect(() => {
     if (first.current) {
       first.current = false;
-      if (seedMatch) return; // sembrado desde home.json — no se consulta sql.js
+      if (seedMatch) return;
     }
     if (!juris || !anio) { setGov(null); return; }
     query<{ name: string; role: string }>(
@@ -130,6 +166,10 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // Estado de filtros (sincronizado con URL)
   const [estado, setEstado] = useState<EstadoTabla>(() => leerEstadoTabla());
 
+  // Modo de vista
+  const [modoIndividual, setModoIndividual] = useState(false);
+  const [paginaIndividual, setPaginaIndividual] = useState(0);
+
   const jurisFiltradas = estado.anio
     ? JURISDICCIONES.filter((j) => estado.anio! >= DISPONIBILIDAD[j][0] && estado.anio! <= DISPONIBILIDAD[j][1])
     : JURISDICCIONES;
@@ -146,14 +186,17 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
 
   const filtros = estadoAFiltros(estado);
 
-  // Gobierno activo (usa seed cuando coincide el filtro)
+  // Gobierno activo
   const seedGob: SeedGob = initial
     ? { juris: initial.filtroInicial.jurisdiccion, anio: initial.filtroInicial.anio, value: initial.gobierno }
     : null;
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
 
-  // Datos agrupados
-  const { rows, totalMonto, loading } = useTabla(filtros);
+  // Datos agrupados (modo default)
+  const { rows: rowsAgrupados, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros);
+
+  // Datos individuales (modo individual)
+  const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual } = useTablaIndividual(filtros, paginaIndividual);
 
   // Detalle expandido: key → Orden[] | "loading"
   const [expandedMap, setExpandedMap] = useState<Map<string, Orden[] | "loading">>(new Map());
@@ -165,7 +208,14 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
       escribirEstadoTabla(next);
       return next;
     });
-    // Colapsar todo al cambiar filtros
+    setExpandedMap(new Map());
+    setPaginaIndividual(0);
+  }, []);
+
+  // Al cambiar modo, resetear página individual
+  const toggleModo = useCallback(() => {
+    setModoIndividual((prev) => !prev);
+    setPaginaIndividual(0);
     setExpandedMap(new Map());
   }, []);
 
@@ -197,7 +247,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     setTextoBusq("");
   };
 
-  // Toggle expandir/colapsar grupo
+  // Toggle expandir/colapsar grupo (modo agrupado)
   const toggleGrupo = useCallback(async (row: OrdenAgrupada) => {
     const key = groupKey(row);
     setExpandedMap((prev) => {
@@ -209,10 +259,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
       next.set(key, "loading");
       return next;
     });
-    // Cargar detalle solo si no está cacheado
     setExpandedMap((prev) => {
       if (!prev.has(key) || prev.get(key) !== "loading") return prev;
-      // Lanzar carga async
       getDetalleGrupo(row.medio_norm, row.proveedor_norm, {
         jurisdiccion: filtros.jurisdiccion,
         anio: filtros.anio,
@@ -228,7 +276,10 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtros.jurisdiccion, filtros.anio]);
 
-  const totalGrupos = rows.length;
+  // Paginación modo individual
+  const totalPaginas = Math.ceil(totalFilas / POR_PAGINA);
+  const loading = modoIndividual ? loadingIndividual : loadingAgrupado;
+  const totalMonto = modoIndividual ? totalMontoIndividual : totalMontoAgrupado;
 
   return (
     <>
@@ -274,7 +325,15 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
 
         <div className="row2">
           <span className="totals">
-            <strong>{fmtNum.format(totalGrupos)}</strong> combinaciones
+            {modoIndividual ? (
+              <>
+                <strong>{fmtNum.format(totalFilas)}</strong> órdenes
+              </>
+            ) : (
+              <>
+                <strong>{fmtNum.format(rowsAgrupados.length)}</strong> combinaciones
+              </>
+            )}
             {totalMonto > 0 && (
               <> · <strong>$ {fmtARS.format(Math.round(totalMonto))}</strong></>
             )}
@@ -299,7 +358,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
         )}
       </div>
 
-      {/* ── TOOLBAR (búsqueda) ── */}
+      {/* ── TOOLBAR (búsqueda + toggle de modo) ── */}
       <div className="toolbar">
         <div className="search-input-wrap" ref={busqRef} style={{ position: "relative" }}>
           <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -332,87 +391,207 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
             </ul>
           )}
         </div>
-      </div>
 
-      {/* ── TABLA AGRUPADA ── */}
-      <div className="table-wrap">
-        <div className="table-scroll">
-          <table className="data">
-            <thead>
-              <tr>
-                <th style={{ width: 32 }} aria-label="Expandir" />
-                {!estado.jurisdiccion && <th>Jurisdicción</th>}
-                <th>Proveedor</th>
-                <th>Medio</th>
-                <th className="right">Monto (deflactado)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
-              ) : (
-                rows.map((row) => {
-                  const key = groupKey(row);
-                  const detalle = expandedMap.get(key);
-                  const isExpanded = detalle !== undefined;
-                  const isLoading = detalle === "loading";
-                  const colSpanTotal = (!estado.jurisdiccion ? 5 : 4);
-                  return (
-                    <>
-                      {/* Fila agrupada */}
-                      <tr
-                        key={key}
-                        onClick={() => toggleGrupo(row)}
-                        style={{ cursor: "pointer" }}
-                        aria-expanded={isExpanded}
-                      >
-                        <td style={{ textAlign: "center", color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>
-                          {isExpanded ? "▾" : "▸"}
-                        </td>
-                        {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>—</td>}
-                        <td>{row.proveedor ?? row.proveedor_norm ?? "–"}</td>
-                        <td>{row.medio ?? row.medio_norm ?? "–"}</td>
-                        <td className="monto">
-                          <span style={{ marginRight: 8, color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)", fontWeight: 400 }}>
-                            {fmtNum.format(row.n)} órdenes
-                          </span>
-                          {formatMonto(row.total)}
-                        </td>
-                      </tr>
-
-                      {/* Filas hijas */}
-                      {isExpanded && isLoading && (
-                        <tr key={`${key}-loading`} style={{ background: "var(--color-bg-elev-2)" }}>
-                          <td colSpan={colSpanTotal} style={{ padding: "0.5rem 1rem 0.5rem 2.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>
-                            Cargando órdenes…
-                          </td>
-                        </tr>
-                      )}
-                      {isExpanded && !isLoading && (detalle as Orden[]).map((orden) => (
-                        <tr key={`${key}-${orden.id}`} style={{ background: "var(--color-bg-elev-2)" }}>
-                          <td style={{ paddingLeft: "1.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>#{orden.id}</td>
-                          {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.jurisdiccion}</td>}
-                          <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.anio}</td>
-                          <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.resolucion ? (
-                            orden.resolucion.startsWith("http")
-                              ? <a href={orden.resolucion} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗ {orden.anio}</a>
-                              : orden.resolucion
-                          ) : "–"}</td>
-                          <td className="monto" style={{ color: "var(--color-fg-subtle)" }}>
-                            {formatMonto(orden.monto)}
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        {/* Toggle agrupado / individual */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={toggleModo}
+            title={modoIndividual ? "Ver combinaciones agrupadas por proveedor+medio" : "Ver todas las órdenes individuales con paginación"}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "var(--color-bg-elev-2)",
+              border: "1px solid var(--color-border-strong)",
+              padding: "5px 12px", borderRadius: 6,
+              color: "var(--color-fg)", fontSize: "var(--text-micro)",
+              cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap",
+            }}
+          >
+            {modoIndividual ? (
+              <>
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Ver agrupado
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                Ver todas las órdenes
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* ── TABLA ── */}
+      <div className="table-wrap">
+        <div className="table-scroll">
+          {modoIndividual ? (
+            /* ── MODO INDIVIDUAL ── */
+            <table className="data">
+              <thead>
+                <tr>
+                  <th style={{ width: 60, color: "var(--color-fg-subtle)", fontWeight: 400 }}>#</th>
+                  {!estado.jurisdiccion && <th>Jurisdicción</th>}
+                  {!estado.anio && <th>Año</th>}
+                  <th>Proveedor</th>
+                  <th>Medio</th>
+                  <th>Resolución</th>
+                  <th className="right">Monto (deflactado)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingIndividual ? (
+                  <tr><td colSpan={7} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
+                ) : rowsIndividual.length === 0 ? (
+                  <tr><td colSpan={7} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
+                ) : (
+                  rowsIndividual.map((orden) => (
+                    <tr key={orden.id}>
+                      <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>#{orden.id}</td>
+                      {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.jurisdiccion}</td>}
+                      {!estado.anio && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.anio}</td>}
+                      <td>{orden.proveedor ?? "–"}</td>
+                      <td>{orden.medio ?? "–"}</td>
+                      <td style={{ fontSize: "var(--text-small)" }}>
+                        {orden.resolucion ? (
+                          orden.resolucion.startsWith("http")
+                            ? <a href={orden.resolucion} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗ Resolución</a>
+                            : orden.resolucion
+                        ) : "–"}
+                      </td>
+                      <td className="monto">{formatMonto(orden.monto)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            /* ── MODO AGRUPADO ── */
+            <table className="data">
+              <thead>
+                <tr>
+                  <th style={{ width: 32 }} aria-label="Expandir" />
+                  {!estado.jurisdiccion && <th>Jurisdicción</th>}
+                  <th>Proveedor</th>
+                  <th>Medio</th>
+                  <th className="right">Monto (deflactado)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingAgrupado ? (
+                  <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
+                ) : rowsAgrupados.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
+                ) : (
+                  rowsAgrupados.map((row) => {
+                    const key = groupKey(row);
+                    const detalle = expandedMap.get(key);
+                    const isExpanded = detalle !== undefined;
+                    const isLoading = detalle === "loading";
+                    const colSpanTotal = (!estado.jurisdiccion ? 5 : 4);
+                    return (
+                      <>
+                        {/* Fila agrupada */}
+                        <tr
+                          key={key}
+                          onClick={() => toggleGrupo(row)}
+                          style={{ cursor: "pointer" }}
+                          aria-expanded={isExpanded}
+                        >
+                          <td style={{ textAlign: "center", color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>
+                            {isExpanded ? "▾" : "▸"}
+                          </td>
+                          {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>—</td>}
+                          <td>{row.proveedor ?? row.proveedor_norm ?? "–"}</td>
+                          <td>{row.medio ?? row.medio_norm ?? "–"}</td>
+                          <td className="monto">
+                            <span style={{ marginRight: 8, color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)", fontWeight: 400 }}>
+                              {fmtNum.format(row.n)} órdenes
+                            </span>
+                            {formatMonto(row.total)}
+                          </td>
+                        </tr>
+
+                        {/* Filas hijas */}
+                        {isExpanded && isLoading && (
+                          <tr key={`${key}-loading`} style={{ background: "var(--color-bg-elev-2)" }}>
+                            <td colSpan={colSpanTotal} style={{ padding: "0.5rem 1rem 0.5rem 2.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>
+                              Cargando órdenes…
+                            </td>
+                          </tr>
+                        )}
+                        {isExpanded && !isLoading && (detalle as Orden[]).map((orden) => (
+                          <tr key={`${key}-${orden.id}`} style={{ background: "var(--color-bg-elev-2)" }}>
+                            <td style={{ paddingLeft: "1.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>#{orden.id}</td>
+                            {!estado.jurisdiccion && <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.jurisdiccion}</td>}
+                            <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.anio}</td>
+                            <td style={{ color: "var(--color-fg-subtle)", fontSize: "var(--text-small)" }}>{orden.resolucion ? (
+                              orden.resolucion.startsWith("http")
+                                ? <a href={orden.resolucion} target="_blank" rel="noopener" aria-label="Ver resolución oficial">↗ {orden.anio}</a>
+                                : orden.resolucion
+                            ) : "–"}</td>
+                            <td className="monto" style={{ color: "var(--color-fg-subtle)" }}>
+                              {formatMonto(orden.monto)}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* ── PAGINACIÓN MODO INDIVIDUAL ── */}
+      {modoIndividual && totalFilas > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 8, padding: "16px 0", flexWrap: "wrap",
+        }}>
+          <button
+            onClick={() => setPaginaIndividual(0)}
+            disabled={paginaIndividual === 0 || loadingIndividual}
+            style={btnPage}
+            aria-label="Primera página"
+          >«</button>
+          <button
+            onClick={() => setPaginaIndividual((p) => Math.max(0, p - 1))}
+            disabled={paginaIndividual === 0 || loadingIndividual}
+            style={btnPage}
+            aria-label="Página anterior"
+          >‹</button>
+          <span style={{ fontSize: "var(--text-small)", color: "var(--color-fg-subtle)", padding: "0 8px" }}>
+            Página <strong>{paginaIndividual + 1}</strong> de <strong>{totalPaginas}</strong>
+            {" "}· <strong>{fmtNum.format(totalFilas)}</strong> órdenes en total
+          </span>
+          <button
+            onClick={() => setPaginaIndividual((p) => Math.min(totalPaginas - 1, p + 1))}
+            disabled={paginaIndividual >= totalPaginas - 1 || loadingIndividual}
+            style={btnPage}
+            aria-label="Página siguiente"
+          >›</button>
+          <button
+            onClick={() => setPaginaIndividual(totalPaginas - 1)}
+            disabled={paginaIndividual >= totalPaginas - 1 || loadingIndividual}
+            style={btnPage}
+            aria-label="Última página"
+          >»</button>
+        </div>
+      )}
     </>
   );
 }
+
+const btnPage: React.CSSProperties = {
+  background: "var(--color-bg-elev-2)",
+  border: "1px solid var(--color-border-strong)",
+  borderRadius: 6,
+  color: "var(--color-fg)",
+  cursor: "pointer",
+  fontSize: "var(--text-small)",
+  fontWeight: 600,
+  padding: "4px 10px",
+  lineHeight: 1.5,
+};

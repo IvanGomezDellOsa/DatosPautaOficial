@@ -273,14 +273,20 @@ def _parse_2010(path, anio, cont):
         fecha = normalizar_fecha(_cell(row, i_fecha), a)
         tipo = _cell(row, i_tipo)
         medio = _cell(row, i_medio)
+        prov_vp = None
         if _es_via_publica(tipo):
-            medio = "Via Publica"          # colapsa todo Via Publica a un unico medio agrupable
+            # Si el campo "medio" tiene el subtipo especifico (VAGONES, GRANDES FORMATOS,
+            # etc.) lo movemos a proveedor antes de colapsar medio a "Via Publica".
+            medio_limpio = limpiar_str(medio)
+            if medio_limpio and not _es_via_publica(medio_limpio):
+                prov_vp = medio_limpio
+            medio = "Via Publica"
             tipo_final = "Via Publica"
         else:
             tipo_final = tipo
         out.append(registro(
             JURIS, a, monto, path.name,
-            fecha=fecha, medio=medio, tipo_de_medio=tipo_final))
+            fecha=fecha, proveedor=prov_vp, medio=medio, tipo_de_medio=tipo_final))
         cont.ok()
     return out
 
@@ -319,7 +325,11 @@ def _parse_combinado(path, anio, cont):
             cont.descartar("subtotal")
             continue
         if _es_via_publica(tipo) or _es_via_publica(medio):
-            medio = "Via Publica"          # colapsa todo Via Publica a un unico medio agrupable
+            # Si proveedor esta vacio y el campo medio contiene el subtipo especifico
+            # (VAGONES DE SUBTE, INTERIORES SHOPPINGS, etc.) lo usamos como proveedor.
+            if prov is None and medio and not _es_via_publica(medio):
+                prov = limpiar_str(medio)
+            medio = "Via Publica"
             tipo_final = "Via Publica"
         else:
             tipo_final = tipo
@@ -369,7 +379,11 @@ def _parse_pertype(path, anio, cont):
         medio = limpiar_str(_cell(row, idx["medio"]))
         prov = limpiar_str(_cell(row, idx["razon"]))
         if es_vp:
-            medio = "Via Publica"          # colapsa todo Via Publica a un unico medio agrupable
+            # Si proveedor esta vacio y el campo medio contiene el subtipo especifico
+            # (GRANDES FORMATOS, TRANSILUMINADOS, AFICHES, etc.) lo usamos como proveedor.
+            if prov is None and medio and not _es_via_publica(medio):
+                prov = medio
+            medio = "Via Publica"
             tipo_final = "Via Publica"
         else:
             tipo_final = tipo_archivo

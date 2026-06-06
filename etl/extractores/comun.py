@@ -39,7 +39,7 @@ DIR_CABA = DATOS_CRUDOS / "CABA"
 DIR_NACION = DATOS_CRUDOS / "Nacion"
 DIR_PBA = DATOS_CRUDOS / "PBA"
 DIR_SANTA_FE = DATOS_CRUDOS / "Santa Fe"
-DIR_PBA_NUEVOS = CRUDOS_BASE / "PBA Nuevos datos sin curar"
+DIR_PBA_NUEVOS = DATOS_CRUDOS / "PBA Nuevos datos sin curar"
 DIR_CURADO = CRUDOS_BASE / "Datos_Pauta_Oficial_Curado"
 
 # Salida

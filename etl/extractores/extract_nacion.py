@@ -200,6 +200,11 @@ def _parse_pivot(path, anio, cont):
         prov = toks[0][1]
         if prov and prov.strip().lower().startswith(("total", "suma de")):
             continue
+        # Saltar filas donde prov parece un numero (totales de columna scrapeados
+        # como si fueran nombres de proveedor, ej: "116.778.592,23").
+        if prov and re.fullmatch(r"[\d.,\s]+", prov.strip()):
+            cont.descartar("fila_total_numerica")
+            continue
         medio = toks[1][1] if (modo == "mes" and len(toks) > 1) else None
         nums = toks[n_text:]
         emitio = False

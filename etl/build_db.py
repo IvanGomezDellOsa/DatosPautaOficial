@@ -45,7 +45,11 @@ OUT_DIR = ETL_DIR.parent / "public" / "data"
 BUILD_DIR = ETL_DIR / "build"
 OUT_DB = BUILD_DIR / "pauta.sqlite"
 
-CSV_ORDERS = DATA_DIR / "pauta_oficial_unificado.csv"
+_CSV_V2 = DATA_DIR / "pauta_oficial_unificado_v2.csv"
+_CSV_V1 = DATA_DIR / "pauta_oficial_unificado.csv"
+# Preferir la versión v2 (generada por los nuevos extractores en unificar.py)
+# si existe; si no, caer al CSV original para no romper builds previos.
+CSV_ORDERS = _CSV_V2 if _CSV_V2.exists() else _CSV_V1
 CSV_IPC = DATA_DIR / "ipc_indec.csv"
 CSV_GOV = DATA_DIR / "governments.csv"
 CSV_ALIASES = DATA_DIR / "aliases.csv"
@@ -448,7 +452,7 @@ def crear_filtros(con):
     print(f"  filtros_cache: {n} filas")
 
 
-def crear_groups(con, top_n=100):
+def crear_groups(con, top_n=2000):
     """Pre-computa groups_cache: top-N pares (medio_norm, proveedor_norm) por
     monto_deflactado para cada combinacion (jurisdiccion, anio).
 
