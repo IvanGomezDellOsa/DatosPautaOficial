@@ -147,22 +147,35 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
 
   // ── Modo agrupado ────────────────────────────────────────────────────────
   if (agrupado) {
-    // Sin entidad: lookup puntual en groups_cache (pre-computado en el ETL).
-    // Evita el GROUP BY sobre orders, que requiere escanear todo el set
-    // filtrado y dispara el prefetch exponencial de sql.js-httpvfs.
+    // Sin entidad: lookup puntual + PAGINADO en groups_cache (pre-computado en
+    // el ETL, que ahora guarda TODAS las combinaciones, no un top-N). Evita el
+    // GROUP BY sobre orders y permite recorrer la base entera agrupada sin traer
+    // miles de filas de golpe. ORDER BY rank usa idx_gcache; LIMIT/OFFSET pagina.
     if (!entidadNorm) {
+      const [{ total }] = await query<{ total: number }>(
+        `SELECT COUNT(*) as total FROM groups_cache WHERE jurisdiccion = ? AND anio = ?`,
+        [jurisdiccion ?? "*", anio ?? 0],
+      );
       const filas = await query<OrdenAgrupada>(
         `SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
          FROM groups_cache
          WHERE jurisdiccion = ? AND anio = ?
          ORDER BY rank
-         LIMIT 2000`,
-        [jurisdiccion ?? "*", anio ?? 0],
+         LIMIT ? OFFSET ?`,
+        [jurisdiccion ?? "*", anio ?? 0, porPagina, pagina * porPagina],
       );
-      return { filas, totalFilas: filas.length };
+      return { filas, totalFilas: Number(total) };
     }
-    // Con entidad: el set es chico, GROUP BY en vivo es rapido.
-    // HAVING excluye el grupo (null,null): ordenes sin proveedor ni medio.
+    // Con entidad: el set es chico (un solo proveedor/medio), GROUP BY en vivo es
+    // rapido. Igual se pagina por consistencia con la UI. HAVING excluye el grupo
+    // (null,null): ordenes sin proveedor ni medio.
+    const [{ total }] = await query<{ total: number }>(
+      `SELECT COUNT(*) as total FROM (
+         SELECT 1 FROM orders ${where}
+         GROUP BY medio, proveedor
+         HAVING medio IS NOT NULL OR proveedor IS NOT NULL)`,
+      params,
+    );
     const filas = await query<OrdenAgrupada>(
       `SELECT medio AS medio_norm, proveedor AS proveedor_norm,
               medio, proveedor,
@@ -171,10 +184,10 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
        GROUP BY medio, proveedor
        HAVING medio IS NOT NULL OR proveedor IS NOT NULL
        ORDER BY total DESC
-       LIMIT 2000`,
-      params,
+       LIMIT ? OFFSET ?`,
+      [...params, porPagina, pagina * porPagina],
     );
-    return { filas, totalFilas: filas.length };
+    return { filas, totalFilas: Number(total) };
   }
 
   // ── Modo individual (original) ───────────────────────────────────────────

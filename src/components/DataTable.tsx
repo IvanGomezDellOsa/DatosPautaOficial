@@ -64,29 +64,31 @@ function formatMonto(v: number | null): string {
 // Hook: datos agrupados
 // ---------------------------------------------------------------------------
 
-function useTabla(filtros: FiltrosTabla) {
+function useTabla(filtros: FiltrosTabla, pagina: number) {
   const [rows, setRows] = useState<OrdenAgrupada[]>([]);
+  const [totalFilas, setTotalFilas] = useState(0);
   const [totalMonto, setTotalMonto] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ filas }, tots] = await Promise.all([
-        getOrdenes({ ...filtros, agrupado: true }),
+      const [{ filas, totalFilas: total }, tots] = await Promise.all([
+        getOrdenes({ ...filtros, agrupado: true, pagina, porPagina: POR_PAGINA }),
         getTotalesFiltro(filtros),
       ]);
       setRows(filas as OrdenAgrupada[]);
+      setTotalFilas(Number(total));
       setTotalMonto(tots.montoTotal);
     } finally {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(filtros)]);
+  }, [JSON.stringify(filtros), pagina]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  return { rows, totalMonto, loading };
+  return { rows, totalFilas, totalMonto, loading };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +177,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // Modo de vista
   const [modoIndividual, setModoIndividual] = useState(false);
   const [paginaIndividual, setPaginaIndividual] = useState(0);
+  const [paginaAgrupado, setPaginaAgrupado] = useState(0);
 
   const jurisFiltradas = estado.anio
     ? JURISDICCIONES.filter((j) => estado.anio! >= DISPONIBILIDAD[j][0] && estado.anio! <= DISPONIBILIDAD[j][1])
@@ -198,8 +201,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     : null;
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
 
-  // Datos agrupados (modo default)
-  const { rows: rowsAgrupados, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros);
+  // Datos agrupados (modo default) — paginado, igual que el individual
+  const { rows: rowsAgrupados, totalFilas: totalCombinaciones, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros, paginaAgrupado);
 
   // Datos individuales (modo individual)
   const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual } = useTablaIndividual(filtros, paginaIndividual);
@@ -216,12 +219,18 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     });
     setExpandedMap(new Map());
     setPaginaIndividual(0);
+    setPaginaAgrupado(0);
   }, []);
+
+  // Al cambiar de página agrupada, colapsar los detalles (las claves expandidas
+  // pertenecen a la página anterior).
+  useEffect(() => { setExpandedMap(new Map()); }, [paginaAgrupado]);
 
   // Al cambiar modo, resetear página individual
   const toggleModo = useCallback(() => {
     setModoIndividual((prev) => !prev);
     setPaginaIndividual(0);
+    setPaginaAgrupado(0);
     setExpandedMap(new Map());
   }, []);
 
@@ -305,10 +314,14 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     cargarTandaDetalle(row, key, offset);
   }, [expandedMap, cargarTandaDetalle]);
 
-  // Paginación modo individual
-  const totalPaginas = Math.ceil(totalFilas / POR_PAGINA);
+  // Paginación — unificada para ambos modos (individual y agrupado).
   const loading = modoIndividual ? loadingIndividual : loadingAgrupado;
   const totalMonto = modoIndividual ? totalMontoIndividual : totalMontoAgrupado;
+  // Registros totales del modo activo: órdenes (individual) o combinaciones (agrupado).
+  const totalRegistros = modoIndividual ? totalFilas : totalCombinaciones;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / POR_PAGINA));
+  const paginaActual = modoIndividual ? paginaIndividual : paginaAgrupado;
+  const setPaginaActual = modoIndividual ? setPaginaIndividual : setPaginaAgrupado;
 
   // Solo se permite expandir un grupo cuando hay jurisdicción Y año: ese es el
   // caso que resuelve el covering index idx_orders_juris_anio_medio_prov (lookup
@@ -367,7 +380,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
               </>
             ) : (
               <>
-                <strong>{fmtNum.format(rowsAgrupados.length)}</strong> combinaciones
+                <strong>{fmtNum.format(totalCombinaciones)}</strong> combinaciones
               </>
             )}
             {totalMonto > 0 && (
@@ -614,37 +627,38 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
         </div>
       </div>
 
-      {/* ── PAGINACIÓN MODO INDIVIDUAL ── */}
-      {modoIndividual && totalFilas > 0 && (
+      {/* ── PAGINACIÓN (individual y agrupado) ── */}
+      {totalRegistros > POR_PAGINA && (
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "center",
           gap: 8, padding: "16px 0", flexWrap: "wrap",
         }}>
           <button
-            onClick={() => setPaginaIndividual(0)}
-            disabled={paginaIndividual === 0 || loadingIndividual}
+            onClick={() => setPaginaActual(0)}
+            disabled={paginaActual === 0 || loading}
             style={btnPage}
             aria-label="Primera página"
           >«</button>
           <button
-            onClick={() => setPaginaIndividual((p) => Math.max(0, p - 1))}
-            disabled={paginaIndividual === 0 || loadingIndividual}
+            onClick={() => setPaginaActual((p) => Math.max(0, p - 1))}
+            disabled={paginaActual === 0 || loading}
             style={btnPage}
             aria-label="Página anterior"
           >‹</button>
           <span style={{ fontSize: "var(--text-small)", color: "var(--color-fg-subtle)", padding: "0 8px" }}>
-            Página <strong>{paginaIndividual + 1}</strong> de <strong>{totalPaginas}</strong>
-            {" "}· <strong>{fmtNum.format(totalFilas)}</strong> órdenes en total
+            Página <strong>{paginaActual + 1}</strong> de <strong>{totalPaginas}</strong>
+            {" "}· <strong>{fmtNum.format(totalRegistros)}</strong>{" "}
+            {modoIndividual ? "órdenes" : "combinaciones"} en total
           </span>
           <button
-            onClick={() => setPaginaIndividual((p) => Math.min(totalPaginas - 1, p + 1))}
-            disabled={paginaIndividual >= totalPaginas - 1 || loadingIndividual}
+            onClick={() => setPaginaActual((p) => Math.min(totalPaginas - 1, p + 1))}
+            disabled={paginaActual >= totalPaginas - 1 || loading}
             style={btnPage}
             aria-label="Página siguiente"
           >›</button>
           <button
-            onClick={() => setPaginaIndividual(totalPaginas - 1)}
-            disabled={paginaIndividual >= totalPaginas - 1 || loadingIndividual}
+            onClick={() => setPaginaActual(totalPaginas - 1)}
+            disabled={paginaActual >= totalPaginas - 1 || loading}
             style={btnPage}
             aria-label="Última página"
           >»</button>

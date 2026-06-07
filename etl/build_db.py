@@ -529,18 +529,25 @@ def crear_filtros(con):
     print(f"  filtros_cache: {n} filas")
 
 
-def crear_groups(con, top_n=2000):
-    """Pre-computa groups_cache: top-N pares (medio_norm, proveedor_norm) por
-    monto_deflactado para cada combinacion (jurisdiccion, anio).
+def crear_groups(con, top_n=None):
+    """Pre-computa groups_cache: TODOS los pares (medio_norm, proveedor_norm),
+    rankeados por monto_deflactado, para cada combinacion (jurisdiccion, anio).
 
     Analogo a rankings_cache pero agrupando por el par en lugar de por una
-    sola dimension. El DataTable hace un lookup puntual aqui en vez de correr
-    un GROUP BY sobre orders (que requiere escanear todo el set filtrado y
-    dispara el prefetch exponencial de sql.js-httpvfs).
+    sola dimension. El DataTable hace un lookup puntual + paginado aqui (ORDER
+    BY rank, LIMIT/OFFSET) en vez de correr un GROUP BY sobre orders (que
+    requiere escanear todo el set filtrado y dispara el prefetch exponencial de
+    sql.js-httpvfs).
+
+    Se guardan TODAS las combinaciones (no un top-N) para que el usuario pueda
+    paginar la base entera en modo agrupado; el front nunca trae mas de una
+    pagina por vez. `rank` da el orden (por monto desc) para esa paginacion.
+    top_n=None => sin tope; pasar un entero solo para debug.
 
     Claves: jurisdiccion='*' = todas, anio=0 = todos. Solo cubre el caso SIN
     filtro de entidad; con proveedor/medio el set es chico y se agrupa en vivo.
     """
+    limit_clause = f"LIMIT {top_n}" if top_n else ""
     con.executescript("""
         CREATE TABLE groups_cache (
             jurisdiccion   TEXT    NOT NULL,
@@ -576,11 +583,12 @@ def crear_groups(con, top_n=2000):
     """)
 
     def insert_top(juris_key, anio_key, rows):
+        filas = rows[:top_n] if top_n else rows
         con.executemany(
             "INSERT INTO groups_cache VALUES (?,?,?,?,?,?,?,?,?)",
             [(juris_key, anio_key, i + 1,
               r[0], r[1], r[2], r[3], r[4], r[5])
-             for i, r in enumerate(rows[:top_n])]
+             for i, r in enumerate(filas)]
         )
 
     # Global
@@ -590,7 +598,7 @@ def crear_groups(con, top_n=2000):
                SUM(total), SUM(n)
         FROM _groups
         GROUP BY medio_norm, proveedor_norm
-        ORDER BY 5 DESC LIMIT {top_n}
+        ORDER BY 5 DESC {limit_clause}
     """).fetchall()
     insert_top("*", 0, rows)
 
@@ -603,7 +611,7 @@ def crear_groups(con, top_n=2000):
                    SUM(total), SUM(n)
             FROM _groups WHERE jurisdiccion=?
             GROUP BY medio_norm, proveedor_norm
-            ORDER BY 5 DESC LIMIT {top_n}
+            ORDER BY 5 DESC {limit_clause}
         """, [juris]).fetchall()
         insert_top(juris, 0, rows)
 
@@ -616,7 +624,7 @@ def crear_groups(con, top_n=2000):
                    SUM(total), SUM(n)
             FROM _groups WHERE anio=?
             GROUP BY medio_norm, proveedor_norm
-            ORDER BY 5 DESC LIMIT {top_n}
+            ORDER BY 5 DESC {limit_clause}
         """, [anio]).fetchall()
         insert_top("*", anio, rows)
 
@@ -626,7 +634,7 @@ def crear_groups(con, top_n=2000):
         rows = con.execute(f"""
             SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
             FROM _groups WHERE jurisdiccion=? AND anio=?
-            ORDER BY total DESC LIMIT {top_n}
+            ORDER BY total DESC {limit_clause}
         """, [juris, anio]).fetchall()
         insert_top(juris, anio, rows)
 
