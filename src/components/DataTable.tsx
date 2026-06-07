@@ -64,11 +64,15 @@ function formatMonto(v: number | null): string {
 // Hook: datos agrupados
 // ---------------------------------------------------------------------------
 
-function useTabla(filtros: FiltrosTabla, pagina: number) {
-  const [rows, setRows] = useState<OrdenAgrupada[]>([]);
-  const [totalFilas, setTotalFilas] = useState(0);
-  const [totalMonto, setTotalMonto] = useState(0);
-  const [loading, setLoading] = useState(true);
+/** Seed de la primera página agrupada (de home.json) para el primer paint. */
+type SeedAgrupado = { filas: OrdenAgrupada[]; totalFilas: number; totalMonto: number } | null;
+
+function useTabla(filtros: FiltrosTabla, pagina: number, seed: SeedAgrupado) {
+  const [rows, setRows] = useState<OrdenAgrupada[]>(() => (seed ? seed.filas : []));
+  const [totalFilas, setTotalFilas] = useState(() => (seed ? seed.totalFilas : 0));
+  const [totalMonto, setTotalMonto] = useState(() => (seed ? seed.totalMonto : 0));
+  const [loading, setLoading] = useState(() => !seed);
+  const first = useRef(true);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -86,7 +90,17 @@ function useTabla(filtros: FiltrosTabla, pagina: number) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filtros), pagina]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  // Si la vista inicial coincide con el seed (home.json), no se toca sql.js en
+  // el primer render: el primer paint sale del estado sembrado. sql.js recién
+  // arranca cuando el usuario cambia filtro/página.
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      if (seed) return;
+    }
+    cargar();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargar]);
 
   return { rows, totalFilas, totalMonto, loading };
 }
@@ -201,8 +215,22 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     : null;
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
 
+  // Seed del primer paint: solo aplica si la vista inicial es EXACTAMENTE la
+  // que precomputó home.json (PBA + año por defecto, agrupado, página 0, sin
+  // entidad, deflactado). Si la URL trae otro filtro, se consulta en vivo.
+  const seedTabla: SeedAgrupado =
+    initial &&
+    !modoIndividual &&
+    paginaAgrupado === 0 &&
+    !estado.entidadNorm &&
+    estado.jurisdiccion === initial.filtroInicial.jurisdiccion &&
+    estado.anio === initial.filtroInicial.anio &&
+    estado.deflactado === initial.filtroInicial.deflactado
+      ? { filas: initial.tabla.filas, totalFilas: initial.tabla.totalFilas, totalMonto: initial.totales.montoTotal }
+      : null;
+
   // Datos agrupados (modo default) — paginado, igual que el individual
-  const { rows: rowsAgrupados, totalFilas: totalCombinaciones, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros, paginaAgrupado);
+  const { rows: rowsAgrupados, totalFilas: totalCombinaciones, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros, paginaAgrupado, seedTabla);
 
   // Datos individuales (modo individual)
   const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual } = useTablaIndividual(filtros, paginaIndividual);

@@ -784,15 +784,17 @@ def escribir_home(con, prov_disp):
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    # 1. Tabla -- getOrdenes(PBA, 2025, ordenPor='id', desc=False)
+    # 1. Tabla -- getOrdenes(PBA, ANIO, agrupado) pagina 0. El modo por defecto
+    #    del DataTable es AGRUPADO, asi que sembramos la primera pagina de
+    #    combinaciones (medio,proveedor) desde groups_cache, identico a la query
+    #    del front, para que el primer paint no toque sql.js.
     total_filas = cur.execute(
-        "SELECT COUNT(*) FROM orders WHERE jurisdiccion=? AND anio=?",
+        "SELECT COUNT(*) FROM groups_cache WHERE jurisdiccion=? AND anio=?",
         (JURIS, ANIO)).fetchone()[0]
     filas = rows(
-        """SELECT id, medio, proveedor, monto,
-                  resolucion, jurisdiccion, anio
-           FROM orders WHERE jurisdiccion=? AND anio=?
-           ORDER BY id ASC LIMIT 100""", (JURIS, ANIO))
+        """SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
+           FROM groups_cache WHERE jurisdiccion=? AND anio=?
+           ORDER BY rank LIMIT 100""", (JURIS, ANIO))
 
     # 2. Totales -- getTotalesFiltro
     t = cur.execute(

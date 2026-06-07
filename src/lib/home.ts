@@ -10,7 +10,7 @@
  * Si cambian las queries del front o el filtro por defecto, regenerar home.json.
  */
 
-import type { Orden, RankingItem, ResultadoCuantoRecibio } from "./queries";
+import type { OrdenAgrupada, RankingItem, ResultadoCuantoRecibio } from "./queries";
 import type { EntidadBusqueda } from "./search";
 
 export interface HomeFiltroInicial {
@@ -33,7 +33,8 @@ export interface HomeTotales {
 
 export interface HomeSeed {
   filtroInicial: HomeFiltroInicial;
-  tabla: { filas: Orden[]; totalFilas: number };
+  // Primera página del modo AGRUPADO (default): combinaciones (medio, proveedor).
+  tabla: { filas: OrdenAgrupada[]; totalFilas: number };
   totales: HomeTotales;
   gobierno: { name: string; role: string } | null;
   rankingContextual: { proveedor: RankingItem[]; medio: RankingItem[] };
