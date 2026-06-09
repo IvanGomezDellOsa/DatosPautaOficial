@@ -18,6 +18,15 @@ public/data/grupos.json
 # el limite de 25 MiB de Cloudflare Pages; los chunks van a public/data/).
 etl/build/
 
+# backups y archivos de trabajo del ETL (no son fuentes: las fuentes reales son
+# pauta_oficial_unificado.csv / _v2.csv, ya versionadas). Evita que backups
+# pesados o csv auxiliares ensucien el repo o se commiteen por error.
+etl/data/*backup*.csv
+etl/data/medios_sin_grupo.csv
+
+# config local de las herramientas de Claude (preview, settings locales)
+.claude/
+
 # Python (ETL)
 __pycache__/
 *.pyc

@@ -318,7 +318,7 @@ export async function getCuantoRecibio(
 export interface FiltrosRanking {
   jurisdiccion?: string;
   anio?: number;
-  tipo?: "proveedor" | "medio";
+  tipo?: "proveedor" | "medio" | "grupo";
   limite?: number;
 }
 

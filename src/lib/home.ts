@@ -37,8 +37,8 @@ export interface HomeSeed {
   tabla: { filas: OrdenAgrupada[]; totalFilas: number };
   totales: HomeTotales;
   gobierno: { name: string; role: string } | null;
-  rankingContextual: { proveedor: RankingItem[]; medio: RankingItem[] };
-  rankingGlobal: { proveedor: RankingItem[]; medio: RankingItem[] };
+  rankingContextual: { proveedor: RankingItem[]; medio: RankingItem[]; grupo: RankingItem[] };
+  rankingGlobal: { proveedor: RankingItem[]; medio: RankingItem[]; grupo: RankingItem[] };
   generadorDemo: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio } | null;
 }
 

@@ -545,7 +545,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
             /* ── MODO AGRUPADO ── */
             <>
             {!puedeExpandir && rowsAgrupados.length > 0 && (
-              <p style={{ margin: "0 0 0.5rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>
+              <p style={{ margin: 0, padding: "0.75rem 1rem", color: "var(--color-fg-subtle)", fontSize: "var(--text-micro)" }}>
                 Filtrá por jurisdicción y año para poder ver las órdenes individuales de cada grupo.
               </p>
             )}

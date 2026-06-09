@@ -13,6 +13,8 @@ import type { SeedRankings } from "../lib/home";
 
 const fmtARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
 
+type TipoRanking = "proveedor" | "medio" | "grupo";
+
 function formatMonto(v: number): string {
   if (v >= 1_000_000_000) return `$ ${(v / 1_000_000_000).toFixed(1).replace(".", ",")} MM`;
   if (v >= 1_000_000) return `$ ${Math.round(v / 1_000_000).toLocaleString("es-AR")} M`;
@@ -28,8 +30,8 @@ interface RankingCardProps {
   subtitulo: string;
   items: RankingItem[];
   loading: boolean;
-  tipo: "proveedor" | "medio";
-  onTipoChange: (t: "proveedor" | "medio") => void;
+  tipo: TipoRanking;
+  onTipoChange: (t: TipoRanking) => void;
 }
 
 function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: RankingCardProps) {
@@ -56,6 +58,13 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
             onClick={() => onTipoChange("medio")}
           >
             Medio
+          </button>
+          <button
+            className={tipo === "grupo" ? "on" : ""}
+            type="button"
+            onClick={() => onTipoChange("grupo")}
+          >
+            Grupo mediático
           </button>
         </div>
       </div>
@@ -102,6 +111,21 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
           Los totales son aproximaciones inferiores: al haber huecos de cobertura, el monto real puede ser mayor.
         </p>
       )}
+
+      {tipo === "grupo" && items.length > 0 && (
+        <p className="card-disclaimer">
+          Agrupación según el{" "}
+          <a
+            href="https://argentina.mom-gmr.org/es/propietarios/grupos-mediaticos/"
+            target="_blank"
+            rel="noopener"
+            style={{ color: "var(--color-fg-subtle)", textDecoration: "underline" }}
+          >
+            Media Ownership Monitor Argentina
+          </a>{" "}
+          (2018), CC BY-ND 4.0. La pauta se asigna por medio, no al holding.
+        </p>
+      )}
     </div>
   );
 }
@@ -112,7 +136,7 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
 
 export default function Rankings({ initial }: { initial?: SeedRankings }) {
   // Ranking contextual (sigue los filtros de la tabla)
-  const [tipoCtx, setTipoCtx] = useState<"proveedor" | "medio">("proveedor");
+  const [tipoCtx, setTipoCtx] = useState<TipoRanking>("proveedor");
   const [itemsCtx, setItemsCtx] = useState<RankingItem[]>(
     initial ? initial.rankingContextual.proveedor : [],
   );
@@ -124,7 +148,7 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
   );
 
   // Ranking global (toda la base)
-  const [tipoGlb, setTipoGlb] = useState<"proveedor" | "medio">("proveedor");
+  const [tipoGlb, setTipoGlb] = useState<TipoRanking>("proveedor");
   const [itemsGlb, setItemsGlb] = useState<RankingItem[]>(
     initial ? initial.rankingGlobal.proveedor : [],
   );
@@ -138,7 +162,7 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
     const partes = [];
     if (jurisdiccion) partes.push(jurisdiccion);
     if (anio) partes.push(String(anio));
-    setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Toda nuestra base de datos"}`);
+    setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Todas las jurisdicciones y años"}`);
 
     // Si los filtros coinciden con el seed de home.json, servimos desde ahí
     // (sin inicializar sql.js). Funciona también al alternar proveedor/medio.

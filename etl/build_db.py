@@ -287,7 +287,7 @@ def crear_esquema(con):
 
 
 
-def crear_rankings(con, prov_disp, medio_disp, top_n=5):
+def crear_rankings(con, prov_disp, medio_disp, grupos, top_n=5):
     """Pre-computa todos los rankings posibles y los guarda en rankings_cache.
 
     La data historica es inmutable: pre-calculamos el top N para cada
@@ -297,6 +297,12 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
     Combinaciones: global (1) + por juris (4) + por anio (~22)
                    + juris x anio (~88) = ~115 por tipo => ~4600 filas total.
     Clave: jurisdiccion='*' = todas las jurisdicciones, anio=0 = todos los anios.
+
+    Tipos: 'proveedor', 'medio' (una dimension de orders) y 'grupo' (holding que
+    suma varios medios/proveedores con OR a nivel orden, identico criterio que
+    totals_cache). Para grupo, norm = grupo_slug y nombre = grupo_nombre. La
+    agregacion global/por-juris/por-anio reusa SUM(total)/SUM(n) sobre el
+    desglose por (juris, anio), igual que para proveedor/medio.
     """
     def get_best_names(disp):
         res = []
@@ -335,6 +341,37 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
             GROUP BY o.jurisdiccion, o.anio, o.medio;
     """)
 
+    # --- desglose por grupo (holding) -> _rgrupo --------------------------
+    # Mismo esquema que _rprov/_rmedio: (jurisdiccion, anio, norm, nombre,
+    # total, n). norm = grupo_slug, nombre = grupo_nombre. Por cada grupo se
+    # suma sobre ambos ejes con OR a nivel orden (medio IN (...) OR proveedor
+    # IN (...)); como cada orden tiene un solo medio y un solo proveedor, el OR
+    # no duplica. Mismo criterio que crear_totals.
+    con.executescript("""
+        CREATE TEMP TABLE _rgrupo(
+            jurisdiccion TEXT, anio INTEGER, norm TEXT, nombre TEXT,
+            total REAL, n INTEGER);
+    """)
+    for g in grupos:
+        medios = sorted({m["norm"] for m in g["miembros"] if m["eje"] == "medio"})
+        provs = sorted({m["norm"] for m in g["miembros"] if m["eje"] == "proveedor"})
+        conds, params = [], []
+        if medios:
+            conds.append(f"medio IN ({','.join('?' * len(medios))})")
+            params += medios
+        if provs:
+            conds.append(f"proveedor IN ({','.join('?' * len(provs))})")
+            params += provs
+        if not conds:
+            continue
+        where = " OR ".join(conds)
+        con.execute(f"""
+            INSERT INTO _rgrupo
+            SELECT jurisdiccion, anio, ?, ?, SUM(monto), COUNT(*)
+            FROM orders WHERE {where}
+            GROUP BY jurisdiccion, anio
+        """, [g["slug"], g["nombre"], *params])
+
     con.executescript("""
         CREATE TABLE rankings_cache (
             tipo         TEXT    NOT NULL,
@@ -357,7 +394,7 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
              for i, r in enumerate(rows[:top_n])]
         )
 
-    for tipo, tbl in [("proveedor", "_rprov"), ("medio", "_rmedio")]:
+    for tipo, tbl in [("proveedor", "_rprov"), ("medio", "_rmedio"), ("grupo", "_rgrupo")]:
         # --- global (todas las jurisdicciones, todos los anios) ---------------
         rows = con.execute(f"""
             SELECT norm, MAX(nombre), SUM(total), SUM(n)
@@ -393,7 +430,9 @@ def crear_rankings(con, prov_disp, medio_disp, top_n=5):
             insert_top(tipo, tbl, juris, anio, rows)
 
     n = con.execute("SELECT COUNT(*) FROM rankings_cache").fetchone()[0]
-    print(f"  rankings_cache: {n} filas ({n // (top_n * 2)} combinaciones)")
+    n_grupo = con.execute(
+        "SELECT COUNT(*) FROM rankings_cache WHERE tipo='grupo'").fetchone()[0]
+    print(f"  rankings_cache: {n} filas (incluye {n_grupo} de tipo='grupo')")
 
 
 def crear_totals(con, grupos):
@@ -820,9 +859,11 @@ def escribir_home(con, prov_disp):
                WHERE tipo=? AND jurisdiccion=? AND anio=? ORDER BY rank LIMIT 5""",
             (tipo, juris_key, anio_key))
     rankingContextual = {"proveedor": ranking(JURIS, ANIO, "proveedor"),
-                         "medio": ranking(JURIS, ANIO, "medio")}
+                         "medio": ranking(JURIS, ANIO, "medio"),
+                         "grupo": ranking(JURIS, ANIO, "grupo")}
     rankingGlobal = {"proveedor": ranking("*", 0, "proveedor"),
-                     "medio": ranking("*", 0, "medio")}
+                     "medio": ranking("*", 0, "medio"),
+                     "grupo": ranking("*", 0, "grupo")}
 
     # 6. Demo del Generador (Clarin) -- getCuantoRecibio. Evita el buscar("Clarin")
     #    de montaje, que hoy fuerza la descarga de search.json (1,5 MB) al inicio.
@@ -1115,7 +1156,7 @@ def main():
                      [(k, str(v)) for k, v in meta.items()])
 
     # --- tablas de rankings pre-computadas (evitan full-scan en el front) ---
-    crear_rankings(con, prov_disp, medio_disp)
+    crear_rankings(con, prov_disp, medio_disp, grupos)
 
     # --- totales pre-computados por entidad (vista "Cuanto recibio") --------
     #     incluye tipo='grupo' (holdings) computado desde grupos_mom.csv
