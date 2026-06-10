@@ -11,6 +11,7 @@ import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris, 
 import { urlGenerador } from "../lib/url-state";
 import { buscar, buscarGrupos, getGrupoPorNorm, type EntidadBusqueda, type GrupoInfo } from "../lib/search";
 import { descargarPlaca } from "../lib/generarImagenCanvas";
+import { useSugerenciasNav } from "../lib/useSugerenciasNav";
 
 // ---------------------------------------------------------------------------
 // Helpers de formato
@@ -75,11 +76,9 @@ function desglosePorJuris(
 function DesgloseJuris({
   porAnio,
   anioSel,
-  tipo,
 }: {
   porAnio: TotalPorAnioJuris[];
   anioSel: number | "historico";
-  tipo: TipoEntidad;
 }) {
   const filas = desglosePorJuris(porAnio, anioSel);
   if (!filas.length) return null;
@@ -89,8 +88,8 @@ function DesgloseJuris({
       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"var(--text-small)" }}>
         <thead>
           <tr style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)" }}>
-            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6 }}>Jurisdicción</th>
-            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6 }}>Período</th>
+            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6, paddingRight:8 }}>Jurisdicción</th>
+            <th style={{ textAlign:"left", fontWeight:500, paddingBottom:6, paddingRight:8 }}>Período</th>
             <th style={{ textAlign:"right", fontWeight:500, paddingBottom:6 }}>Monto</th>
           </tr>
         </thead>
@@ -103,7 +102,7 @@ function DesgloseJuris({
                   <span style={{ color:"var(--color-fg-subtle)", whiteSpace:"nowrap", fontSize:"var(--text-micro)" }}>
                     {f.anioMin === f.anioMax ? f.anioMin : `${f.anioMin}–${f.anioMax}`}
                   </span>
-                  <div style={{ flexGrow:1, height:4, background:"var(--color-border)", borderRadius:2, minWidth:40 }}>
+                  <div className="desglose-bar" style={{ flexGrow:1, height:4, background:"var(--color-border)", borderRadius:2, minWidth:40 }}>
                     <div style={{ height:"100%", background:"var(--color-accent)", borderRadius:2, width:`${Math.round((f.total / maxTotal) * 100)}%` }} />
                   </div>
                 </div>
@@ -281,6 +280,14 @@ export default function Generador({ initial }: GeneradorProps) {
     setMostrarSugs(false);
   };
 
+  // Navegación por teclado del dropdown de sugerencias
+  const { idx: idxSug, onKeyDown: onKeyDownSugs } = useSugerenciasNav(
+    sugerencias.length,
+    mostrarSugs,
+    (i) => elegirEntidad(sugerencias[i]),
+    () => setMostrarSugs(false),
+  );
+
   // Cambio de toggle Proveedor / Medio / Grupo mediático. Limpia la selección;
   // en modo grupo precarga el grupo más grande para que la vista no quede vacía.
   const cambiarTipo = (t: TipoEntidad) => {
@@ -355,25 +362,22 @@ export default function Generador({ initial }: GeneradorProps) {
   };
 
   const onCopiarLink = async () => {
-    await navigator.clipboard.writeText(compartirUrl()).catch(() => {});
-    showToast("Link copiado al portapapeles");
+    try {
+      await navigator.clipboard.writeText(compartirUrl());
+      showToast("Link copiado al portapapeles");
+    } catch {
+      showToast("No se pudo copiar el link");
+    }
   };
-
-  const contextoAnio =
-    anioSel === "historico"
-      ? resultado
-        ? `${Math.min(...resultado.porAnio.map((r) => r.anio))} — ${Math.max(...resultado.porAnio.map((r) => r.anio))} (histórico)`
-        : "(histórico)"
-      : String(anioSel);
 
   return (
     <div className="gen-card">
       {/* ── Búsqueda ── */}
       <div className="gen-search-row">
-        <div className="segmented" role="tablist" aria-label="Tipo">
-          <button className={tipo === "proveedor" ? "on" : ""} type="button" onClick={() => cambiarTipo("proveedor")}>Proveedor</button>
-          <button className={tipo === "medio" ? "on" : ""} type="button" onClick={() => cambiarTipo("medio")}>Medio</button>
-          <button className={tipo === "grupo" ? "on" : ""} type="button" onClick={() => cambiarTipo("grupo")}>Grupo mediático</button>
+        <div className="segmented" role="group" aria-label="Tipo de entidad">
+          <button className={tipo === "proveedor" ? "on" : ""} aria-pressed={tipo === "proveedor"} type="button" onClick={() => cambiarTipo("proveedor")}>Proveedor</button>
+          <button className={tipo === "medio" ? "on" : ""} aria-pressed={tipo === "medio"} type="button" onClick={() => cambiarTipo("medio")}>Medio</button>
+          <button className={tipo === "grupo" ? "on" : ""} aria-pressed={tipo === "grupo"} type="button" onClick={() => cambiarTipo("grupo")}>Grupo mediático</button>
         </div>
 
         <div className="gen-search-input-wrap" ref={busqRef} style={{ position: "relative" }}>
@@ -386,22 +390,24 @@ export default function Generador({ initial }: GeneradorProps) {
             value={textoBusq}
             placeholder={tipo === "grupo" ? "Buscar grupo mediático…" : "Buscar proveedor o medio…"}
             aria-label="Buscar entidad"
+            aria-autocomplete="list"
+            aria-controls="sugs-gen"
+            aria-activedescendant={idxSug >= 0 ? `sug-gen-${idxSug}` : undefined}
             onChange={(e) => { setTextoBusq(e.target.value); setMostrarSugs(true); }}
             onFocus={() => setMostrarSugs(true)}
+            onKeyDown={onKeyDownSugs}
           />
-          <span className="chevron-icon">▾</span>
+          <span className="chevron-icon" aria-hidden="true">▾</span>
 
           {mostrarSugs && sugerencias.length > 0 && (
-            <ul role="listbox" style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:50, background:"var(--color-bg-elev-2)", border:"1px solid var(--color-border-strong)", borderRadius:8, marginTop:4, padding:"4px 0", listStyle:"none", boxShadow:"0 8px 32px rgba(0,0,0,.4)" }}>
-              {sugerencias.map((s) => (
-                <li key={s.id} role="option" aria-selected={entidadActual?.norm === s.norm}
+            <ul role="listbox" id="sugs-gen" className="suggest-list">
+              {sugerencias.map((s, i) => (
+                <li key={s.id} id={`sug-gen-${i}`} role="option" aria-selected={entidadActual?.norm === s.norm}
+                  className={i === idxSug ? "suggest-item activo" : "suggest-item"}
                   onClick={() => elegirEntidad(s)}
-                  style={{ padding:"8px 14px", cursor:"pointer", fontSize:"var(--text-small)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-bg-elev-3)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                 >
                   <span>{s.nombre}</span>
-                  <span style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", whiteSpace:"nowrap", flexShrink:0 }}>{fmtNum.format(s.n)} órdenes</span>
+                  <span className="meta">{fmtNum.format(s.n)} órdenes</span>
                 </li>
               ))}
             </ul>
@@ -440,7 +446,7 @@ export default function Generador({ initial }: GeneradorProps) {
             {resultado && resultado.porAnio.length > 0 && (
               <>
                 <div className="gen-separator" />
-                <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} tipo={tipo} />
+                <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} />
               </>
             )}
             {tipo === "grupo" && grupoInfo && (
@@ -459,10 +465,10 @@ export default function Generador({ initial }: GeneradorProps) {
 
       {/* ── Year pills ── */}
       <div className="gen-controls-row">
-        <div className="year-pills" role="tablist" aria-label="Período">
-          <button className={anioSel === "historico" ? "year-pill on" : "year-pill"} type="button" onClick={() => setAnioSel("historico")}>Histórico</button>
+        <div className="year-pills" role="group" aria-label="Período">
+          <button className={anioSel === "historico" ? "year-pill on" : "year-pill"} aria-pressed={anioSel === "historico"} type="button" onClick={() => setAnioSel("historico")}>Histórico</button>
           {ANIOS_PILLS.map((a) => (
-            <button key={a} className={anioSel === a ? "year-pill on" : "year-pill"} type="button" onClick={() => setAnioSel(a)}>{a}</button>
+            <button key={a} className={anioSel === a ? "year-pill on" : "year-pill"} aria-pressed={anioSel === a} type="button" onClick={() => setAnioSel(a)}>{a}</button>
           ))}
         </div>
       </div>
@@ -484,13 +490,13 @@ export default function Generador({ initial }: GeneradorProps) {
             </svg>
             {generandoImg ? "Generando…" : "Descargar imagen"}
           </button>
-          <button className="share-btn" type="button" onClick={onShareX}>
+          <button className="share-btn" type="button" onClick={onShareX} disabled={!hayDatos}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
             Compartir en X
           </button>
-          <button className="share-btn" type="button" onClick={onCopiarLink}>
+          <button className="share-btn" type="button" onClick={onCopiarLink} disabled={!hayDatos}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -502,7 +508,7 @@ export default function Generador({ initial }: GeneradorProps) {
 
       {/* Toast */}
       {toast && (
-        <div className="toast show" style={{ position:"fixed", bottom:"2rem", left:"50%", transform:"translateX(-50%)" }}>
+        <div className="toast toast--center show" role="status">
           {toast}
         </div>
       )}

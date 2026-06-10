@@ -44,9 +44,10 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
           <div className="card-title">{titulo}</div>
           <div className="card-sub">{subtitulo}</div>
         </div>
-        <div className="segmented" role="tablist" aria-label="Tipo">
+        <div className="segmented" role="group" aria-label="Tipo de entidad">
           <button
             className={tipo === "proveedor" ? "on" : ""}
+            aria-pressed={tipo === "proveedor"}
             type="button"
             onClick={() => onTipoChange("proveedor")}
           >
@@ -54,6 +55,7 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
           </button>
           <button
             className={tipo === "medio" ? "on" : ""}
+            aria-pressed={tipo === "medio"}
             type="button"
             onClick={() => onTipoChange("medio")}
           >
@@ -61,6 +63,7 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
           </button>
           <button
             className={tipo === "grupo" ? "on" : ""}
+            aria-pressed={tipo === "grupo"}
             type="button"
             onClick={() => onTipoChange("grupo")}
           >

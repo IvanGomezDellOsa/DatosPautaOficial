@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 /* ════════════════════════════════════════════════════════════════════════
    Sistema visual «Datos Pauta Oficial»
    Tokens del brief 06_Brief_Diseno_Visual.md (v4).
@@ -17,14 +15,13 @@
   --color-fg-strong: #f8fafc;
   --color-fg: #e2e8f0;
   --color-fg-muted: #94a3b8;
-  --color-fg-subtle: #64748b;
+  /* #7c8aa0 (antes #64748b): mínimo ~4.5:1 sobre --color-bg para texto micro */
+  --color-fg-subtle: #7c8aa0;
   --color-accent: #22d3ee;
   --color-accent-dim: #0891b2;
   --color-accent-glow: rgba(34, 211, 238, 0.22);
-  --font-data: 'Space Grotesk Variable', var(--font-sans, system-ui);
 
   --text-hero: clamp(2rem, 4.5vw, 4rem);
-  --text-display: clamp(2.25rem, 4vw, 3.75rem);
   --text-h2: 1.75rem;
   --text-h3: 1.25rem;
   --text-body: 1.0625rem;
@@ -32,7 +29,6 @@
   --text-small: 0.9375rem;
   --text-micro: 0.8125rem;
   --text-monto-xl: clamp(1.8rem, 8vw, 5rem);
-  --text-monto-lg: 1.625rem;
 
   --table-row-h: 48px;
 }
@@ -41,6 +37,21 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+/* Paridad con el preflight de Tailwind (removido): los form controls no
+   heredan tipografía por defecto y los svg/img inline generan gap de baseline */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
 }
 
 html {
@@ -118,31 +129,10 @@ body {
   text-decoration: none;
   color: var(--color-fg-strong);
 }
-.brand .flag {
-  border-radius: 2px;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
 .brand .wordmark {
   font-weight: 600;
   font-size: 1.0625rem;
   letter-spacing: -0.01em;
-}
-.hero-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 2.75rem;
-  text-decoration: none;
-  color: var(--color-fg-muted);
-  opacity: 0;
-  animation: stat-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) 50ms both;
-}
-.wordmark-logo {
-  height: 36px;
-  width: auto;
-  display: block;
-  flex-shrink: 0;
 }
 
 /* ═══════════════════════════════════ HERO ══════════════════════════════════ */
@@ -215,12 +205,10 @@ body {
   max-width: none;
   width: 100%;
 }
-.hero-stats,
-.hero-facts-bar {
+.hero-stats {
   width: 100%;
 }
 
-/* uniqueness-badge y exclusive-badge reemplazados por .hero-facts */
 @keyframes line-in {
   from {
     opacity: 0;
@@ -339,37 +327,6 @@ body {
   max-width: 18ch;
 }
 
-/* ── Facts bar (inicio de sección "Todos los datos") ── */
-.hero-facts-bar {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 2rem;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.hf-item {
-  flex: 1 1 0;
-  min-width: 140px;
-  display: flex;
-  align-items: center;
-  padding: 0.8rem 1.2rem;
-  border-right: 1px solid var(--color-border);
-  font-size: var(--text-small);
-  font-weight: 400;
-  color: var(--color-fg-muted);
-  line-height: 1.45;
-}
-.hf-item:last-child { border-right: none; }
-@media (max-width: 640px) {
-  .hf-item {
-    flex: 1 1 45%;
-    border-bottom: 1px solid var(--color-border);
-  }
-  .hf-item:nth-child(2n) { border-right: none; }
-  .hf-item:nth-last-child(-n+2) { border-bottom: none; }
-}
-
 /* ── Scroll hint ── */
 .scroll-hint {
   position: absolute;
@@ -397,6 +354,12 @@ body {
   opacity: 0;
   pointer-events: none;
 }
+/* En landscape de teléfono el hint pisa las stats */
+@media (max-height: 500px) {
+  .scroll-hint {
+    display: none;
+  }
+}
 @keyframes hint-bounce {
   0%, 55%, 100% { transform: translateX(-50%) translateY(0); }
   75%            { transform: translateX(-50%) translateY(6px); }
@@ -407,11 +370,17 @@ body {
   padding: 0 0 4rem;
   position: relative;
 }
+/* 1 columna en mobile: con 2 los labels absolutos de .cov-axis se solapan */
 .coverage-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+@media (min-width: 640px) {
+  .coverage-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 @media (min-width: 1024px) {
   .coverage-grid {
@@ -539,6 +508,19 @@ body {
 .table-section {
   padding: 2.5rem 0 4rem;
   position: relative;
+  /* Los islands son client:only: reserva altura para evitar salto de layout */
+  min-height: 640px;
+}
+
+/* Anchors + nav sticky: que el título no quede tapado al navegar */
+[id] {
+  scroll-margin-top: 72px;
+}
+
+/* Foco visible consistente en controles custom */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .section-head {
@@ -569,18 +551,6 @@ body {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-.filter-bar .row1 .spacer {
-  flex: 1;
-  min-width: 1rem;
-}
-@media (max-width: 720px) {
-  .filter-bar .row1 .spacer {
-    display: none;
-  }
-  .filter-bar .totals-toggle {
-    margin-top: 4px;
-  }
 }
 .filter-bar .row2 {
   margin-top: 12px;
@@ -622,6 +592,19 @@ body {
   color: var(--color-fg-subtle);
   font-size: var(--text-micro);
   max-width: 42ch;
+}
+@media (max-width: 720px) {
+  .filter-bar .row2 {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .filter-bar .row2-right {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .filter-bar .row2-right .approx {
+    max-width: none;
+  }
 }
 .filter-bar .row3 {
   margin-top: 14px;
@@ -730,26 +713,13 @@ body {
   color: var(--color-fg);
 }
 
-/* Toggle «Ver totales» (nuevo) */
-.totals-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.totals-toggle .totals-label {
-  font-size: var(--text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-fg-subtle);
-  font-weight: 600;
-}
-
 /* Toolbar */
 .toolbar {
   display: flex;
   gap: 0.75rem;
   align-items: center;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap; /* en mobile el toggle de modo baja de línea, no desborda */
 }
 .search-input-wrap {
   position: relative;
@@ -801,6 +771,12 @@ body {
   padding: 0 6px;
   font-family: ui-monospace, monospace;
 }
+/* El atajo "/" no aplica en touch */
+@media (hover: none) {
+  .search-kbd {
+    display: none;
+  }
+}
 
 /* Tabla */
 .table-wrap {
@@ -839,15 +815,6 @@ table.data thead th {
 table.data thead th.right {
   text-align: right;
 }
-table.data thead th .sort {
-  margin-left: 6px;
-  opacity: 0.3;
-  font-size: 10px;
-}
-table.data thead th.active .sort {
-  opacity: 1;
-  color: var(--color-accent);
-}
 table.data tbody td {
   padding: 0 18px;
   height: var(--table-row-h);
@@ -864,19 +831,7 @@ table.data tbody td.monto {
   font-weight: 500;
   color: var(--color-fg-strong);
 }
-table.data tbody td.resol {
-  text-align: center;
-}
-table.data tbody td.resol a {
-  color: var(--color-fg-muted);
-  text-decoration: none;
-  font-size: 14px;
-}
-table.data tbody td.resol a:hover {
-  color: var(--color-accent);
-}
 table.data tbody tr {
-  cursor: pointer;
   transition: background 200ms ease;
 }
 table.data tbody td:first-child {
@@ -890,219 +845,306 @@ table.data tbody tr:hover {
 table.data tbody tr:hover td:first-child {
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
-table.data tbody tr.selected {
-  background: var(--color-bg-elev-2);
+/* Anchos estables por columna semántica (las columnas se ocultan según
+   filtros: nth-child quedaba desfasado y agigantaba la columna de la flecha).
+   Solo desktop: en mobile (cards) estos min-width romperían el grid. */
+@media (min-width: 768px) {
+  table.data .col-expand { width: 36px; min-width: 36px; }
+  table.data .col-id { min-width: 90px; }
+  table.data .col-juris { min-width: 110px; }
+  table.data .col-anio { min-width: 70px; }
+  table.data .col-proveedor,
+  table.data .col-medio { min-width: 180px; }
+  table.data .col-resol { min-width: 120px; }
+  table.data .col-monto { min-width: 150px; }
 }
-table.data tbody tr.selected td:first-child {
-  box-shadow: inset 2px 0 0 var(--color-accent);
-}
-/* Anchos estables de columnas */
-/* Anchos estables de columnas */
-table.data th:nth-child(1),
-table.data td:nth-child(1) { min-width: 110px; }
-table.data th:nth-child(2),
-table.data td:nth-child(2) { min-width: 130px; }
-table.data th:nth-child(3),
-table.data td:nth-child(3) { min-width: 160px; }
-table.data th:nth-child(4),
-table.data td:nth-child(4) { min-width: 200px; }
-table.data th:nth-child(5),
-table.data td:nth-child(5) { min-width: 100px; }
 
-/* Vista Mobile: Evitar scroll horizontal (card layout) */
+/* Botón de expandir grupo (accesible por teclado) */
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg-subtle);
+  font-size: 0.7em;
+  padding: 6px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+/* ── Vista mobile: cards en lugar de tabla (sin scroll horizontal) ──
+   Clases por columna asignadas en DataTable.tsx:
+   - fila agrupada  (.row-grupo):   col-expand [col-juris] col-proveedor col-medio col-monto
+   - fila individual (.row-orden):  col-id [col-juris] [col-anio] col-proveedor col-medio col-resol col-monto
+   - fila detalle   (.row-detalle): col-id [col-juris] col-anio col-resol col-monto
+   - filas de 1 celda (.row-msg, .row-vermas): mensaje / botón "ver más" */
 @media (max-width: 767px) {
-  table.data, table.data tbody, table.data tr, table.data td {
+  .table-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+  table.data,
+  table.data tbody {
     display: block;
     width: 100%;
   }
-  table.data thead {
+  /* width auto: con 100% los td inflan los tracks del grid y cortan el monto */
+  table.data tbody td {
     display: block;
+    width: auto;
   }
-  table.data thead tr {
-    display: flex;
-    overflow-x: auto;
-    padding: 8px 16px;
-    gap: 8px;
-    border-bottom: 1px solid var(--color-border);
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  table.data thead tr::-webkit-scrollbar { display: none; }
-  table.data thead th {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 12px;
-    background: var(--color-bg-elev-2);
-    border-radius: 99px;
-    font-size: var(--text-micro);
-    white-space: nowrap;
-    border: none;
-    flex-shrink: 0;
-  }
-  table.data thead th.active {
-    background: var(--color-accent-glow);
-    color: var(--color-accent);
-  }
-  table.data thead th:last-child {
+  /* Sin sorting no hay nada que hacer con los headers en mobile */
+  table.data thead {
     display: none;
-  }
-
-  table.data tbody tr {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "medio   monto"
-      "proveedor resol"
-      "juris  fecha";
-    padding: 16px;
-    gap: 6px 12px;
-    border-bottom: 1px solid var(--color-border-subtle);
-    align-items: start;
-    height: auto;
-    cursor: default;
   }
   table.data tbody td {
     padding: 0;
     border: none;
     height: auto;
-    min-width: 0 !important;
+    min-width: 0;
+    max-width: none;
     white-space: normal;
     overflow: visible;
     text-overflow: unset;
     word-break: break-word;
   }
-  table.data tbody tr.selected td:first-child,
+  table.data tbody tr {
+    display: grid;
+    padding: 14px 16px;
+    gap: 4px 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    align-items: start;
+    height: auto;
+  }
   table.data tbody tr:hover td:first-child {
     box-shadow: none;
   }
-  table.data tbody tr.selected,
-  table.data tbody tr:active {
-    background: var(--color-bg-elev-2);
-    border-left: 3px solid var(--color-accent);
-    padding-left: 13px;
-  }
 
-  /* Ocultar número de orden en mobile */
-  table.data tbody td.col-id {
-    display: none;
+  /* Fila agrupada: proveedor titular, medio secundario, monto protagonista */
+  table.data tbody tr.row-grupo {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "proveedor expand"
+      "medio     medio"
+      "monto     monto";
   }
-
-  /* Grid Area Mapping dinámico */
-  table.data tbody td.col-fecha {
-    grid-area: fecha;
-    font-size: var(--text-micro);
-    color: var(--color-fg-subtle);
+  .row-grupo .col-expand {
+    grid-area: expand;
+    width: auto;
     text-align: right;
-    white-space: nowrap;
-    align-self: center;
   }
-  table.data tbody td.col-medio {
-    grid-area: medio;
+  .row-grupo .col-juris {
+    display: none; /* en agrupado sin filtro es solo un "—" */
+  }
+  .row-grupo .col-proveedor {
+    grid-area: proveedor;
     font-size: var(--text-body);
     font-weight: 600;
     color: var(--color-fg-strong);
     line-height: 1.3;
-    white-space: normal;
-    word-break: break-word;
-    overflow: visible;
   }
-  table.data tbody td.col-proveedor {
-    grid-area: proveedor;
+  .row-grupo .col-medio {
+    grid-area: medio;
     font-size: var(--text-small);
     color: var(--color-fg-muted);
-    white-space: normal;
-    word-break: break-word;
-    overflow: visible;
-    align-self: start;
   }
-  table.data tbody td.col-jurisdiccion {
-    grid-area: juris;
-    font-size: var(--text-micro);
-    color: var(--color-fg-subtle);
-    white-space: nowrap;
-    align-self: center;
-  }
-  table.data tbody td.col-monto_deflactado {
+  .row-grupo .col-monto {
     grid-area: monto;
+    text-align: left;
+    font-size: var(--text-body);
+    margin-top: 2px;
+  }
+
+  /* Fila individual (modo "todas las órdenes") */
+  table.data tbody tr.row-orden {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "proveedor proveedor"
+      "medio     medio"
+      "juris     anio"
+      "monto     resol";
+  }
+  .row-orden .col-id { display: none; }
+  .row-orden .col-proveedor {
+    grid-area: proveedor;
     font-size: var(--text-body);
     font-weight: 600;
-    color: var(--color-accent);
-    text-align: right;
-    white-space: nowrap;
-    align-self: start;
+    color: var(--color-fg-strong);
+    line-height: 1.3;
   }
-  table.data tbody td.col-resolucion {
-    grid-area: resol;
-    display: flex;
-    justify-content: flex-end;
+  .row-orden .col-medio {
+    grid-area: medio;
+    font-size: var(--text-small);
+    color: var(--color-fg-muted);
+  }
+  .row-orden .col-juris {
+    grid-area: juris;
+    font-size: var(--text-micro) !important;
+    color: var(--color-fg-subtle);
     align-self: center;
   }
-  table.data tbody td.col-resolucion a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
+  .row-orden .col-anio {
+    grid-area: anio;
+    font-size: var(--text-micro) !important;
+    color: var(--color-fg-subtle);
+    text-align: right;
+    align-self: center;
+  }
+  .row-orden .col-monto {
+    grid-area: monto;
+    text-align: left;
+    font-size: var(--text-body);
+    align-self: center;
+  }
+  .row-orden .col-resol {
+    grid-area: resol;
+    text-align: right;
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  /* Fila detalle (órdenes de un grupo expandido): línea compacta indentada */
+  table.data tbody tr.row-detalle {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "anio resol monto";
     background: var(--color-bg-elev-2);
-    border-radius: 6px;
-    text-decoration: none;
-    color: var(--color-fg-strong);
-    font-weight: 600;
+    border-left: 3px solid var(--color-accent-dim);
+    padding: 10px 16px 10px 13px;
+    gap: 0 10px;
+    align-items: center;
+  }
+  .row-detalle .col-id,
+  .row-detalle .col-juris {
+    display: none;
+  }
+  .row-detalle .col-anio {
+    grid-area: anio;
+    padding-left: 0 !important;
+  }
+  .row-detalle .col-resol {
+    grid-area: resol;
+  }
+  .row-detalle .col-monto {
+    grid-area: monto;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Filas de mensaje / "ver más": una sola celda */
+  table.data tbody tr.row-msg,
+  table.data tbody tr.row-vermas {
+    display: block;
+  }
+  table.data tbody tr.row-vermas td {
+    padding: 0.4rem 1rem 0.6rem 13px !important;
   }
 }
 
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: var(--text-micro);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg-elev-3);
-  color: var(--color-fg);
-  min-width: 64px;
-  text-align: center;
-}
-.badge.nac {
-  background: var(--color-fg-strong);
-  color: var(--color-bg);
-  border-color: transparent;
-}
-.badge.caba {
-  background: var(--color-bg-elev-3);
-  color: var(--color-fg-strong);
-}
-.badge.pba {
+/* ── Dropdown de sugerencias (DataTable + Generador) ── */
+.suggest-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
   background: var(--color-bg-elev-2);
-  color: var(--color-fg);
-}
-.badge.sfe {
-  background: var(--color-bg-elev-1);
-  color: var(--color-fg-muted);
-}
-
-.empty-card {
-  margin: 1.5rem 0 0;
-  background: var(--color-bg-elev-1);
-  border: 1px solid var(--color-border);
-  border-left: 2px solid var(--color-fg-subtle);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  padding: 1.25rem 1.5rem;
-  color: var(--color-fg);
+  margin-top: 4px;
+  padding: 4px 0;
+  list-style: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  max-height: 320px;
+  overflow-y: auto;
+  text-align: left;
+}
+.suggest-item {
+  padding: 8px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   font-size: var(--text-small);
 }
-.empty-card strong {
-  color: var(--color-fg-strong);
-  display: block;
-  margin-bottom: 6px;
+.suggest-item:hover,
+.suggest-item.activo {
+  background: var(--color-bg-elev-3);
+}
+.suggest-item .meta {
+  color: var(--color-fg-subtle);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Botón secundario compartido (toggle de modo, ver más, CTA inline) ── */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-elev-2);
+  border: 1px solid var(--color-border-strong);
+  padding: 5px 12px;
+  border-radius: 6px;
+  color: var(--color-fg);
+  font-size: var(--text-micro);
+  cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color 150ms ease;
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.btn-ranking-inline {
+  margin-bottom: 6px;
+}
+
+/* ── Paginación ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+.pagination .info {
+  font-size: var(--text-small);
+  color: var(--color-fg-subtle);
+  padding: 0 8px;
+}
+.btn-page {
+  background: var(--color-bg-elev-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  color: var(--color-fg);
+  cursor: pointer;
+  font-size: var(--text-small);
+  font-weight: 600;
+  padding: 4px 10px;
+  line-height: 1.5;
+}
+.btn-page:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 540px) {
+  .btn-page {
+    padding: 10px 14px; /* área táctil */
+  }
 }
 
 /* ═══════════════════════════════════ GENERADOR ═══════════════════════════════════ */
 .generator-section {
   padding: 3rem 0;
   position: relative;
+  min-height: 560px; /* island client:only — evita salto de layout */
 }
 
 .gen-card {
@@ -1189,14 +1231,6 @@ table.data td:nth-child(5) { min-width: 100px; }
 .gen-result {
   margin-bottom: 1.75rem;
 }
-.gen-entity-eyebrow {
-  font-size: var(--text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--color-fg-subtle);
-  font-weight: 600;
-  margin-bottom: 0.35rem;
-}
 .gen-entity-name {
   font-size: clamp(2rem, 3.5vw, 3.25rem);
   font-weight: 700;
@@ -1265,16 +1299,6 @@ table.data td:nth-child(5) { min-width: 100px; }
     opacity 300ms ease,
     transform 300ms ease;
 }
-.gen-narrative .context {
-  font-size: var(--text-small);
-  color: var(--color-fg-muted);
-  margin-bottom: 0.5rem;
-}
-.gen-narrative .meta {
-  font-size: var(--text-small);
-  color: var(--color-fg-subtle);
-  margin-bottom: 1.25rem;
-}
 .gen-narrative .approx {
   font-size: var(--text-small);
   color: var(--color-fg-subtle);
@@ -1321,14 +1345,6 @@ table.data td:nth-child(5) { min-width: 100px; }
   padding-top: 1.5rem;
   border-top: 1px solid var(--color-border-subtle);
 }
-.share-label {
-  font-size: var(--text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--color-fg-subtle);
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
 .share-buttons {
   display: flex;
   gap: 12px;
@@ -1352,7 +1368,6 @@ table.data td:nth-child(5) { min-width: 100px; }
     border-color 150ms ease,
     box-shadow 150ms ease,
     background 150ms ease;
-  will-change: transform;
 }
 .share-btn:hover {
   border-color: var(--color-accent);
@@ -1371,7 +1386,7 @@ table.data td:nth-child(5) { min-width: 100px; }
   box-shadow: 0 0 0 4px var(--color-accent-glow);
   color: #0b0f19;
 }
-.share-btn--primary:disabled {
+.share-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1379,134 +1394,20 @@ table.data td:nth-child(5) { min-width: 100px; }
   display: block;
 }
 
-/* ════════ Share card preview ════════
-   Cambio v4.1: el nombre de la entidad pasa a ser la línea protagonista.
-   Antes: «Clarín recibió» en 16 px. Ahora: «Clarín» en clamp 1.75–2.75rem
-   peso 700, y «recibió» queda como subtítulo discreto. La cifra mantiene
-   su jerarquía como segundo foco. */
-.share-card-preview {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  background:
-    radial-gradient(circle at 30% 20%, rgba(34, 211, 238, 0.16), transparent 60%),
-    radial-gradient(circle at 70% 80%, rgba(217, 119, 6, 0.08), transparent 60%),
-    var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-  box-shadow:
-    0 30px 60px -20px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
-  transition: transform 200ms ease;
+/* ── Generador en mobile ── */
+@media (max-width: 540px) {
+  .gen-card {
+    padding: 2rem 1.25rem;
+  }
+  .gen-search-row .segmented {
+    width: 100%;
+  }
 }
-.share-card-preview::before {
-  content: "VISTA PREVIA · 1080×1080";
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  font-size: 9px;
-  color: var(--color-fg-subtle);
-  letter-spacing: 0.1em;
-  background: var(--color-bg-elev-2);
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border-subtle);
-  font-weight: 500;
-}
-.share-card-preview .card-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-fg-strong);
-  font-weight: 600;
-}
-.share-card-preview .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.share-card-preview .card-entity-eyebrow {
-  font-size: 11px;
-  color: var(--color-fg-subtle);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-.share-card-preview .card-entity-name {
-  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
-  font-weight: 700;
-  color: var(--color-fg-strong);
-  letter-spacing: -0.025em;
-  line-height: 1.05;
-  margin-bottom: 6px;
-  word-break: break-word;
-}
-.share-card-preview .card-said {
-  font-size: 14px;
-  color: var(--color-fg-muted);
-  font-weight: 500;
-  margin-bottom: 10px;
-  letter-spacing: 0.02em;
-}
-.share-card-preview .card-monto {
-  font-size: clamp(1.5rem, 4vw, 2.5rem);
-  font-weight: 700;
-  color: var(--color-fg-strong);
-  letter-spacing: -0.035em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 14px;
-}
-.share-card-preview .card-period {
-  font-size: 13px;
-  color: var(--color-fg-muted);
-}
-.share-card-preview .card-approx {
-  font-size: 11px;
-  color: var(--color-fg-subtle);
-  margin-top: 14px;
-  line-height: 1.45;
-}
-.share-card-preview .card-footer {
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-subtle);
-  font-size: 12px;
-  color: var(--color-fg-muted);
-}
-
-.select-like {
-  background: var(--color-bg-elev-2);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 11px 16px;
-  font-size: var(--text-small);
-  font-weight: 500;
-  color: var(--color-fg);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  transition:
-    border-color 150ms ease,
-    background 150ms ease;
-}
-.select-like:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-bg-elev-3);
-}
-.select-like::after {
-  content: "▾";
-  color: var(--color-fg-subtle);
-  font-size: 10px;
-}
-.select-like .label {
-  color: var(--color-fg-subtle);
+/* La barra del desglose por jurisdicción empuja el monto fuera de la card */
+@media (max-width: 480px) {
+  .desglose-juris .desglose-bar {
+    display: none;
+  }
 }
 
 /* Segmented (shared) */
@@ -1537,10 +1438,27 @@ table.data td:nth-child(5) { min-width: 100px; }
   color: var(--color-fg-strong);
   box-shadow: 0 0 0 1px var(--color-border-strong);
 }
+/* En pantallas chicas el segmented de 3 opciones desborda su contenedor */
+@media (max-width: 600px) {
+  .segmented {
+    display: flex;
+    flex-shrink: 1;
+    width: 100%;
+  }
+  .segmented button {
+    flex: 1 1 0;
+    padding: 7px 4px;
+  }
+  .card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 
 /* ═══════════════════════════════════ RANKINGS ═══════════════════════════════════ */
 .rankings-section {
   padding: 3rem 0 5rem;
+  min-height: 520px; /* island client:only — evita salto de layout */
 }
 .rankings {
   display: grid;
@@ -1587,7 +1505,6 @@ table.data td:nth-child(5) { min-width: 100px; }
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  cursor: pointer;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 .ranking-row:last-child {
@@ -1670,6 +1587,16 @@ table.data td:nth-child(5) { min-width: 100px; }
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+}
+/* Variante centrada (Generador). right:auto evita que left+right lo estiren */
+.toast--center {
+  left: 50%;
+  right: auto;
+  bottom: 2rem;
+  transform: translateX(-50%) translateY(10px);
+}
+.toast--center.show {
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ═══════════════════════════════════ FOOTER ABOUT ═══════════════════════════════════ */
@@ -1831,6 +1758,10 @@ footer.site-footer .brand .wordmark {
   font-size: 1rem;
   color: var(--color-accent);
 }
+/* display:flex pisa el display:none del UA para [hidden]: hay que re-ocultarlo */
+.fs-panel[hidden] {
+  display: none;
+}
 .fs-panel {
   display: flex;
   gap: 4px;
@@ -1865,6 +1796,20 @@ footer.site-footer .brand .wordmark {
   border-color: var(--color-accent-dim);
   color: var(--color-accent);
   font-weight: 600;
+}
+/* En mobile los flotantes tapan contenido: compactar a botones circulares */
+@media (max-width: 540px) {
+  .fs-float {
+    bottom: 16px;
+    right: 16px;
+  }
+  .fs-float .fs-label {
+    display: none;
+  }
+  .fs-float-btn,
+  .back-top-btn {
+    padding: 12px;
+  }
 }
 
 /* ═══════════════════════════════════ NAV ══════════════════════════════════ */
@@ -2010,30 +1955,4 @@ footer.site-footer .brand .wordmark {
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.5),
     0 0 0 4px var(--color-accent-glow);
-}
-
-/* Botón cargar más */
-.btn-load-more {
-  background: var(--color-bg-elev-2);
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-fg);
-  padding: 8px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: var(--text-small);
-  font-weight: 500;
-  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
-  will-change: transform;
-}
-.btn-load-more:hover:not(:disabled) {
-  background: var(--color-bg-elev-3);
-  border-color: var(--color-accent);
-  transform: translateY(-2px);
-}
-.btn-load-more:active:not(:disabled) {
-  transform: translateY(0);
-}
-.btn-load-more:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }

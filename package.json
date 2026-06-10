@@ -12,15 +12,11 @@
   "dependencies": {
     "@astrojs/react": "^5.0.5",
     "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource-variable/space-grotesk": "^5.2.10",
-    "@tailwindcss/vite": "^4.3.0",
-    "@tanstack/react-table": "^8.21.3",
     "astro": "^6.3.7",
     "minisearch": "^7.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "sql.js-httpvfs": "^0.8.12",
-    "tailwindcss": "^4.3.0"
+    "sql.js-httpvfs": "^0.8.12"
   },
   "devDependencies": {
     "@types/react": "^19.2.15",
