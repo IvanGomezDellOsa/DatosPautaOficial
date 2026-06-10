@@ -165,7 +165,7 @@ export async function generarImagenCanvas(datos: DatosPlaca): Promise<HTMLCanvas
 
   // ---- "recibió en Pauta Oficial" ----
   drawMixed(ctx, [
-    { text: "recibió en ", color: C.fgSubtle, font: `400 40px ${F}` },
+    { text: "recibió de ", color: C.fgSubtle, font: `400 40px ${F}` },
     { text: "Pauta Oficial", color: C.accent, font: `700 40px ${F}` },
   ], PAD, 338 + yShift);
 

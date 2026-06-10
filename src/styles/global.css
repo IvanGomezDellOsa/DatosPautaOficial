@@ -1717,6 +1717,22 @@ table.data td:nth-child(5) { min-width: 100px; }
   color: var(--color-fg-muted);
   font-style: italic;
 }
+.footer-oss {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-micro);
+  color: var(--color-fg-subtle);
+  line-height: 1.6;
+}
+.footer-oss a {
+  color: var(--color-fg-muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+}
+.footer-oss a:hover {
+  color: var(--color-fg);
+}
 
 /* ═══════════════════════════════════ FOOTER ═══════════════════════════════════ */
 footer.site-footer {

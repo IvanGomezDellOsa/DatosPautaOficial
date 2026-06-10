@@ -149,7 +149,7 @@ function PanelGrupo({
         }}
       >
         <span style={{ color: "var(--color-fg-subtle)", fontSize: "0.7em" }}>{abierto ? "▼" : "▶"}</span>
-        Qué medios y empresas se suman ({conDatos})
+        Qué integra este grupo ({conDatos})
       </button>
 
       {abierto && (
@@ -349,7 +349,8 @@ export default function Generador({ initial }: GeneradorProps) {
     if (!entidadActual) return;
     const hum = humanizarMonto(montoMostrado());
     const montoTxt = hum ? `$${hum.num} ${hum.unidad}` : `$${formatMontoGrande(montoMostrado())}`;
-    const texto = `${entidadActual.nombre} recibió ${montoTxt} de pauta oficial. Fuente: datospautaoficial.com.ar`;
+    const periodoTxt = anioSel !== "historico" ? ` en ${anioSel}` : "";
+    const texto = `${entidadActual.nombre}${periodoTxt} recibió ${montoTxt} de pauta oficial. Fuente: datospautaoficial.com.ar`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(texto + "\n" + compartirUrl())}`, "_blank", "noopener");
   };
 
@@ -422,7 +423,7 @@ export default function Generador({ initial }: GeneradorProps) {
       ) : (
         <div className="gen-result">
           <div className="gen-entity-name">{entidadActual?.nombre ?? "—"}</div>
-          <div className="gen-said">recibió en <span style={{ color:"var(--color-accent)", fontWeight:600 }}>Pauta Oficial</span></div>
+          <div className="gen-said">recibió de <span style={{ color:"var(--color-accent)", fontWeight:600 }}>Pauta Oficial</span></div>
           <div className="gen-narrative">
             <div className="monto" style={{ opacity: loading ? 0.4 : 1, transition:"opacity 200ms" }}>
               {(() => {
@@ -450,7 +451,7 @@ export default function Generador({ initial }: GeneradorProps) {
               />
             )}
             <p className="approx">
-              <strong>* Aproximado.</strong> Al haber huecos de cobertura en los datos públicos, el monto real recibido puede ser mayor.
+              <strong>Cifra aproximada.</strong> Al haber huecos de cobertura en los datos públicos, el monto real recibido puede ser mayor.
             </p>
           </div>
         </div>

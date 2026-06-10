@@ -1,0 +1,341 @@
+---
+import Layout from "../layouts/Layout.astro";
+import "@fontsource-variable/space-grotesk";
+
+const EMAIL =
+  "mailto:ivan.gdo@outlook.com?subject=Consulta%20sobre%20Datos%20Pauta%20Oficial";
+const EMAIL_ERROR =
+  "mailto:ivan.gdo@outlook.com?subject=Correcci%C3%B3n%20de%20alias%20%E2%80%94%20Datos%20Pauta%20Oficial";
+const GITHUB = "https://github.com/IvanGomezDellOsa/DatosPautaOficial";
+---
+
+<Layout
+    title="Metodología y aviso legal — Datos Pauta Oficial"
+    description="Cómo se construye la base de datos de pauta oficial, qué representa cada cifra y qué límites tiene."
+>
+    {/* ═══════ NAV ═══════ */}
+    <nav class="site-nav" aria-label="Navegación">
+        <div class="container-wide nav-inner">
+            <div class="nav-brand-area">
+                <a
+                    href="/"
+                    style="display:inline-flex; align-items:center; gap:10px; text-decoration:none;"
+                >
+                    <svg class="nav-logo" viewBox="0 0 16 10" aria-hidden="true">
+                        <rect width="16" height="3.33" y="0" fill="#74acdf"
+                        ></rect>
+                        <rect width="16" height="3.34" y="3.33" fill="#ffffff"
+                        ></rect>
+                        <rect width="16" height="3.33" y="6.67" fill="#74acdf"
+                        ></rect>
+                    </svg>
+                    <span class="wordmark">Datos Pauta Oficial</span>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">← Volver a los datos</a>
+            </div>
+        </div>
+    </nav>
+
+    {/* ═══════ CONTENIDO ═══════ */}
+    <main class="metodo">
+        <div class="metodo-wrap">
+            <header class="metodo-head">
+                <h1>Metodología y aviso legal</h1>
+                <p class="lede">
+                    Cómo se construye esta base de datos, qué representa cada
+                    cifra y qué límites tiene.
+                </p>
+            </header>
+
+            <div class="metodo-banner">
+                <strong>Esta web no debe tomarse como infalible.</strong> Es una
+                herramienta de consulta construida sobre datos públicos imperfectos.
+                Las cifras son aproximadas y pueden contener errores propios de las
+                fuentes oficiales o del procesamiento. Verificá siempre contra la
+                fuente original antes de usar un dato con fines formales.
+            </div>
+
+            <section class="metodo-intro">
+                <h2>Qué es este proyecto</h2>
+                <p>
+                    Datos Pauta Oficial es un proyecto personal e independiente,
+                    desarrollado por una sola persona, sin fines de lucro y sin
+                    afiliación política ni partidaria. Su único objetivo es
+                    centralizar y facilitar el acceso a información que ya es
+                    pública: la distribución de la pauta oficial (publicidad
+                    gubernamental) en la Argentina.
+                </p>
+                <p>
+                    Usar este sitio implica aceptar esta metodología y las
+                    limitaciones de responsabilidad que se detallan a
+                    continuación.
+                </p>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">1</span> Origen de los datos y responsabilidad</h3>
+                <p>
+                    Toda la información económica proviene exclusivamente de
+                    fuentes públicas oficiales: boletines oficiales, portales de
+                    transparencia y resoluciones de organismos de la Nación,
+                    CABA, Provincia de Buenos Aires y Santa Fe.
+                </p>
+                <p>
+                    Este sitio se limita a reproducir de forma fiel y atribuida
+                    lo que esos organismos publicaron. <strong
+                        >No generamos ni auditamos los montos originales.</strong
+                    > Cualquier inexactitud, error u omisión en los montos, adjudicatarios
+                    o razones sociales de los documentos fuente es responsabilidad
+                    exclusiva del organismo emisor.
+                </p>
+                <p>
+                    El uso de la plataforma es bajo responsabilidad del usuario.
+                    El autor no responde por daños ni por decisiones tomadas con
+                    base en esta información.
+                </p>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">2</span> Huecos de cobertura</h3>
+                <p>
+                    Los totales deben leerse siempre como <em
+                        >aproximaciones inferiores</em
+                    >.
+                </p>
+                <ul>
+                    <li>
+                        Si un organismo o período no aparece, es porque esa
+                        información no fue publicada ni puesta a disposición de
+                        forma accesible por las autoridades correspondientes.
+                    </li>
+                    <li>
+                        Al haber huecos en las fuentes, el monto real recibido
+                        por un proveedor probablemente sea <strong>mayor</strong>
+                        al que figura acá.
+                    </li>
+                </ul>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">3</span> Normalización de nombres (alias)</h3>
+                <p>
+                    Las bases estatales registran a un mismo proveedor bajo
+                    muchas variantes («CLARIN S.A.», «Clarín», «CLARIN SA»). Para
+                    que los datos sean buscables, se unifican todas las variantes
+                    bajo un <strong>nombre canónico</strong>, mediante una
+                    combinación de agrupamiento automático y revisión manual de
+                    buena fe.
+                </p>
+                <p>
+                    Este proceso <strong>no es infalible</strong>: puede haber
+                    errores de asignación, homónimos (empresas distintas con
+                    nombres parecidos) o agrupaciones incorrectas. No debe
+                    tomarse como un veredicto definitivo sobre la identidad de un
+                    proveedor.
+                </p>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">4</span> Ajuste por inflación (deflactación)</h3>
+                <p>
+                    Para comparar montos de distintos años de forma justa, todas
+                    las cifras se expresan en pesos constantes de <strong
+                        >marzo de 2026</strong
+                    >, ajustadas con el <strong>IPC mensual del INDEC</strong>.
+                    Es la aplicación de una fórmula estándar sobre el dato
+                    público, no una alteración del monto original.
+                </p>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">5</span> Grupos mediáticos</h3>
+                <p>
+                    La pertenencia de un medio a un grupo empresarial se basa en
+                    el <a
+                        href="https://argentina.mom-gmr.org/es/propietarios/grupos-mediaticos/"
+                        target="_blank"
+                        rel="noopener">Media Ownership Monitor Argentina</a
+                    > (2018), de Reporteros Sin Fronteras y Tiempo Argentino, reutilizado
+                    bajo licencia CC BY-ND 4.0.
+                </p>
+                <p>
+                    Dado el tiempo transcurrido, la composición de los grupos
+                    puede haber cambiado. Se incluye solo como referencia
+                    contextual. La pauta se asigna por medio, no al holding.
+                </p>
+            </section>
+
+            <section class="metodo-sec">
+                <h3><span class="num">6</span> Contacto y reporte de errores</h3>
+                <p>
+                    Este es un proyecto abierto a la comunidad. Escribime para
+                    reportar errores, sugerir mejoras, aportar datos o por
+                    cualquier consulta sobre el proyecto.
+                </p>
+                <ul>
+                    <li>
+                        <strong>Error de agrupación (alias):</strong> si dos
+                        cosas se unificaron mal, <a href={EMAIL_ERROR}
+                            >escribime con el asunto «Corrección de alias»</a
+                        > y lo reviso.
+                    </li>
+                    <li>
+                        <strong>Error de monto o adjudicatario:</strong> si el
+                        error viene del documento oficial, el sitio se limita a
+                        reflejar lo que el Estado publicó y no puede rectificar
+                        datos que nacen defectuosos en la fuente. En ese caso, el
+                        reclamo corresponde al organismo emisor.
+                    </li>
+                    <li>
+                        <strong>Cualquier otra cosa:</strong> dudas, ideas,
+                        colaboraciones o comentarios son bienvenidos.
+                    </li>
+                </ul>
+                <div class="metodo-cta">
+                    <a href={EMAIL} class="metodo-cta-btn">Escribime →</a>
+                </div>
+            </section>
+
+            <p class="metodo-oss">
+                Proyecto de código abierto. Mirá o contribuí al código en <a
+                    href={GITHUB}
+                    target="_blank"
+                    rel="noopener">GitHub ↗</a
+                >.
+            </p>
+        </div>
+    </main>
+
+    {/* ═══════ FOOTER ═══════ */}
+    <footer class="site-footer">
+        <div class="container-wide footer-topbar">
+            <a
+                class="brand"
+                href="/"
+                style="display:inline-flex; align-items:center; gap:10px;"
+            >
+                <svg viewBox="0 0 16 10" width="20" height="13" style="border-radius:2px">
+                    <rect width="16" height="3.33" y="0" fill="#74acdf"></rect>
+                    <rect width="16" height="3.34" y="3.33" fill="#ffffff"></rect>
+                    <rect width="16" height="3.33" y="6.67" fill="#74acdf"></rect>
+                </svg>
+                <span class="wordmark">Datos Pauta Oficial</span>
+            </a>
+            <div class="footer-links">
+                <a href={EMAIL} class="footer-contact-btn">Contacto</a>
+            </div>
+        </div>
+    </footer>
+</Layout>
+
+<style>
+    .metodo {
+        padding: clamp(2.5rem, 6vw, 4.5rem) 0 4rem;
+    }
+    .metodo-wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 1.25rem;
+    }
+    .metodo-head h1 {
+        font-size: var(--text-h2);
+        color: var(--color-fg-strong);
+        margin: 0 0 0.5rem;
+        line-height: 1.15;
+    }
+    .metodo-head .lede {
+        color: var(--color-fg-muted);
+        font-size: var(--text-body);
+        margin: 0;
+    }
+    .metodo-banner {
+        margin: 2rem 0 2.5rem;
+        padding: 1rem 1.25rem;
+        background: var(--color-bg-elev-1);
+        border: 1px solid var(--color-border);
+        border-left: 3px solid var(--color-accent);
+        border-radius: 8px;
+        color: var(--color-fg);
+        font-size: var(--text-small);
+        line-height: 1.6;
+    }
+    .metodo-banner strong {
+        color: var(--color-fg-strong);
+    }
+    .metodo-intro {
+        margin-bottom: 2.5rem;
+    }
+    .metodo-intro h2 {
+        font-size: var(--text-h3);
+        color: var(--color-fg-strong);
+        margin: 0 0 0.75rem;
+    }
+    .metodo-sec {
+        margin-bottom: 2.25rem;
+    }
+    .metodo-sec h3 {
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+        font-size: var(--text-body);
+        color: var(--color-fg-strong);
+        margin: 0 0 0.75rem;
+    }
+    .metodo-sec h3 .num {
+        flex-shrink: 0;
+        color: var(--color-accent);
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+    }
+    .metodo p,
+    .metodo li {
+        color: var(--color-fg);
+        font-size: var(--text-body);
+        line-height: 1.7;
+    }
+    .metodo p {
+        margin: 0 0 0.85rem;
+    }
+    .metodo ul {
+        margin: 0 0 0.85rem;
+        padding-left: 1.2rem;
+    }
+    .metodo li {
+        margin-bottom: 0.5rem;
+    }
+    .metodo a {
+        color: var(--color-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .metodo em {
+        color: var(--color-fg-strong);
+        font-style: italic;
+    }
+    .metodo-cta {
+        margin-top: 1.25rem;
+    }
+    .metodo-cta-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.55rem 1.1rem;
+        background: var(--color-accent);
+        color: var(--color-bg) !important;
+        font-weight: 600;
+        font-size: var(--text-small);
+        border-radius: 8px;
+        text-decoration: none !important;
+    }
+    .metodo-oss {
+        margin-top: 3rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--color-border);
+        color: var(--color-fg-subtle);
+        font-size: var(--text-micro) !important;
+    }
+    .metodo-oss a {
+        color: var(--color-fg-muted);
+    }
+</style>

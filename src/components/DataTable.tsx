@@ -400,6 +400,15 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
           )}
         </div>
 
+        {gobierno && (
+          <div className="row3">
+            <span className="governance-tag">
+              <span className="label">Gestión</span>
+              <strong>{gobierno.name}</strong> — {gobierno.role}
+            </span>
+          </div>
+        )}
+
         <div className="row2">
           <span className="totals">
             {modoIndividual ? (
@@ -424,15 +433,6 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
             <span className="approx">· Los totales son aproximaciones inferiores: al haber huecos de cobertura, el monto real puede ser mayor.</span>
           </div>
         </div>
-
-        {gobierno && (
-          <div className="row3">
-            <span className="governance-tag">
-              <span className="label">Gestión</span>
-              <strong>{gobierno.name}</strong> — {gobierno.role}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ── TOOLBAR (búsqueda + toggle de modo) ── */}

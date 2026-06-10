@@ -9,7 +9,7 @@ interface Props {
 
 const {
   title = "Datos Pauta Oficial",
-  description = "Todos los datos publicos de pauta oficial de la Argentina, en un solo lugar.",
+  description = "Todos los datos públicos de pauta oficial de la Argentina, en un solo lugar.",
 } = Astro.props;
 ---
 
@@ -19,6 +19,15 @@ const {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://datospautaoficial.com.ar" />
+    <meta property="og:image" content="https://datospautaoficial.com.ar/logo.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="https://datospautaoficial.com.ar/logo.webp" />
     <link rel="icon" type="image/x-icon" href="/ico__datos_pauta_oficial.ico" />
     <title>{title}</title>
   </head>
