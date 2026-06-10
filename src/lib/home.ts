@@ -39,7 +39,7 @@ export interface HomeSeed {
   gobierno: { name: string; role: string } | null;
   rankingContextual: { proveedor: RankingItem[]; medio: RankingItem[]; grupo: RankingItem[] };
   rankingGlobal: { proveedor: RankingItem[]; medio: RankingItem[]; grupo: RankingItem[] };
-  generadorDemo: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio } | null;
+  generadorDemo: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio; tipo: import("./queries").TipoEntidad } | null;
 }
 
 /** Slice que recibe DataTable. */

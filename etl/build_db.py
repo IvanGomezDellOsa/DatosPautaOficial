@@ -865,29 +865,27 @@ def escribir_home(con, prov_disp):
                      "medio": ranking("*", 0, "medio"),
                      "grupo": ranking("*", 0, "grupo")}
 
-    # 6. Demo del Generador (Clarin) -- getCuantoRecibio. Evita el buscar("Clarin")
-    #    de montaje, que hoy fuerza la descarga de search.json (1,5 MB) al inicio.
-    norm = "clarin" if "clarin" in prov_disp else next(
-        (k for k in sorted(prov_disp, key=lambda kk: -sum(prov_disp[kk].values()))
-         if "clar" in k), None)
+    # 6. Demo del Generador (Grupo Clarín) -- getCuantoRecibio tipo='grupo'.
+    #    Muestra el top 1 de grupos para que la sección arranque con datos
+    #    representativos sin forzar la descarga de search.json (1,5 MB) al inicio.
+    grupo_row = cur.execute(
+        """SELECT norm, nombre, total, n FROM rankings_cache
+           WHERE tipo='grupo' AND jurisdiccion='*' AND anio=0
+           ORDER BY rank LIMIT 1""").fetchone()
     generadorDemo = None
-    if norm:
-        grafias = prov_disp[norm]
-        nombre = max(grafias.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        n_ent = sum(grafias.values())
-        fil = rows(
+    if grupo_row:
+        gnorm, gnombre, gtotal_hist, gn_hist = grupo_row
+        gpor = rows(
             """SELECT anio, jurisdiccion, total, n_ordenes FROM totals_cache
-               WHERE tipo='proveedor' AND norm=? ORDER BY anio DESC""", (norm,))
-        glob = next((r for r in fil if r["anio"] == 0 and r["jurisdiccion"] == "*"), None)
-        por = [r for r in fil if not (r["anio"] == 0 and r["jurisdiccion"] == "*")]
-        total_hist = (glob["total"] if glob else sum((r["total"] or 0) for r in por)) or 0
-        n_hist = glob["n_ordenes"] if glob else sum(r["n_ordenes"] for r in por)
+               WHERE tipo='grupo' AND norm=? ORDER BY anio DESC""", (gnorm,))
+        gpor = [r for r in gpor if not (r["anio"] == 0 and r["jurisdiccion"] == "*")]
         generadorDemo = {
-            "entidad": {"id": "p:" + norm, "norm": norm, "nombre": nombre,
-                        "n": n_ent, "tipo": "proveedor"},
-            "resultado": {"nombre": nombre, "norm": norm, "tipo": "proveedor",
-                          "totalHistorico": total_hist, "nOrdenesHistorico": n_hist,
-                          "porAnio": por},
+            "tipo": "grupo",
+            "entidad": {"id": "g:" + gnorm, "norm": gnorm, "nombre": gnombre,
+                        "n": gn_hist, "tipo": "grupo"},
+            "resultado": {"nombre": gnombre, "norm": gnorm, "tipo": "grupo",
+                          "totalHistorico": gtotal_hist or 0, "nOrdenesHistorico": gn_hist,
+                          "porAnio": gpor},
         }
 
     home = {

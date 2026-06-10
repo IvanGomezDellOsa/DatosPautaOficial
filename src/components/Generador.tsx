@@ -190,11 +190,11 @@ const ANIOS_PILLS = [2025, 2024, 2023, 2022, 2021];
 // ---------------------------------------------------------------------------
 
 interface GeneradorProps {
-  initial?: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio } | null;
+  initial?: { entidad: EntidadBusqueda; resultado: ResultadoCuantoRecibio; tipo: TipoEntidad } | null;
 }
 
 export default function Generador({ initial }: GeneradorProps) {
-  const [tipo, setTipo] = useState<TipoEntidad>("proveedor");
+  const [tipo, setTipo] = useState<TipoEntidad>(initial?.tipo ?? "grupo");
   const [textoBusq, setTextoBusq] = useState(initial ? initial.entidad.nombre : "Clarín");
   const [sugerencias, setSugerencias] = useState<EntidadBusqueda[]>([]);
   const [mostrarSugs, setMostrarSugs] = useState(false);
