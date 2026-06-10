@@ -106,11 +106,6 @@ function RankingCard({ titulo, subtitulo, items, loading, tipo, onTipoChange }: 
         )}
       </div>
 
-      {items.length > 0 && (
-        <p className="card-disclaimer">
-          Los totales son aproximaciones inferiores: al haber huecos de cobertura, el monto real puede ser mayor.
-        </p>
-      )}
 
       {tipo === "grupo" && items.length > 0 && (
         <p className="card-disclaimer">
@@ -143,8 +138,8 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
   const [loadingCtx, setLoadingCtx] = useState(!initial);
   const [tituloCtx, setTituloCtx] = useState(
     initial
-      ? `Top 5 — ${initial.filtroInicial.jurisdiccion} ${initial.filtroInicial.anio}`
-      : "Top 5 — filtros activos",
+      ? `${initial.filtroInicial.jurisdiccion} · ${initial.filtroInicial.anio}`
+      : "Sin filtros activos",
   );
 
   // Ranking global (toda la base)
@@ -162,7 +157,7 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
     const partes = [];
     if (jurisdiccion) partes.push(jurisdiccion);
     if (anio) partes.push(String(anio));
-    setTituloCtx(`Top 5 — ${partes.length ? partes.join(" ") : "Todas las jurisdicciones y años"}`);
+    setTituloCtx(partes.length ? partes.join(" · ") : "Todas las jurisdicciones");
 
     // Si los filtros coinciden con el seed de home.json, servimos desde ahí
     // (sin inicializar sql.js). Funciona también al alternar proveedor/medio.
@@ -229,15 +224,15 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
     <div className="rankings">
       <RankingCard
         titulo={tituloCtx}
-        subtitulo="Contextual · deflactado"
+        subtitulo="deflactado"
         items={itemsCtx}
         loading={loadingCtx}
         tipo={tipoCtx}
         onTipoChange={setTipoCtx}
       />
       <RankingCard
-        titulo="Top 5 — Toda nuestra base de datos"
-        subtitulo="Global · deflactado"
+        titulo="Base completa"
+        subtitulo="deflactado"
         items={itemsGlb}
         loading={loadingGlb}
         tipo={tipoGlb}
