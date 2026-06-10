@@ -466,15 +466,22 @@ const home = JSON.parse(
     })();
 
     // ─────────── Scroll reveal de secciones ───────────
+    // threshold 0 + rootMargin: dispara cuando el elemento asoma ~40px.
+    // Con threshold 0.08, una sección más alta que 12.5 viewports (la tabla
+    // en mobile mide ~9.500px) nunca alcanzaba el 8% visible y quedaba en
+    // opacity:0 para siempre (tabla "invisible" pero seleccionable).
     (function () {
         var els = document.querySelectorAll(".reveal");
         var io = new IntersectionObserver(
             function (entries) {
                 entries.forEach(function (en) {
-                    if (en.isIntersecting) en.target.classList.add("in-view");
+                    if (en.isIntersecting) {
+                        en.target.classList.add("in-view");
+                        io.unobserve(en.target);
+                    }
                 });
             },
-            { threshold: 0.08 },
+            { threshold: 0, rootMargin: "0px 0px -40px 0px" },
         );
         els.forEach(function (el) {
             io.observe(el);
