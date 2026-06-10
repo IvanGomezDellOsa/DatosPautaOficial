@@ -345,6 +345,14 @@ export default function Generador({ initial }: GeneradorProps) {
     }
   };
 
+  const onShareX = () => {
+    if (!entidadActual) return;
+    const hum = humanizarMonto(montoMostrado());
+    const montoTxt = hum ? `$${hum.num} ${hum.unidad}` : `$${formatMontoGrande(montoMostrado())}`;
+    const texto = `${entidadActual.nombre} recibió ${montoTxt} de pauta oficial. Fuente: datospautaoficial.com.ar`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(texto + "\n" + compartirUrl())}`, "_blank", "noopener");
+  };
+
   const onCopiarLink = async () => {
     await navigator.clipboard.writeText(compartirUrl()).catch(() => {});
     showToast("Link copiado al portapapeles");
@@ -474,6 +482,12 @@ export default function Generador({ initial }: GeneradorProps) {
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
             {generandoImg ? "Generando…" : "Descargar imagen"}
+          </button>
+          <button className="share-btn" type="button" onClick={onShareX}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            Compartir en X
           </button>
           <button className="share-btn" type="button" onClick={onCopiarLink}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
