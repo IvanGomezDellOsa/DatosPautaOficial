@@ -10,16 +10,26 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris, type TipoEntidad } from "../lib/queries";
 import { urlGenerador } from "../lib/url-state";
 import { buscar, buscarGrupos, getGrupoPorNorm, type EntidadBusqueda, type GrupoInfo } from "../lib/search";
+import { descargarPlaca } from "../lib/generarImagenCanvas";
 
 // ---------------------------------------------------------------------------
 // Helpers de formato
 // ---------------------------------------------------------------------------
 
 const fmtARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const fmtARS1 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 const fmtNum = new Intl.NumberFormat("es-AR");
 
 function formatMontoGrande(v: number): string {
   return fmtARS.format(Math.round(v));
+}
+
+function humanizarMonto(v: number): { num: string; unidad: string } | null {
+  if (v < 1e6) return null;
+  const m = v / 1e6;
+  const rounded = Math.round(m * 10) / 10;
+  const num = m >= 100 ? fmtARS.format(Math.round(m)) : fmtARS1.format(rounded);
+  return { num, unidad: rounded === 1 ? "millón" : "millones" };
 }
 
 // ---------------------------------------------------------------------------
@@ -105,11 +115,6 @@ function DesgloseJuris({
           ))}
         </tbody>
       </table>
-      {tipo !== "grupo" && (
-        <p style={{ marginTop:"0.75rem", color:"var(--color-fg-subtle)", fontSize:"var(--text-micro)", lineHeight:1.5, textAlign:"left" }}>
-          Cada empresa se registra por separado en los datos oficiales. Este total corresponde solo a esta razón social.
-        </p>
-      )}
     </div>
   );
 }
@@ -197,6 +202,7 @@ export default function Generador({ initial }: GeneradorProps) {
   const [anioSel, setAnioSel] = useState<number | "historico">("historico");
   const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(initial ? initial.resultado : null);
   const [loading, setLoading] = useState(false);
+  const [generandoImg, setGenerandoImg] = useState(false);
   const [toast, setToast] = useState("");
   // Modo grupo: detalle del holding seleccionado (miembros que se suman).
   const [grupoInfo, setGrupoInfo] = useState<GrupoInfo | null>(null);
@@ -316,19 +322,26 @@ export default function Generador({ initial }: GeneradorProps) {
     setTimeout(() => setToast(""), 2200);
   };
 
-  const onShareX = () => {
-    if (!entidadActual) return;
-    const monto = formatMontoGrande(montoMostrado());
-    const texto = `${entidadActual.nombre} recibió $ ${monto} en publicidad oficial · datospautaoficial.com.ar`;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(texto + "\n" + compartirUrl())}`, "_blank", "noopener");
-  };
-
-  const onShareIG = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: "Datos Pauta Oficial", url: compartirUrl() }).catch(() => {});
-    } else {
-      await navigator.clipboard.writeText(compartirUrl()).catch(() => {});
-      showToast("Link copiado · pegalo en Instagram");
+  const onDescargarImagen = async () => {
+    if (!entidadActual || !resultado) return;
+    setGenerandoImg(true);
+    try {
+      const filas = desglosePorJuris(resultado.porAnio, anioSel);
+      const periodoImg =
+        anioSel === "historico" && resultado.porAnio.length > 0
+          ? `${Math.min(...resultado.porAnio.map((r) => r.anio))}–${Math.max(...resultado.porAnio.map((r) => r.anio))}`
+          : String(anioSel);
+      await descargarPlaca({
+        nombre: entidadActual.nombre,
+        periodo: periodoImg,
+        juris: filas.map((f) => ({
+          nombre: f.juris,
+          monto: f.total,
+          periodo: f.anioMin === f.anioMax ? String(f.anioMin) : `${f.anioMin}–${f.anioMax}`,
+        })),
+      });
+    } finally {
+      setGenerandoImg(false);
     }
   };
 
@@ -401,17 +414,25 @@ export default function Generador({ initial }: GeneradorProps) {
       ) : (
         <div className="gen-result">
           <div className="gen-entity-name">{entidadActual?.nombre ?? "—"}</div>
-          <div className="gen-said">recibió en pauta oficial</div>
+          <div className="gen-said">recibió en <span style={{ color:"var(--color-accent)", fontWeight:600 }}>Pauta Oficial</span></div>
           <div className="gen-narrative">
             <div className="monto" style={{ opacity: loading ? 0.4 : 1, transition:"opacity 200ms" }}>
-              <span className="currency-prefix">$</span>
-              {formatMontoGrande(montoMostrado())}
-            </div>
-            <div className="context">
-              en <strong style={{ color:"var(--color-fg)" }}>{contextoAnio}</strong>
+              {(() => {
+                const hum = humanizarMonto(montoMostrado());
+                if (hum) return (
+                  <>
+                    <span className="currency-prefix">$</span>{hum.num}
+                    <span className="monto-unidad"> {hum.unidad}</span>
+                  </>
+                );
+                return <><span className="currency-prefix">$</span>{formatMontoGrande(montoMostrado())}</>;
+              })()}
             </div>
             {resultado && resultado.porAnio.length > 0 && (
-              <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} tipo={tipo} />
+              <>
+                <div className="gen-separator" />
+                <DesgloseJuris porAnio={resultado.porAnio} anioSel={anioSel} tipo={tipo} />
+              </>
             )}
             {tipo === "grupo" && grupoInfo && (
               <PanelGrupo
@@ -439,23 +460,23 @@ export default function Generador({ initial }: GeneradorProps) {
 
       {/* ── Share buttons ── */}
       <div className="share-block">
+        <p className="share-cta">Compartí en tus redes sociales</p>
         <div className="share-buttons">
-          <button className="share-btn" type="button" onClick={onShareX}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          <button
+            className="share-btn share-btn--primary"
+            type="button"
+            onClick={onDescargarImagen}
+            disabled={generandoImg || !hayDatos}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Compartir en X
-          </button>
-          <button className="share-btn" type="button" onClick={onShareIG}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-            Compartir en Instagram
+            {generandoImg ? "Generando…" : "Descargar imagen"}
           </button>
           <button className="share-btn" type="button" onClick={onCopiarLink}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
             </svg>

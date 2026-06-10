@@ -159,11 +159,7 @@ export function urlGenerador(estado: EstadoGenerador): string {
   if (estado.norm) p.set("p", estado.norm);
   if (estado.tipo && estado.tipo !== "proveedor") p.set("modo", estado.tipo);
   if (estado.anio !== "historico") p.set("y", String(estado.anio));
-  const base =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/`
-      : "https://datospautaoficial.com.ar/";
-  return `${base}?${p.toString()}`;
+  return `https://datospautaoficial.com.ar/?${p.toString()}`;
 }
 
 function setOrDel(p: URLSearchParams, key: string, val: string | null): void {

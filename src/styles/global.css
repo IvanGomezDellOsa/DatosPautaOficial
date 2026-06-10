@@ -1285,6 +1285,20 @@ table.data td:nth-child(5) { min-width: 100px; }
   color: var(--color-fg-muted);
   font-weight: 500;
 }
+.gen-narrative .monto .monto-unidad {
+  font-size: 0.36em;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  margin-left: 0.15em;
+  vertical-align: baseline;
+}
+.gen-separator {
+  width: 120px;
+  height: 6px;
+  background: var(--color-accent);
+  border-radius: 3px;
+  margin: 1.25rem auto 0;
+}
 .gen-narrative .monto .currency-prefix {
   font-size: 0.42em;
   font-weight: 500;
@@ -1295,6 +1309,13 @@ table.data td:nth-child(5) { min-width: 100px; }
 }
 
 /* Share buttons */
+.share-cta {
+  font-size: var(--text-small);
+  color: var(--color-fg-subtle);
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
 .share-block {
   margin-top: 2rem;
   padding-top: 1.5rem;
@@ -1337,6 +1358,22 @@ table.data td:nth-child(5) { min-width: 100px; }
   border-color: var(--color-accent);
   box-shadow: 0 0 0 4px var(--color-accent-glow);
   background: var(--color-bg-elev-3);
+}
+.share-btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #0b0f19;
+  font-weight: 600;
+}
+.share-btn--primary:hover {
+  background: #38e4f5;
+  border-color: #38e4f5;
+  box-shadow: 0 0 0 4px var(--color-accent-glow);
+  color: #0b0f19;
+}
+.share-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .share-btn svg {
   display: block;
@@ -1900,10 +1937,11 @@ footer.site-footer .brand .wordmark {
   }
   .nav-logo {
     display: block;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    background: url('/logo.webp') center/contain no-repeat;
+    width: 40px;
+    height: 25px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
   }
   .mobile-menu-btn {
     display: none;
