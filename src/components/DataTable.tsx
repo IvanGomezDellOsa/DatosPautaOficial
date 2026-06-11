@@ -72,20 +72,33 @@ function useTabla(filtros: FiltrosTabla, pagina: number, seed: SeedAgrupado) {
   const [totalFilas, setTotalFilas] = useState(() => (seed ? seed.totalFilas : 0));
   const [totalMonto, setTotalMonto] = useState(() => (seed ? seed.totalMonto : 0));
   const [loading, setLoading] = useState(() => !seed);
+  const [error, setError] = useState(false);
   const first = useRef(true);
+  // Guard contra respuestas fuera de orden: si el usuario cambia el filtro
+  // mientras una query lenta sigue en vuelo, la respuesta vieja se descarta.
+  const seq = useRef(0);
 
   const cargar = useCallback(async () => {
+    const id = ++seq.current;
     setLoading(true);
+    setError(false);
     try {
       const [{ filas, totalFilas: total }, tots] = await Promise.all([
         getOrdenes({ ...filtros, agrupado: true, pagina, porPagina: POR_PAGINA }),
         getTotalesFiltro(filtros),
       ]);
+      if (id !== seq.current) return;
       setRows(filas as OrdenAgrupada[]);
       setTotalFilas(Number(total));
       setTotalMonto(tots.montoTotal);
+    } catch {
+      if (id !== seq.current) return;
+      setRows([]);
+      setTotalFilas(0);
+      setTotalMonto(0);
+      setError(true);
     } finally {
-      setLoading(false);
+      if (id === seq.current) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filtros), pagina]);
@@ -102,7 +115,7 @@ function useTabla(filtros: FiltrosTabla, pagina: number, seed: SeedAgrupado) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargar]);
 
-  return { rows, totalFilas, totalMonto, loading };
+  return { rows, totalFilas, totalMonto, loading, error, recargar: cargar };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,19 +132,30 @@ function useTablaIndividual(filtros: FiltrosTabla, pagina: number, activo: boole
   const [totalFilas, setTotalFilas] = useState(0);
   const [totalMonto, setTotalMonto] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const seq = useRef(0);
 
   const cargar = useCallback(async () => {
+    const id = ++seq.current;
     setLoading(true);
+    setError(false);
     try {
       const [{ filas, totalFilas: total }, tots] = await Promise.all([
         getOrdenes({ ...filtros, agrupado: false, pagina, porPagina: POR_PAGINA, ordenPor: "monto", desc: true }),
         getTotalesFiltro(filtros),
       ]);
+      if (id !== seq.current) return;
       setRows(filas as Orden[]);
       setTotalFilas(Number(total));
       setTotalMonto(tots.montoTotal);
+    } catch {
+      if (id !== seq.current) return;
+      setRows([]);
+      setTotalFilas(0);
+      setTotalMonto(0);
+      setError(true);
     } finally {
-      setLoading(false);
+      if (id === seq.current) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filtros), pagina]);
@@ -141,7 +165,7 @@ function useTablaIndividual(filtros: FiltrosTabla, pagina: number, activo: boole
     cargar();
   }, [cargar, activo]);
 
-  return { rows, totalFilas, totalMonto, loading };
+  return { rows, totalFilas, totalMonto, loading, error, recargar: cargar };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +195,8 @@ function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob
          AND (date_to IS NULL OR CAST(substr(date_to,1,4) AS INTEGER) >= ?)
        ORDER BY date_from DESC LIMIT 1`,
       [juris, anio, anio],
-    ).then((rows) => setGov(rows[0] ?? null));
+    ).then((rows) => setGov(rows[0] ?? null))
+     .catch(() => setGov(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [juris, anio]);
   return gov;
@@ -257,10 +282,10 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
       : null;
 
   // Datos agrupados (modo default) — paginado, igual que el individual
-  const { rows: rowsAgrupados, totalFilas: totalCombinaciones, totalMonto: totalMontoAgrupado, loading: loadingAgrupado } = useTabla(filtros, paginaAgrupado, seedTabla);
+  const { rows: rowsAgrupados, totalFilas: totalCombinaciones, totalMonto: totalMontoAgrupado, loading: loadingAgrupado, error: errorAgrupado, recargar: recargarAgrupado } = useTabla(filtros, paginaAgrupado, seedTabla);
 
   // Datos individuales (modo individual)
-  const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual } = useTablaIndividual(filtros, paginaIndividual, modoIndividual);
+  const { rows: rowsIndividual, totalFilas, totalMonto: totalMontoIndividual, loading: loadingIndividual, error: errorIndividual, recargar: recargarIndividual } = useTablaIndividual(filtros, paginaIndividual, modoIndividual);
 
   // Detalle expandido: key → { filas cargadas hasta ahora, si está cargando una tanda }
   const [expandedMap, setExpandedMap] = useState<Map<string, DetalleGrupoState>>(new Map());
@@ -292,7 +317,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   // MiniSearch: buscar mientras tipea
   useEffect(() => {
     if (!textoBusq.trim()) { setSugerencias([]); return; }
-    buscar(textoBusq).then(setSugerencias);
+    buscar(textoBusq).then(setSugerencias).catch(() => setSugerencias([]));
   }, [textoBusq]);
 
   // Cerrar sugerencias al hacer click fuera
@@ -341,6 +366,16 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
         const n = new Map(p);
         // offset 0 = primera tanda (reemplaza); resto = append
         n.set(key, { filas: offset === 0 ? nuevas : [...cur.filas, ...nuevas], cargando: false });
+        return n;
+      });
+    }).catch(() => {
+      // Falla de red: salir del estado "cargando" para que no quede el
+      // spinner eterno; el usuario puede colapsar/expandir para reintentar.
+      setExpandedMap((p) => {
+        const cur = p.get(key);
+        if (!cur) return p;
+        const n = new Map(p);
+        n.set(key, { ...cur, cargando: false });
         return n;
       });
     });
@@ -554,6 +589,11 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
               <tbody>
                 {loadingIndividual ? (
                   <tr className="row-msg"><td colSpan={colsIndividual} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
+                ) : errorIndividual ? (
+                  <tr className="row-msg"><td colSpan={colsIndividual} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>
+                    No se pudieron cargar los datos. Revisá tu conexión.{" "}
+                    <button type="button" className="btn-secondary" onClick={recargarIndividual}>Reintentar</button>
+                  </td></tr>
                 ) : rowsIndividual.length === 0 ? (
                   <tr className="row-msg"><td colSpan={colsIndividual} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
                 ) : (
@@ -598,6 +638,11 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
               <tbody>
                 {loadingAgrupado ? (
                   <tr className="row-msg"><td colSpan={colsAgrupado} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>Cargando datos…</td></tr>
+                ) : errorAgrupado ? (
+                  <tr className="row-msg"><td colSpan={colsAgrupado} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>
+                    No se pudieron cargar los datos. Revisá tu conexión.{" "}
+                    <button type="button" className="btn-secondary" onClick={recargarAgrupado}>Reintentar</button>
+                  </td></tr>
                 ) : rowsAgrupados.length === 0 ? (
                   <tr className="row-msg"><td colSpan={colsAgrupado} style={{ textAlign:"center", padding:"3rem", color:"var(--color-fg-subtle)" }}>No hay resultados para los filtros seleccionados.</td></tr>
                 ) : (

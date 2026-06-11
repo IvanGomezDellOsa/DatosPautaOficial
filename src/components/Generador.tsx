@@ -213,18 +213,18 @@ export default function Generador({ initial }: GeneradorProps) {
   // listamos los grupos con datos para poblar el desplegable.
   useEffect(() => {
     if (tipo === "grupo") {
-      buscarGrupos(textoBusq).then(setSugerencias);
+      buscarGrupos(textoBusq).then(setSugerencias).catch(() => setSugerencias([]));
       return;
     }
     if (!textoBusq.trim()) { setSugerencias([]); return; }
-    buscar(textoBusq, tipo).then(setSugerencias);
+    buscar(textoBusq, tipo).then(setSugerencias).catch(() => setSugerencias([]));
   }, [textoBusq, tipo]);
 
   // Cargar el detalle (miembros) del grupo seleccionado para el panel de
   // transparencia. Sólo aplica en modo grupo.
   useEffect(() => {
     if (entidadActual && entidadActual.tipo === "grupo") {
-      getGrupoPorNorm(entidadActual.norm).then(setGrupoInfo);
+      getGrupoPorNorm(entidadActual.norm).then(setGrupoInfo).catch(() => setGrupoInfo(null));
     } else {
       setGrupoInfo(null);
     }
@@ -246,6 +246,12 @@ export default function Generador({ initial }: GeneradorProps) {
     try {
       const res = await getCuantoRecibio(e.norm, e.tipo, e.nombre);
       setResultado(res);
+    } catch {
+      // Falla de red/DB: no dejar el resultado de la entidad anterior bajo el
+      // nombre nuevo. El estado vacío genérico ya explica que puede no haber datos.
+      setResultado(null);
+      setToast("No se pudieron cargar los datos. Probá de nuevo.");
+      setTimeout(() => setToast(""), 2200);
     } finally {
       setLoading(false);
     }
@@ -262,16 +268,17 @@ export default function Generador({ initial }: GeneradorProps) {
     if (entidadActual) consultar(entidadActual);
   }, [entidadActual, consultar]);
 
-  // Demo "Clarín" al montar. Solo si NO hay seed; el buscar() de montaje es lo
-  // que disparaba la descarga de search.json (1,5 MB) en el primer paint.
+  // Demo al montar, solo si NO hay seed. El tipo inicial es "grupo", así que el
+  // demo carga el grupo top (grupos.json, ~8 KB) — consistente con el toggle y
+  // sin forzar la descarga de search.json (1,5 MB) en el primer paint.
   useEffect(() => {
     if (initial) return;
-    buscar("Clarín", "proveedor", 1).then((res) => {
+    buscarGrupos("", 1).then((res) => {
       if (res[0]) {
         setEntidadActual(res[0]);
         setTextoBusq(res[0].nombre);
       }
-    });
+    }).catch(() => {});
   }, []);
 
   const elegirEntidad = (e: EntidadBusqueda) => {
@@ -301,7 +308,7 @@ export default function Generador({ initial }: GeneradorProps) {
     if (t === "grupo") {
       buscarGrupos("", 1).then((res) => {
         if (res[0]) { setEntidadActual(res[0]); setTextoBusq(res[0].nombre); }
-      });
+      }).catch(() => {});
     } else {
       setTextoBusq("");
     }

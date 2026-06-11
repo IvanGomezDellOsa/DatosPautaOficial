@@ -11,6 +11,9 @@ const {
   title = "Datos Pauta Oficial",
   description = "Todos los datos públicos de pauta oficial de la Argentina, en un solo lugar.",
 } = Astro.props;
+
+// URL canónica por página (site viene de astro.config.mjs).
+const canonical = new URL(Astro.url.pathname, Astro.site);
 ---
 
 <!doctype html>
@@ -22,14 +25,20 @@ const {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://datospautaoficial.com.ar" />
+    <meta property="og:url" content={canonical.href} />
     <meta property="og:image" content="https://datospautaoficial.com.ar/logo.webp" />
+    <link rel="canonical" href={canonical.href} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content="https://datospautaoficial.com.ar/logo.webp" />
     <link rel="icon" type="image/x-icon" href="/ico__datos_pauta_oficial.ico" />
     <title>{title}</title>
+    {/* Sin JS el IntersectionObserver del scroll-reveal nunca corre: las
+        secciones .reveal quedarían en opacity:0. Este override las muestra. */}
+    <noscript>
+      <style>{`.reveal { opacity: 1 !important; transform: none !important; }`}</style>
+    </noscript>
   </head>
   <body>
     <slot />

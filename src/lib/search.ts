@@ -42,7 +42,10 @@ let _indexPromise: Promise<MiniSearch<EntidadBusqueda>> | null = null;
 export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
   if (!_indexPromise) {
     _indexPromise = fetch("/data/search.json")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`search.json: HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         const docs: EntidadBusqueda[] = [
           ...data.proveedores.map((p: EntidadBusqueda) => ({
@@ -67,6 +70,11 @@ export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
         });
         ms.addAll(docs);
         return ms;
+      })
+      .catch((err) => {
+        // No cachear el fallo: el próximo buscar() reintenta la descarga.
+        _indexPromise = null;
+        throw err;
       });
   }
   return _indexPromise!;
@@ -99,8 +107,15 @@ let _gruposPromise: Promise<GrupoInfo[]> | null = null;
 export function getGrupos(): Promise<GrupoInfo[]> {
   if (!_gruposPromise) {
     _gruposPromise = fetch("/data/grupos.json")
-      .then((r) => r.json())
-      .then((data) => data.grupos as GrupoInfo[]);
+      .then((r) => {
+        if (!r.ok) throw new Error(`grupos.json: HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => data.grupos as GrupoInfo[])
+      .catch((err) => {
+        _gruposPromise = null;
+        throw err;
+      });
   }
   return _gruposPromise;
 }

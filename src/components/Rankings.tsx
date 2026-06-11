@@ -183,6 +183,8 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
         limite: 5,
       });
       setItemsCtx(items);
+    } catch {
+      setItemsCtx([]); // falla de red/DB → "Sin datos para esta selección"
     } finally {
       setLoadingCtx(false);
     }
@@ -199,6 +201,8 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
     try {
       const items = await getRanking({ tipo: tipoGlb, limite: 5 });
       setItemsGlb(items);
+    } catch {
+      setItemsGlb([]);
     } finally {
       setLoadingGlb(false);
     }

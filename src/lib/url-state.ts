@@ -47,9 +47,12 @@ export function leerEstadoTabla(): EstadoTabla {
   // la URL debe traer juris=todas o anio=todos.
   const jurisParam = p.get("juris");
   const anioParam  = p.get("anio");
+  // anio no numérico en la URL (?anio=abc) → NaN rompería el seed y los
+  // selects de disponibilidad; se cae al default.
+  const anioNum = anioParam != null ? Number(anioParam) : NaN;
   return {
     jurisdiccion: jurisParam === "todas" ? null : (jurisParam ?? "PBA"),
-    anio:         anioParam  === "todos" ? null : (anioParam != null ? Number(anioParam) : 2025),
+    anio:         anioParam  === "todos" ? null : (Number.isInteger(anioNum) ? anioNum : 2025),
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
     deflactado: p.get("def") !== "0",

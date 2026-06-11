@@ -2,8 +2,8 @@
  * db.ts — singleton de sql.js-httpvfs para Datos Pauta Oficial.
  *
  * Inicializa el worker UNA sola vez (lazy) y lo reutiliza en toda la app.
- * El worker carga la SQLite en modo chunked desde /data/config.json:
- *   6 chunks de 20 MiB, todos bajo el límite de 25 MiB de Cloudflare Pages.
+ * El worker carga la SQLite en modo chunked desde /data/config.json
+ * (chunks de 20 MiB, bajo el límite de 25 MiB de Cloudflare Pages).
  *
  * Solo usar desde componentes React con directiva client:* en Astro.
  */
@@ -33,7 +33,12 @@ export function getDb(): Promise<WorkerHttpvfs> {
       [{ from: "jsonconfig", configUrl: "/data/config.json" }],
       workerUrl.toString(),
       wasmUrl,
-    );
+    ).catch((err) => {
+      // Si la inicialización falla (sin red, WASM/config no cargan), no dejar
+      // cacheada una Promise rechazada para siempre: el próximo getDb() reintenta.
+      _workerPromise = null;
+      throw err;
+    });
   }
   return _workerPromise;
 }
