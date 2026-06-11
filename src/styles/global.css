@@ -828,7 +828,8 @@ table.data tbody td {
 table.data tbody td.monto {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  /* 600 = mismo peso que los montos de las cards mobile; la cifra es la heroína */
+  font-weight: 600;
   color: var(--color-fg-strong);
 }
 table.data tbody tr {
