@@ -20,6 +20,11 @@ import json
 import sys
 from pathlib import Path
 
+# La consola de Windows usa cp1252 por defecto y los caracteres unicode del
+# reporte (─, ✓, ✗) tiraban UnicodeEncodeError antes de validar nada.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 REPO = Path(__file__).resolve().parent.parent
 CF_LIMIT = 25 * 1024 * 1024  # 25 MiB en bytes
 

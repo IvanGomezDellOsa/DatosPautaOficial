@@ -2018,3 +2018,87 @@ footer.site-footer .brand .wordmark {
     0 4px 20px rgba(0, 0, 0, 0.5),
     0 0 0 4px var(--color-accent-glow);
 }
+
+/* ═══════════════════════════ POPOVER DE CONTACTO ═══════════════════════════
+   Desktop: los mailto: abren esta tarjeta (sin app de correo asociada el link
+   no hace nada). En touch no se monta (Layout.astro gatea por any-pointer). */
+.mail-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(5, 8, 14, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.mail-popover {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg-elev-1);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+}
+.mail-popover-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-fg-subtle);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px;
+}
+.mail-popover-close:hover {
+  color: var(--color-fg-strong);
+}
+.mail-popover-title {
+  color: var(--color-fg-subtle);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.mail-popover-mail {
+  color: var(--color-fg-strong);
+  font-size: var(--text-body);
+  font-weight: 600;
+  word-break: break-all;
+  user-select: all;
+  margin-bottom: 1rem;
+}
+.mail-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.mail-popover-copy {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+.mail-popover-copy:hover {
+  background: var(--color-accent-dim);
+}
+.mail-popover-open {
+  color: var(--color-fg-muted);
+  font-size: var(--text-small);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.mail-popover-open:hover {
+  color: var(--color-fg-strong);
+}

@@ -47,5 +47,77 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
   </head>
   <body>
     <slot />
+
+    <script is:inline>
+      // ─────────── Popout de contacto para links mailto: ───────────
+      // En mobile el mailto: abre la app de correo y funciona bien. En desktop
+      // suele no haber cliente de correo asociado y el click "no hace nada".
+      // Acá: en dispositivos sin puntero táctil se intercepta el click y se
+      // muestra una tarjeta con la dirección, botón de copiar y el mailto como
+      // alternativa para quien sí tiene app configurada.
+      (function () {
+        var esTouch = window.matchMedia("(any-pointer: coarse)").matches;
+        if (esTouch) return;
+
+        var abierto = null;
+
+        function cerrar() {
+          if (!abierto) return;
+          abierto.backdrop.remove();
+          document.removeEventListener("keydown", abierto.onKey);
+          if (abierto.trigger) abierto.trigger.focus();
+          abierto = null;
+        }
+
+        function abrir(href, trigger) {
+          cerrar();
+          var email = href.replace(/^mailto:/, "").split("?")[0];
+
+          var backdrop = document.createElement("div");
+          backdrop.className = "mail-popover-backdrop";
+
+          var card = document.createElement("div");
+          card.className = "mail-popover";
+          card.setAttribute("role", "dialog");
+          card.setAttribute("aria-modal", "true");
+          card.setAttribute("aria-label", "Contacto por email");
+          card.innerHTML =
+            '<button type="button" class="mail-popover-close" aria-label="Cerrar">×</button>' +
+            '<div class="mail-popover-title">Contacto</div>' +
+            '<div class="mail-popover-mail"></div>' +
+            '<div class="mail-popover-actions">' +
+            '  <button type="button" class="mail-popover-copy">Copiar email</button>' +
+            '  <a class="mail-popover-open" href="' + href + '">Abrir en tu app de correo</a>' +
+            "</div>";
+          card.querySelector(".mail-popover-mail").textContent = email;
+
+          card.querySelector(".mail-popover-close").addEventListener("click", cerrar);
+          var btnCopy = card.querySelector(".mail-popover-copy");
+          btnCopy.addEventListener("click", function () {
+            navigator.clipboard.writeText(email).then(
+              function () { btnCopy.textContent = "Copiado ✓"; setTimeout(cerrar, 900); },
+              function () { btnCopy.textContent = "No se pudo copiar"; }
+            );
+          });
+          backdrop.addEventListener("mousedown", function (e) {
+            if (e.target === backdrop) cerrar();
+          });
+          var onKey = function (e) { if (e.key === "Escape") cerrar(); };
+          document.addEventListener("keydown", onKey);
+
+          backdrop.appendChild(card);
+          document.body.appendChild(backdrop);
+          abierto = { backdrop: backdrop, onKey: onKey, trigger: trigger };
+          btnCopy.focus();
+        }
+
+        document.addEventListener("click", function (e) {
+          var a = e.target && e.target.closest && e.target.closest('a[href^="mailto:"]');
+          if (!a) return;
+          e.preventDefault();
+          abrir(a.getAttribute("href"), a);
+        });
+      })();
+    </script>
   </body>
 </html>
