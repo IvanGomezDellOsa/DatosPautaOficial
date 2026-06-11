@@ -40,13 +40,17 @@ import type { SeedTabla } from "../lib/home";
 // ---------------------------------------------------------------------------
 
 const JURISDICCIONES = ["CABA", "Nación", "PBA", "Santa Fe"];
-const ANIOS = Array.from({ length: 23 }, (_, i) => 2025 - i); // 2025..2003
+// Rango de años con datos por jurisdicción. ÚNICA fuente del rango de años en
+// este componente: al cargar datos nuevos, actualizar solo esta tabla.
 const DISPONIBILIDAD: Record<string, [number, number]> = {
   "Nación": [2009, 2022],
   "CABA": [2003, 2024],
   "PBA": [2020, 2025],
   "Santa Fe": [2008, 2023],
 };
+const ANIO_MIN = Math.min(...Object.values(DISPONIBILIDAD).map(([a]) => a));
+const ANIO_MAX = Math.max(...Object.values(DISPONIBILIDAD).map(([, b]) => b));
+const ANIOS = Array.from({ length: ANIO_MAX - ANIO_MIN + 1 }, (_, i) => ANIO_MAX - i);
 const POR_PAGINA = 50;
 // Órdenes que se cargan por tanda al expandir un grupo. Pequeño a propósito:
 // un grupo grande (cientos de órdenes casi idénticas) cargaría lentísimo de una.
@@ -218,8 +222,16 @@ type DetalleGrupoState = { filas: Orden[]; cargando: boolean };
 // ---------------------------------------------------------------------------
 
 export default function DataTable({ initial }: { initial?: SeedTabla }) {
+  // Defaults de la vista (URL sin params): vienen de home.json, calculados por
+  // el ETL (jurisdicción seed + su año más reciente con datos). Así la vista
+  // inicial, el seed del primer paint y la URL "limpia" no pueden divergir
+  // cuando la base avanza de año.
+  const defaults = initial
+    ? { jurisdiccion: initial.filtroInicial.jurisdiccion, anio: initial.filtroInicial.anio }
+    : undefined;
+
   // Estado de filtros (sincronizado con URL)
-  const [estado, setEstado] = useState<EstadoTabla>(() => leerEstadoTabla());
+  const [estado, setEstado] = useState<EstadoTabla>(() => leerEstadoTabla(defaults));
 
   // Modo de vista
   const [modoIndividual, setModoIndividual] = useState(false);
@@ -263,16 +275,15 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   const gobierno = useGobierno(estado.jurisdiccion, estado.anio, seedGob);
 
   // Seed del primer paint: solo aplica si la vista inicial es EXACTAMENTE la
-  // que precomputó home.json (PBA + año por defecto, agrupado, página 0, sin
-  // entidad, deflactado). Si la URL trae otro filtro, se consulta en vivo.
+  // que precomputó home.json (jurisdicción + año por defecto, agrupado,
+  // página 0, sin entidad). Si la URL trae otro filtro, se consulta en vivo.
   const seedTabla: SeedAgrupado =
     initial &&
     !modoIndividual &&
     paginaAgrupado === 0 &&
     !estado.entidadNorm &&
     estado.jurisdiccion === initial.filtroInicial.jurisdiccion &&
-    estado.anio === initial.filtroInicial.anio &&
-    estado.deflactado === initial.filtroInicial.deflactado
+    estado.anio === initial.filtroInicial.anio
       ? {
           // home.json precomputa 100 filas; si POR_PAGINA es menor, recortar
           filas: initial.tabla.filas.slice(0, POR_PAGINA),
@@ -294,12 +305,13 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   const setFiltro = useCallback((patch: Partial<EstadoTabla>) => {
     setEstado((prev) => {
       const next = { ...prev, ...patch };
-      escribirEstadoTabla(next);
+      escribirEstadoTabla(next, defaults);
       return next;
     });
     setExpandedMap(new Map());
     setPaginaIndividual(0);
     setPaginaAgrupado(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Al cambiar de página agrupada, colapsar los detalles (las claves expandidas
@@ -521,6 +533,8 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
             type="search"
             placeholder="Buscar proveedor o medio…"
             aria-label="Buscar"
+            role="combobox"
+            aria-expanded={mostrarSugs && sugerencias.length > 0}
             aria-autocomplete="list"
             aria-controls="sugs-tabla"
             aria-activedescendant={idxSug >= 0 ? `sug-tabla-${idxSug}` : undefined}

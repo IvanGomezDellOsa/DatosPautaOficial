@@ -8,8 +8,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getCuantoRecibio, type ResultadoCuantoRecibio, type TotalPorAnioJuris, type TipoEntidad } from "../lib/queries";
-import { urlGenerador } from "../lib/url-state";
-import { buscar, buscarGrupos, getGrupoPorNorm, type EntidadBusqueda, type GrupoInfo } from "../lib/search";
+import { urlGenerador, leerEstadoGenerador } from "../lib/url-state";
+import { buscar, buscarGrupos, getGrupoPorNorm, entidadPorNorm, type EntidadBusqueda, type GrupoInfo } from "../lib/search";
 import { descargarPlaca } from "../lib/generarImagenCanvas";
 import { useSugerenciasNav } from "../lib/useSugerenciasNav";
 
@@ -193,13 +193,18 @@ interface GeneradorProps {
 }
 
 export default function Generador({ initial }: GeneradorProps) {
-  const [tipo, setTipo] = useState<TipoEntidad>(initial?.tipo ?? "grupo");
-  const [textoBusq, setTextoBusq] = useState(initial ? initial.entidad.nombre : "Clarín");
+  // Deeplink (?p=<norm>&modo=...&y=...): los links de "Compartir" apuntan acá.
+  // Si la URL trae una entidad, tiene prioridad sobre el demo del seed.
+  const [deeplink] = useState(() => leerEstadoGenerador());
+  const conDeeplink = !!deeplink.norm;
+
+  const [tipo, setTipo] = useState<TipoEntidad>(conDeeplink ? deeplink.tipo : (initial?.tipo ?? "grupo"));
+  const [textoBusq, setTextoBusq] = useState(!conDeeplink && initial ? initial.entidad.nombre : "");
   const [sugerencias, setSugerencias] = useState<EntidadBusqueda[]>([]);
   const [mostrarSugs, setMostrarSugs] = useState(false);
-  const [entidadActual, setEntidadActual] = useState<EntidadBusqueda | null>(initial ? initial.entidad : null);
-  const [anioSel, setAnioSel] = useState<number | "historico">("historico");
-  const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(initial ? initial.resultado : null);
+  const [entidadActual, setEntidadActual] = useState<EntidadBusqueda | null>(!conDeeplink && initial ? initial.entidad : null);
+  const [anioSel, setAnioSel] = useState<number | "historico">(conDeeplink ? deeplink.anio : "historico");
+  const [resultado, setResultado] = useState<ResultadoCuantoRecibio | null>(!conDeeplink && initial ? initial.resultado : null);
   const [loading, setLoading] = useState(false);
   const [generandoImg, setGenerandoImg] = useState(false);
   const [toast, setToast] = useState("");
@@ -268,17 +273,40 @@ export default function Generador({ initial }: GeneradorProps) {
     if (entidadActual) consultar(entidadActual);
   }, [entidadActual, consultar]);
 
-  // Demo al montar, solo si NO hay seed. El tipo inicial es "grupo", así que el
-  // demo carga el grupo top (grupos.json, ~8 KB) — consistente con el toggle y
-  // sin forzar la descarga de search.json (1,5 MB) en el primer paint.
+  // Deeplink al montar: resuelve la clave de la URL a su entidad y consulta.
+  // Grupo → lookup en grupos.json; proveedor/medio → lookup exacto en el
+  // índice de búsqueda.
   useEffect(() => {
-    if (initial) return;
+    if (!conDeeplink) return;
+    const resolver = async (): Promise<EntidadBusqueda | null> => {
+      if (deeplink.tipo === "grupo") {
+        const g = await getGrupoPorNorm(deeplink.norm!);
+        return g ? { id: `g:${g.norm}`, norm: g.norm, nombre: g.nombre, n: g.n, tipo: "grupo" } : null;
+      }
+      return entidadPorNorm(deeplink.norm!, deeplink.tipo);
+    };
+    resolver().then((e) => {
+      if (e) {
+        setEntidadActual(e);
+        setTextoBusq(e.nombre);
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Demo al montar, solo si NO hay seed ni deeplink. El tipo inicial es
+  // "grupo", así que el demo carga el grupo top (grupos.json, ~8 KB) —
+  // consistente con el toggle y sin forzar la descarga de search.json (1,5 MB)
+  // en el primer paint.
+  useEffect(() => {
+    if (initial || conDeeplink) return;
     buscarGrupos("", 1).then((res) => {
       if (res[0]) {
         setEntidadActual(res[0]);
         setTextoBusq(res[0].nombre);
       }
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const elegirEntidad = (e: EntidadBusqueda) => {
@@ -397,6 +425,8 @@ export default function Generador({ initial }: GeneradorProps) {
             value={textoBusq}
             placeholder={tipo === "grupo" ? "Buscar grupo mediático…" : "Buscar proveedor o medio…"}
             aria-label="Buscar entidad"
+            role="combobox"
+            aria-expanded={mostrarSugs && sugerencias.length > 0}
             aria-autocomplete="list"
             aria-controls="sugs-gen"
             aria-activedescendant={idxSug >= 0 ? `sug-gen-${idxSug}` : undefined}
@@ -428,10 +458,24 @@ export default function Generador({ initial }: GeneradorProps) {
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-fg-subtle)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin:"0 auto 1rem", display:"block" }}>
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <div style={{ color:"var(--color-fg-strong)", fontWeight:600, marginBottom:"0.5rem" }}>No encontramos registros</div>
-          <div style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-small)", maxWidth:400, margin:"0 auto", lineHeight:1.5 }}>
-            La base de datos oficial tiene baches de información. Verificá el nombre o probá por razón social.
-          </div>
+          {/* Distinguir "la entidad no existe en la base" de "el año elegido
+              no tiene datos": en el segundo caso el nombre está bien y el
+              mensaje de 'verificá el nombre' confundía. */}
+          {resultado && resultado.totalHistorico > 0 && anioSel !== "historico" ? (
+            <>
+              <div style={{ color:"var(--color-fg-strong)", fontWeight:600, marginBottom:"0.5rem" }}>Sin registros en {anioSel}</div>
+              <div style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-small)", maxWidth:400, margin:"0 auto", lineHeight:1.5 }}>
+                {entidadActual.nombre} sí tiene registros en otros períodos. Probá «Histórico» u otro año.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ color:"var(--color-fg-strong)", fontWeight:600, marginBottom:"0.5rem" }}>No encontramos registros</div>
+              <div style={{ color:"var(--color-fg-subtle)", fontSize:"var(--text-small)", maxWidth:400, margin:"0 auto", lineHeight:1.5 }}>
+                La base de datos oficial tiene baches de información. Verificá el nombre o probá por razón social.
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="gen-result">

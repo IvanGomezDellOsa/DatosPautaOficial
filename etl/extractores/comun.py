@@ -20,6 +20,7 @@ import io
 import os
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,12 @@ COLUMNS = [
 ]
 
 JURISDICCIONES_VALIDAS = {"CABA", "Nación", "PBA", "Santa Fe"}
+
+# Rango de años aceptado por el pipeline. El techo es dinámico (año actual +1)
+# para que cargar datos de un año nuevo no los descarte silenciosamente como
+# "fuera de rango"; el piso 2003 filtra basura de parseo (fechas rotas, etc.).
+ANIO_MIN = 2003
+ANIO_MAX = date.today().year + 1
 
 # ---------------------------------------------------------------------------
 # Logging simple a stderr (no contamina el stdout que pueda capturarse)
@@ -315,9 +322,9 @@ def registro(jurisdiccion, anio, monto, archivo_origen,
 
 
 def anio_de_texto(texto):
-    """Extrae el primer anio de 4 digitos (2003-2025) de un string."""
-    for m in re.findall(r"(20[0-2]\d)", str(texto)):
+    """Extrae el primer anio de 4 digitos dentro del rango valido de un string."""
+    for m in re.findall(r"(20\d\d)", str(texto)):
         a = int(m)
-        if 2003 <= a <= 2025:
+        if ANIO_MIN <= a <= ANIO_MAX:
             return a
     return None

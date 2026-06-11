@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extractores"))
 import comun  # noqa: E402
-from comun import COLUMNS, JURISDICCIONES_VALIDAS, OUTPUT_CSV, DATA_DIR, log  # noqa: E402
+from comun import COLUMNS, JURISDICCIONES_VALIDAS, OUTPUT_CSV, DATA_DIR, log, ANIO_MIN, ANIO_MAX  # noqa: E402
 
 import extract_caba       # noqa: E402
 import extract_nacion     # noqa: E402
@@ -36,7 +36,7 @@ def _valida_fila(r, descartes):
         return False
     # anio
     a = r.get("anio")
-    if a is None or not (2003 <= a <= 2025):
+    if a is None or not (ANIO_MIN <= a <= ANIO_MAX):
         descartes["anio_fuera_de_rango"] += 1
         return False
     # jurisdiccion

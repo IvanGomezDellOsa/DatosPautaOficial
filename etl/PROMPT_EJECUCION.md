@@ -74,20 +74,19 @@ En `REPORTE_VALIDACION.md`:
 - Cualquier traceback → reportalo completo y **no** continúes con el rename del paso final.
 
 ## Paso final (solo si todo lo anterior dio OK)
-`build_db.py` lee `etl/data/pauta_oficial_unificado.csv` (nombre canónico, sin `_v2`).
-Una vez verificado el v2, reemplazá el canónico (con backup) y regenerá la base:
+`build_db.py` lee directamente `etl/data/pauta_oficial_unificado_v2.csv` (es el
+CSV canónico y el único versionado). Regenerá la base:
 ```
-# Windows
-copy etl\data\pauta_oficial_unificado.csv etl\data\pauta_oficial_unificado_backup.csv
-move /Y etl\data\pauta_oficial_unificado_v2.csv etl\data\pauta_oficial_unificado.csv
 python etl/build_db.py
 ```
-Verificá que `etl/build/pauta.sqlite` tenga ~506.700 filas en la tabla `orders` y que
-`public/data/home.json` se haya regenerado.
+Verificá que `etl/build/pauta.sqlite` tenga las filas esperadas en la tabla `orders`
+y que `public/data/home.json` se haya regenerado (es el seed de la portada y SÍ se
+commitea).
 
 ## Qué commitear y qué NO
 - **Commitear:** `etl/extractores/*.py`, `etl/unificar.py`, `etl/validar.py`,
-  `etl/data/pauta_oficial_unificado.csv` (canónico actualizado), `REPORTE_VALIDACION.md`,
-  `etl/PROMPT_EJECUCION.md`.
+  `etl/data/pauta_oficial_unificado_v2.csv` (canónico actualizado),
+  `public/data/home.json`, `REPORTE_VALIDACION.md`, `etl/PROMPT_EJECUCION.md`.
 - **NO commitear:** datos crudos, `__pycache__/`, backups, `pauta.sqlite`,
-  ni `pauta_oficial_unificado_v2.csv` (ya renombrado al canónico).
+  chunks `pauta.sqlite.*`, `config.json`, `search.json`, `grupos.json`
+  (artefactos reproducibles, ya gitignored).

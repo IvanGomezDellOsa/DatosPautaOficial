@@ -17,9 +17,11 @@ public/data/grupos.json
 # SQLite monolitica generada en etl/build/ (fuera de public/ para no superar
 # el limite de 25 MiB de Cloudflare Pages; los chunks van a public/data/).
 etl/build/
+# archivos .db sueltos en etl/ (restos de invocaciones del CLI de sqlite3)
+etl/*.db
 
-# backups y archivos de trabajo del ETL (no son fuentes: las fuentes reales son
-# pauta_oficial_unificado.csv / _v2.csv, ya versionadas). Evita que backups
+# backups y archivos de trabajo del ETL (no son fuentes: la fuente real es
+# pauta_oficial_unificado_v2.csv, ya versionada). Evita que backups
 # pesados o csv auxiliares ensucien el repo o se commiteen por error.
 etl/data/*backup*.csv
 etl/data/medios_sin_grupo.csv

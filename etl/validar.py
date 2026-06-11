@@ -22,7 +22,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extractores"))
 import comun  # noqa: E402
-from comun import OUTPUT_CSV, REPO_ROOT, JURISDICCIONES_VALIDAS, log  # noqa: E402
+from comun import OUTPUT_CSV, REPO_ROOT, JURISDICCIONES_VALIDAS, log, ANIO_MIN, ANIO_MAX  # noqa: E402
 
 RE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REPORTE = REPO_ROOT / "REPORTE_VALIDACION.md"
@@ -70,7 +70,7 @@ def validar(ruta=None):
     for r in filas:
         try:
             a = int(r["anio"])
-            if not (2003 <= a <= 2025):
+            if not (ANIO_MIN <= a <= ANIO_MAX):
                 anios_malos[r["anio"]] += 1
         except (ValueError, TypeError):
             anios_malos[r["anio"]] += 1
@@ -109,7 +109,7 @@ def validar(ruta=None):
 
     L.append("\n## Jurisdicciones / años fuera de rango\n")
     L.append(f"- jurisdicciones invalidas: {dict(juris_malas) if juris_malas else 'ninguna ✅'}")
-    L.append(f"- años fuera de 2003-2025: {dict(anios_malos) if anios_malos else 'ninguno ✅'}")
+    L.append(f"- años fuera de {ANIO_MIN}-{ANIO_MAX}: {dict(anios_malos) if anios_malos else 'ninguno ✅'}")
 
     L.append("\n## Top-10 valores de `medio` que parecen TIPOS (revisar)\n")
     if medios_tipo:

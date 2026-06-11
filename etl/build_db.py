@@ -5,10 +5,11 @@ Fase 3 del proyecto. Toma el CSV unificado de Fase 2 y produce la base que el
 navegador consulta con sql.js-httpvfs.
 
 Entradas (en etl/data/):
-  - pauta_oficial_unificado.csv  OBLIGATORIO  esquema canonico de 8 columnas
-  - ipc_indec.csv                OBLIGATORIO  serie mensual de inflacion
-  - governments.csv              OBLIGATORIO  vigencias de gestion (hardcoded)
-  - aliases.csv                  OPCIONAL     normalizacion curada de nombres
+  - pauta_oficial_unificado_v2.csv  OBLIGATORIO  CSV canonico (lo emite unificar.py;
+                                    si no existe cae a pauta_oficial_unificado.csv)
+  - ipc_indec.csv                   OBLIGATORIO  serie mensual de inflacion
+  - governments.csv                 OBLIGATORIO  vigencias de gestion (hardcoded)
+  - aliases.csv                     OPCIONAL     normalizacion curada de nombres
 
 Salida:
   - public/data/pauta.sqlite     base read-only (archivo unico, para uso local)
@@ -47,8 +48,8 @@ OUT_DB = BUILD_DIR / "pauta.sqlite"
 
 _CSV_V2 = DATA_DIR / "pauta_oficial_unificado_v2.csv"
 _CSV_V1 = DATA_DIR / "pauta_oficial_unificado.csv"
-# Preferir la versión v2 (generada por los nuevos extractores en unificar.py)
-# si existe; si no, caer al CSV original para no romper builds previos.
+# El canonico es el v2 (lo emite unificar.py y es el unico versionado).
+# El fallback al nombre viejo solo existe para builds locales antiguos.
 CSV_ORDERS = _CSV_V2 if _CSV_V2.exists() else _CSV_V1
 CSV_IPC = DATA_DIR / "ipc_indec.csv"
 CSV_GOV = DATA_DIR / "governments.csv"

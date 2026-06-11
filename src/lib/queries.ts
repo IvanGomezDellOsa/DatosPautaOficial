@@ -89,7 +89,7 @@ export interface FiltrosTabla {
   /** clave normalizada devuelta por MiniSearch */
   entidadNorm?: string;
   entidadTipo?: "proveedor" | "medio";
-  deflactado?: boolean;
+  /** Orden del modo individual (lo fija el componente, no la URL). */
   ordenPor?: "monto" | "id";
   desc?: boolean;
   pagina?: number;
@@ -115,7 +115,6 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     anio,
     entidadNorm,
     entidadTipo,
-    deflactado = true,
     ordenPor = "monto",
     desc = true,
     pagina = 0,

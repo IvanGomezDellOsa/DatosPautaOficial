@@ -153,7 +153,13 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
   const [loadingGlb, setLoadingGlb] = useState(!initial);
 
   const cargarContextual = useCallback(async () => {
-    const estado = leerEstadoTabla();
+    // Mismos defaults que DataTable (home.json) para que ambos islands lean
+    // la URL "limpia" como la misma vista.
+    const estado = leerEstadoTabla(
+      initial
+        ? { jurisdiccion: initial.filtroInicial.jurisdiccion, anio: initial.filtroInicial.anio }
+        : undefined,
+    );
     const { jurisdiccion, anio } = estado;
 
     // Título dinámico

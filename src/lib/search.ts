@@ -38,6 +38,9 @@ export interface GrupoInfo {
 }
 
 let _indexPromise: Promise<MiniSearch<EntidadBusqueda>> | null = null;
+// Documentos crudos del índice; lookup exacto por norm para los deeplinks
+// (?p=<norm>), donde no hay texto que buscar sino una clave que resolver.
+let _docs: EntidadBusqueda[] | null = null;
 
 export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
   if (!_indexPromise) {
@@ -69,6 +72,7 @@ export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
           searchOptions: { prefix: true, fuzzy: 0.2 },
         });
         ms.addAll(docs);
+        _docs = docs;
         return ms;
       })
       .catch((err) => {
@@ -78,6 +82,19 @@ export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
       });
   }
   return _indexPromise!;
+}
+
+/**
+ * Resuelve una clave normalizada exacta a su entidad (nombre de display, n).
+ * Lo usan los deeplinks del Generador (?p=<norm>&modo=...): ahí no hay texto
+ * que buscar, hay una clave que resolver.
+ */
+export async function entidadPorNorm(
+  norm: string,
+  tipo: "proveedor" | "medio",
+): Promise<EntidadBusqueda | null> {
+  await getSearchIndex();
+  return _docs?.find((d) => d.tipo === tipo && d.norm === norm) ?? null;
 }
 
 /** Busca en el índice y devuelve hasta `limite` sugerencias. */

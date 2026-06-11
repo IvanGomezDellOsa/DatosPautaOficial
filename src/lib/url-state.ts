@@ -5,7 +5,7 @@
  * permite compartir y guardar vistas específicas (permalinks).
  *
  * Parámetros soportados:
- *   Tabla:      juris, anio, norm, tipo, def, orden, desc
+ *   Tabla:      juris, anio, norm, tipo
  *   Generador:  p (norm), modo (proveedor|medio|grupo), y (anio|historico)
  */
 
@@ -20,10 +20,21 @@ export interface EstadoTabla {
   anio: number | null;
   entidadNorm: string | null;
   entidadTipo: "proveedor" | "medio";
-  deflactado: boolean;
-  ordenPor: "monto" | "id";
-  desc: boolean;
 }
+
+/**
+ * Vista por defecto cuando la URL no trae params. Los islands deben pasar el
+ * default real desde home.json (filtroInicial, calculado por el ETL como la
+ * jurisdicción seed + su año más reciente con datos) para que la vista
+ * inicial, el seed del primer paint y la URL "limpia" siempre coincidan.
+ * Este fallback hardcodeado solo aplica si un island se monta sin seed.
+ */
+export interface DefaultsTabla {
+  jurisdiccion: string;
+  anio: number;
+}
+
+export const DEFAULTS_TABLA: DefaultsTabla = { jurisdiccion: "PBA", anio: 2025 };
 
 export interface EstadoGenerador {
   norm: string | null;
@@ -37,29 +48,23 @@ export interface EstadoGenerador {
 // ---------------------------------------------------------------------------
 
 /** Lee el estado de la tabla desde la URL actual (window.location.search). */
-export function leerEstadoTabla(): EstadoTabla {
+export function leerEstadoTabla(defaults: DefaultsTabla = DEFAULTS_TABLA): EstadoTabla {
   const p = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : "",
   );
-  // Defaults: PBA + 2025 + orden por id (orden de la base).
-  // Si la URL trae el param, prevalece; si no, se usa el default.
-  // Para "sin filtro" (todas las jurisdicciones / todos los años),
-  // la URL debe traer juris=todas o anio=todos.
+  // Si la URL trae el param, prevalece; si no, se usa el default (que viene
+  // de home.json). Para "sin filtro" (todas las jurisdicciones / todos los
+  // años), la URL debe traer juris=todas o anio=todos.
   const jurisParam = p.get("juris");
   const anioParam  = p.get("anio");
   // anio no numérico en la URL (?anio=abc) → NaN rompería el seed y los
   // selects de disponibilidad; se cae al default.
   const anioNum = anioParam != null ? Number(anioParam) : NaN;
   return {
-    jurisdiccion: jurisParam === "todas" ? null : (jurisParam ?? "PBA"),
-    anio:         anioParam  === "todos" ? null : (Number.isInteger(anioNum) ? anioNum : 2025),
+    jurisdiccion: jurisParam === "todas" ? null : (jurisParam ?? defaults.jurisdiccion),
+    anio:         anioParam  === "todos" ? null : (Number.isInteger(anioNum) ? anioNum : defaults.anio),
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
-    deflactado: p.get("def") !== "0",
-    // Default: id ascendente. 'monto' via param.
-    ordenPor: p.get("orden") === "monto" ? "monto" : "id",
-    // Default desc=false (ascendente). desc=1 en la URL activa el orden descendente.
-    desc: p.get("desc") === "1",
   };
 }
 
@@ -87,49 +92,34 @@ export function leerEstadoGenerador(): EstadoGenerador {
 /**
  * Actualiza la URL con el nuevo estado de tabla SIN recargar la página.
  * Solo escribe los parámetros que difieren del default para mantener las
- * URLs limpias (ej: sin `def=1` cuando el default ya es deflactado=true).
+ * URLs limpias.
  */
-export function escribirEstadoTabla(estado: Partial<EstadoTabla>): void {
+export function escribirEstadoTabla(
+  estado: Partial<EstadoTabla>,
+  defaults: DefaultsTabla = DEFAULTS_TABLA,
+): void {
   if (typeof window === "undefined") return;
   const p = new URLSearchParams(window.location.search);
 
-  // juris: "PBA" es default → no se escribe. null → "todas" (param explícito).
+  // juris: el default → no se escribe. null → "todas" (param explícito).
   const jurisVal = estado.jurisdiccion === undefined ? undefined
-                 : estado.jurisdiccion === null        ? "todas"
-                 : estado.jurisdiccion === "PBA"       ? null   // default, no escribir
+                 : estado.jurisdiccion === null                  ? "todas"
+                 : estado.jurisdiccion === defaults.jurisdiccion ? null   // default, no escribir
                  : estado.jurisdiccion;
   setOrDel(p, "juris", jurisVal ?? null);
-  // anio: 2025 es default → no se escribe. null → "todos" (param explícito).
+  // anio: el default → no se escribe. null → "todos" (param explícito).
   const anioVal = estado.anio === undefined ? undefined
-                : estado.anio === null      ? "todos"
-                : estado.anio === 2025      ? null   // default, no escribir
+                : estado.anio === null          ? "todos"
+                : estado.anio === defaults.anio ? null   // default, no escribir
                 : String(estado.anio);
   setOrDel(p, "anio", anioVal ?? null);
   setOrDel(p, "norm", estado.entidadNorm ?? null);
   setOrDel(p, "tipo", estado.entidadTipo === "medio" ? "medio" : null); // proveedor es default
-  setOrDel(p, "def", estado.deflactado === false ? "0" : null);         // deflactado es default
-  // orden: "id" (orden por defecto) → no se escribe. "monto" sí.
-  setOrDel(p, "orden", estado.ordenPor === "monto" ? "monto" : null);
-  setOrDel(p, "desc", estado.desc === true ? "1" : null);               // asc (false) es default
-
-  const search = p.toString();
-  const url = search ? `?${search}` : window.location.pathname;
-  window.history.replaceState(null, "", url);
-}
-
-/** Actualiza la URL del generador. */
-export function escribirEstadoGenerador(estado: Partial<EstadoGenerador>): void {
-  if (typeof window === "undefined") return;
-  const p = new URLSearchParams(window.location.search);
-
-  setOrDel(p, "p", estado.norm ?? null);
-  // proveedor es default (no se escribe); medio y grupo van como modo=...
-  setOrDel(p, "modo", estado.tipo && estado.tipo !== "proveedor" ? estado.tipo : null);
-  setOrDel(p, "y",
-    estado.anio != null && estado.anio !== "historico"
-      ? String(estado.anio)
-      : null,
-  );
+  // Params legacy que ya no hacen nada (def/orden/desc): se limpian de la URL
+  // para que los permalinks viejos no prometan un estado que no existe.
+  p.delete("def");
+  p.delete("orden");
+  p.delete("desc");
 
   const search = p.toString();
   const url = search ? `?${search}` : window.location.pathname;
@@ -146,9 +136,6 @@ export function estadoAFiltros(estado: EstadoTabla): FiltrosTabla {
     anio: estado.anio ?? undefined,
     entidadNorm: estado.entidadNorm ?? undefined,
     entidadTipo: estado.entidadTipo,
-    deflactado: estado.deflactado,
-    ordenPor: estado.ordenPor,
-    desc: estado.desc,
   };
 }
 
@@ -162,7 +149,8 @@ export function urlGenerador(estado: EstadoGenerador): string {
   if (estado.norm) p.set("p", estado.norm);
   if (estado.tipo && estado.tipo !== "proveedor") p.set("modo", estado.tipo);
   if (estado.anio !== "historico") p.set("y", String(estado.anio));
-  return `https://datospautaoficial.com.ar/?${p.toString()}`;
+  // El hash lleva al receptor directo a la sección "Cuánto recibió".
+  return `https://datospautaoficial.com.ar/?${p.toString()}#cuanto-recibio`;
 }
 
 function setOrDel(p: URLSearchParams, key: string, val: string | null): void {
