@@ -572,6 +572,8 @@ body {
   color: var(--color-fg-strong);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  /* que el "$" no quede huérfano al final de línea, separado del número */
+  white-space: nowrap;
 }
 .filter-bar .row2 .approx {
   color: var(--color-fg-subtle);
@@ -632,6 +634,26 @@ body {
 .governance-tag strong {
   color: var(--color-fg-strong);
   font-weight: 600;
+}
+/* Filter bar compacto en mobile: el tag de gestión y los totales ocupaban
+   demasiado y se partían en pedazos desordenados. (Debe ir DESPUÉS de las
+   reglas base de .governance-tag: misma especificidad, gana la última.) */
+@media (max-width: 540px) {
+  .filter-bar {
+    padding: 1rem;
+  }
+  .filter-bar .row2 .totals {
+    font-size: var(--text-small);
+  }
+  .governance-tag {
+    display: block;
+    padding: 8px 12px;
+    font-size: var(--text-small);
+  }
+  .governance-tag .label {
+    display: block;
+    margin-bottom: 2px;
+  }
 }
 
 .filter-bar .lead {
@@ -879,6 +901,13 @@ table.data tbody tr:hover td:first-child {
    - fila detalle   (.row-detalle): col-id [col-juris] col-anio col-resol col-monto
    - filas de 1 celda (.row-msg, .row-vermas): mensaje / botón "ver más" */
 @media (max-width: 767px) {
+  /* El contenedor deja de ser una caja: cada fila es su propia card */
+  .table-wrap {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
   .table-scroll {
     max-height: none;
     overflow: visible;
@@ -887,6 +916,7 @@ table.data tbody tr:hover td:first-child {
   table.data tbody {
     display: block;
     width: 100%;
+    background: transparent;
   }
   /* width auto: con 100% los td inflan los tracks del grid y cortan el monto */
   table.data tbody td {
@@ -912,12 +942,22 @@ table.data tbody tr:hover td:first-child {
     display: grid;
     padding: 14px 16px;
     gap: 4px 12px;
-    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-elev-1);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin-bottom: 10px;
     align-items: start;
     height: auto;
   }
   table.data tbody tr:hover td:first-child {
     box-shadow: none;
+  }
+  /* Grupo expandido: la card madre se conecta con sus filas de detalle */
+  table.data tbody tr.row-grupo:has(.expand-btn[aria-expanded="true"]) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+    margin-bottom: 0;
   }
 
   /* Fila agrupada: proveedor titular, medio secundario, monto protagonista */
@@ -1003,15 +1043,23 @@ table.data tbody tr:hover td:first-child {
     white-space: nowrap;
   }
 
-  /* Fila detalle (órdenes de un grupo expandido): línea compacta indentada */
+  /* Fila detalle (órdenes de un grupo expandido): línea compacta indentada,
+     pegada a la card madre (sin radius ni margen entre medio) */
   table.data tbody tr.row-detalle {
     grid-template-columns: auto 1fr auto;
     grid-template-areas: "anio resol monto";
-    background: var(--color-bg-elev-2);
+    background: var(--color-bg-elev-2) !important;
     border-left: 3px solid var(--color-accent-dim);
+    border-radius: 0;
+    margin-bottom: 0;
+    border-top: none;
     padding: 10px 16px 10px 13px;
     gap: 0 10px;
     align-items: center;
+  }
+  table.data tbody tr.row-detalle:last-child {
+    border-radius: 0 0 10px 10px;
+    margin-bottom: 10px;
   }
   .row-detalle .col-id,
   .row-detalle .col-juris {
@@ -1034,6 +1082,13 @@ table.data tbody tr:hover td:first-child {
   table.data tbody tr.row-msg,
   table.data tbody tr.row-vermas {
     display: block;
+  }
+  /* "Ver más" cierra la card del grupo expandido */
+  table.data tbody tr.row-vermas {
+    background: var(--color-bg-elev-2) !important;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    margin-bottom: 10px;
   }
   table.data tbody tr.row-vermas td {
     padding: 0.4rem 1rem 0.6rem 13px !important;
