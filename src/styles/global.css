@@ -1138,6 +1138,12 @@ table.data tbody tr:hover td:first-child {
   .btn-page {
     padding: 10px 14px; /* área táctil */
   }
+  /* Las 4 flechas en una sola línea; el "Página X de Y" abajo, centrado */
+  .pagination .info {
+    order: 1;
+    width: 100%;
+    text-align: center;
+  }
 }
 
 /* ═══════════════════════════════════ GENERADOR ═══════════════════════════════════ */

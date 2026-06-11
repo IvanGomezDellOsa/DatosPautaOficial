@@ -12,7 +12,7 @@
  * Modos de vista:
  *  - Agrupado (default): muestra pares únicos (proveedor+medio) por monto,
  *    expandibles para ver órdenes individuales. Lee de groups_cache.
- *  - Individual: órdenes una a una, paginadas de a 100, mostrando TODOS los datos.
+ *  - Individual: órdenes una a una, paginadas (POR_PAGINA), mostrando TODOS los datos.
  */
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
@@ -47,7 +47,7 @@ const DISPONIBILIDAD: Record<string, [number, number]> = {
   "PBA": [2020, 2025],
   "Santa Fe": [2008, 2023],
 };
-const POR_PAGINA = 100;
+const POR_PAGINA = 50;
 // Órdenes que se cargan por tanda al expandir un grupo. Pequeño a propósito:
 // un grupo grande (cientos de órdenes casi idénticas) cargaría lentísimo de una.
 const POR_TANDA_DETALLE = 15;
@@ -248,7 +248,12 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     estado.jurisdiccion === initial.filtroInicial.jurisdiccion &&
     estado.anio === initial.filtroInicial.anio &&
     estado.deflactado === initial.filtroInicial.deflactado
-      ? { filas: initial.tabla.filas, totalFilas: initial.tabla.totalFilas, totalMonto: initial.totales.montoTotal }
+      ? {
+          // home.json precomputa 100 filas; si POR_PAGINA es menor, recortar
+          filas: initial.tabla.filas.slice(0, POR_PAGINA),
+          totalFilas: initial.tabla.totalFilas,
+          totalMonto: initial.totales.montoTotal,
+        }
       : null;
 
   // Datos agrupados (modo default) — paginado, igual que el individual
