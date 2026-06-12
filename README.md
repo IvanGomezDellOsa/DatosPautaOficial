@@ -2,7 +2,7 @@
   <img src="public/logo.webp" alt="Datos Pauta Oficial" width="600">
 </p>
 
-# Datos Pauta Oficial — Publicidad Oficial Argentina en un Solo Lugar
+# Datos Pauta Oficial — La primera y única base unificada de pauta oficial argentina
 
 🌐 **Deploy en producción:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 
