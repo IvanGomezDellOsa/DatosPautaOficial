@@ -1,9 +1,3 @@
-/* ════════════════════════════════════════════════════════════════════════
-   Sistema visual «Datos Pauta Oficial»
-   Tokens del brief 06_Brief_Diseno_Visual.md (v4).
-   Dark mode default y única piel del MVP.
-   ════════════════════════════════════════════════════════════════════════ */
-
 :root {
   --color-bg: #0b0f19;
   --color-bg-elev-1: #111827;
@@ -193,10 +187,6 @@ body {
   }
 }
 
-/* Hero: una sola columna en todos los breakpoints.
-   El bento de cobertura se movió a su propia sección debajo (.coverage-section)
-   — antes el grid 2-col a xl 1280px apretaba las cifras y las hacía colisionar
-   entre 1280 y 1500px porque tienen white-space:nowrap. */
 .hero-grid {
   display: block;
   width: 100%;
@@ -370,7 +360,7 @@ body {
   padding: 0 0 4rem;
   position: relative;
 }
-/* 1 columna en mobile: con 2 los labels absolutos de .cov-axis se solapan */
+/* 1 col en mobile: con 2 los labels de .cov-axis se solapan */
 .coverage-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -517,7 +507,6 @@ body {
   scroll-margin-top: 72px;
 }
 
-/* Foco visible consistente en controles custom */
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -635,9 +624,7 @@ body {
   color: var(--color-fg-strong);
   font-weight: 600;
 }
-/* Filter bar compacto en mobile: el tag de gestión y los totales ocupaban
-   demasiado y se partían en pedazos desordenados. (Debe ir DESPUÉS de las
-   reglas base de .governance-tag: misma especificidad, gana la última.) */
+/* Debe ir DESPUÉS de las reglas base de .governance-tag (misma especificidad) */
 @media (max-width: 540px) {
   .filter-bar {
     padding: 1rem;
@@ -850,7 +837,6 @@ table.data tbody td {
 table.data tbody td.monto {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  /* 600 = mismo peso que los montos de las cards mobile; la cifra es la heroína */
   font-weight: 600;
   color: var(--color-fg-strong);
 }
@@ -868,9 +854,7 @@ table.data tbody tr:hover {
 table.data tbody tr:hover td:first-child {
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
-/* Anchos estables por columna semántica (las columnas se ocultan según
-   filtros: nth-child quedaba desfasado y agigantaba la columna de la flecha).
-   Solo desktop: en mobile (cards) estos min-width romperían el grid. */
+/* nth-child queda desfasado cuando columnas se ocultan por filtro, por eso clases semánticas */
 @media (min-width: 768px) {
   table.data .col-expand { width: 36px; min-width: 36px; }
   table.data .col-id { min-width: 90px; }
@@ -894,12 +878,7 @@ table.data tbody tr:hover td:first-child {
   border-radius: 4px;
 }
 
-/* ── Vista mobile: cards en lugar de tabla (sin scroll horizontal) ──
-   Clases por columna asignadas en DataTable.tsx:
-   - fila agrupada  (.row-grupo):   col-expand [col-juris] col-proveedor col-medio col-monto
-   - fila individual (.row-orden):  col-id [col-juris] [col-anio] col-proveedor col-medio col-resol col-monto
-   - fila detalle   (.row-detalle): col-id [col-juris] col-anio col-resol col-monto
-   - filas de 1 celda (.row-msg, .row-vermas): mensaje / botón "ver más" */
+/* Mobile: cada fila se convierte en una card; columnas mapeadas por clases semánticas en DataTable.tsx */
 @media (max-width: 767px) {
   /* El contenedor deja de ser una caja: cada fila es su propia card */
   .table-wrap {
@@ -2019,9 +1998,7 @@ footer.site-footer .brand .wordmark {
     0 0 0 4px var(--color-accent-glow);
 }
 
-/* ═══════════════════════════ POPOVER DE CONTACTO ═══════════════════════════
-   Desktop: los mailto: abren esta tarjeta (sin app de correo asociada el link
-   no hace nada). En touch no se monta (Layout.astro gatea por any-pointer). */
+/* Popover de contacto: en touch no se monta (Layout.astro gatea por any-pointer) */
 .mail-popover-backdrop {
   position: fixed;
   inset: 0;
@@ -2101,4 +2078,96 @@ footer.site-footer .brand .wordmark {
 }
 .mail-popover-open:hover {
   color: var(--color-fg-strong);
+}
+
+/* ═══════════════════════════════════ NAV SHARE BUTTON ══════════════════════════════════ */
+.nav-share-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.nav-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.nav-share-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-fg-strong);
+}
+.nav-share-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 172px;
+  background: var(--color-bg-elev-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  padding: 4px;
+  z-index: 200;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+.nav-share-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--text-small);
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  transition: background 150ms ease;
+}
+.nav-share-option:hover {
+  background: var(--color-bg-elev-3);
+}
+
+/* Mobile: el botón ocupa toda la fila del menú */
+@media (max-width: 767px) {
+  .nav-share-wrap {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 0.5rem;
+  }
+  .nav-share-btn {
+    height: 44px;
+    padding: 0 0.5rem;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 6px;
+    justify-content: flex-start;
+    color: var(--color-fg-subtle);
+  }
+  .nav-share-panel {
+    position: static;
+    box-shadow: none;
+    border-radius: 8px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+}
+
+/* Desktop: el wrapper ocupa el alto del nav para que top:100% quede bajo la barra */
+@media (min-width: 768px) {
+  .nav-share-wrap {
+    height: 56px;
+    padding: 0 1rem 0 0.5rem;
+  }
 }

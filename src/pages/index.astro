@@ -7,11 +7,7 @@ import Rankings from "../components/Rankings";
 import Generador from "../components/Generador";
 import type { HomeSeed } from "../lib/home";
 
-// Estado inicial precomputado por el ETL (build_db.py → escribir_home).
-// Se lee en build time y se inlinea como prop de los islands: el primer paint
-// muestra datos reales (PBA 2025, fecha asc) sin inicializar sql.js-httpvfs.
-// Antes, la portada disparaba ~256 range-requests HTTP encadenados (~8 s de
-// spinners) para levantar lo que ahora es estático. Ver src/lib/home.ts.
+// Seed precomputado por el ETL: primer paint con datos reales sin inicializar sql.js-httpvfs.
 const home = JSON.parse(
   readFileSync(join(process.cwd(), "public/data/home.json"), "utf-8"),
 ) as HomeSeed;
@@ -48,6 +44,39 @@ const home = JSON.parse(
                 <a href="#cuanto-recibio" class="nav-link" data-nav="cuanto-recibio">Cuánto recibió</a>
                 <a href="#receptores" class="nav-link" data-nav="receptores">Ranking</a>
                 <a href="#acerca" class="nav-link" data-nav="acerca">Acerca de</a>
+                <div class="nav-share-wrap" id="navShareWrap">
+                    <button
+                        class="nav-share-btn"
+                        id="navShareBtn"
+                        type="button"
+                        aria-expanded="false"
+                        aria-haspopup="true"
+                    >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="18" cy="5" r="3"></circle>
+                            <circle cx="6" cy="12" r="3"></circle>
+                            <circle cx="18" cy="19" r="3"></circle>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        </svg>
+                        <span>Compartir web</span>
+                    </button>
+                    <div class="nav-share-panel" id="navSharePanel" hidden>
+                        <button type="button" class="nav-share-option" id="navShareX">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L2.25 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                            Compartir en X
+                        </button>
+                        <button type="button" class="nav-share-option" id="navShareCopy">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copiar link
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -488,9 +517,6 @@ const home = JSON.parse(
         });
     })();
 
-    // Generador y Rankings son React islands (Generador.tsx / Rankings.tsx).
-    // Sus handlers de year-pills, segmented, barras y share ya no viven aquí.
-
     // ─────────── Control tamaño de fuente (flotante) ───────────
     (function () {
         var sizes = ["", "lg", "xl"];
@@ -661,6 +687,60 @@ const home = JSON.parse(
             }
             lastScroll = currentScroll;
         }, { passive: true });
+    })();
+
+    // ─────────── Botón Compartir web ───────────
+    (function () {
+        var SITE_URL = "https://datospautaoficial.com.ar/";
+        var wrap = document.getElementById("navShareWrap");
+        var btn = document.getElementById("navShareBtn");
+        var panel = document.getElementById("navSharePanel");
+        var btnX = document.getElementById("navShareX");
+        var btnCopy = document.getElementById("navShareCopy");
+        if (!btn || !panel) return;
+
+        function togglePanel(open) {
+            panel.hidden = !open;
+            btn.setAttribute("aria-expanded", String(open));
+        }
+
+        function showToast(msg) {
+            var t = document.createElement("div");
+            t.className = "toast";
+            t.textContent = msg;
+            document.body.appendChild(t);
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () { t.classList.add("show"); });
+            });
+            setTimeout(function () {
+                t.classList.remove("show");
+                setTimeout(function () { t.remove(); }, 350);
+            }, 2000);
+        }
+
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            togglePanel(panel.hidden);
+        });
+
+        btnX && btnX.addEventListener("click", function () {
+            var url = "https://x.com/intent/tweet?url=" + encodeURIComponent(SITE_URL);
+            window.open(url, "_blank", "noopener,noreferrer");
+            togglePanel(false);
+        });
+
+        btnCopy && btnCopy.addEventListener("click", function () {
+            navigator.clipboard.writeText(SITE_URL).then(function () {
+                showToast("Link copiado");
+            });
+            togglePanel(false);
+        });
+
+        document.addEventListener("click", function (e) {
+            if (wrap && !wrap.contains(e.target) && !panel.hidden) {
+                togglePanel(false);
+            }
+        });
     })();
 
 </script>
