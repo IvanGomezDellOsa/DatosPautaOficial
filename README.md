@@ -2,7 +2,7 @@
   <img src="public/logo.webp" alt="Datos Pauta Oficial" width="600">
 </p>
 
-# Datos Pauta Oficial — La primera y única base unificada de pauta oficial argentina
+# Datos Pauta Oficial — La primera y única base unificada de pauta oficial Argentina
 
 🌐 **Deploy en producción:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 
@@ -14,7 +14,7 @@ Web pública, neutral y open source que consolida los datos de publicidad oficia
 
 ## 🔍 El diferencial: datos que no existían en ningún otro lado
 
-**Ninguna otra web unificó los datos de pauta oficial argentina en un solo lugar.** Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
+**Ninguna otra web unificó los datos de pauta oficial Argentina en un solo lugar.** Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
 
 **Además, PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución — más de 500 resoluciones procesadas** — para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Ninguna otra web ni medio tiene estos datos.
 
