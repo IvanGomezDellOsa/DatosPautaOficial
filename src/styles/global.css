@@ -1351,7 +1351,7 @@ table.data tbody tr:hover td:first-child {
   font-weight: 500;
 }
 .gen-narrative .monto .monto-unidad {
-  font-size: 0.36em;
+  font-size: 0.48em;
   font-weight: 500;
   color: var(--color-fg-muted);
   margin-left: 0.15em;
@@ -2146,6 +2146,7 @@ footer.site-footer .brand .wordmark {
     flex-direction: column;
     align-items: stretch;
     padding: 0 0.5rem;
+    margin-top: 0.5rem;
   }
   .nav-share-btn {
     height: 44px;

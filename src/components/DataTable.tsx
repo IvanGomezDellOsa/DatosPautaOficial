@@ -51,7 +51,7 @@ const DISPONIBILIDAD: Record<string, [number, number]> = {
 const ANIO_MIN = Math.min(...Object.values(DISPONIBILIDAD).map(([a]) => a));
 const ANIO_MAX = Math.max(...Object.values(DISPONIBILIDAD).map(([, b]) => b));
 const ANIOS = Array.from({ length: ANIO_MAX - ANIO_MIN + 1 }, (_, i) => ANIO_MAX - i);
-const POR_PAGINA = 50;
+const POR_PAGINA = 25;
 // Órdenes que se cargan por tanda al expandir un grupo. Pequeño a propósito:
 // un grupo grande (cientos de órdenes casi idénticas) cargaría lentísimo de una.
 const POR_TANDA_DETALLE = 15;
