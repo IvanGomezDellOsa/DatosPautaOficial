@@ -1,3 +1,5 @@
+[Español](README.md) | [English](README.en.md)
+
 <p align="center">
   <img src="public/logo.webp" alt="Datos Pauta Oficial" width="600">
 </p>
