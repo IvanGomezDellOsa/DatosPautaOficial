@@ -7,6 +7,7 @@
 # Datos Pauta Oficial — The first and only unified database of Argentine official advertising spending
 
 🌐 **Production deploy:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
+🎬 **Video:** [Watch on YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
 A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **540,413 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
 

@@ -7,6 +7,7 @@
 # Datos Pauta Oficial — La primera y única base unificada de pauta oficial argentina
 
 🌐 **Deploy en producción:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
+🎬 **Video:** [Ver en YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
 Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **540.413 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
 
