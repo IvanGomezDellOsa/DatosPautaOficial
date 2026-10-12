@@ -11,15 +11,15 @@
 
 A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **540,413 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
 
-**It is the only website that has ever done this.** No other site or media outlet has consolidated, normalized and published this data in a unified, queryable way. The stance is strictly informative: no accusation, no opinion.
+The stance is strictly informative: no accusation, no opinion.
 
 ---
 
 ## 🔍 The differentiator: data that did not exist anywhere else
 
-**No other website unified Argentine official advertising data in a single place.** Until this project, the information was scattered across open data portals, spreadsheets and PDFs from each jurisdiction, in formats incompatible with one another and with no way to compare amounts across years or governments.
+Until this project, the information was scattered across open data portals, spreadsheets and PDFs from each jurisdiction, in formats incompatible with one another and with no way to compare amounts across years or governments.
 
-**In addition, PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution — more than 500 resolutions processed** — to reconstruct the detail of each order (supplier, media outlet, amount, file number). No other website or media outlet has this data.
+**PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution — more than 500 resolutions processed** — to reconstruct the detail of each order (supplier, media outlet, amount, file number). This data does not exist in any open data portal.
 
 ---
 
@@ -39,7 +39,7 @@ Coverage gaps are shown explicitly on the website: aggregates that could mislead
 
 ## 🏗️ Architecture
 
-The project runs **100% without a backend or servers**: the full SQLite database (~173 MB) lives on Cloudflare R2 split into chunks, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. Operating cost: practically zero.
+The project runs **100% without a backend or servers**: the full SQLite database (~173 MB) lives on Cloudflare R2 split into chunks, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
@@ -107,7 +107,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 📝 Development Notes
 
-Development relied heavily on AI throughout the whole cycle: as an engine to speed up production, as a second opinion on technical decisions and as a complement of knowledge in areas outside my expertise.
+Development relied heavily on AI throughout the whole cycle: as an engine to speed up production and as a second opinion on technical decisions. The product, architecture and data handling decisions are my own.
 
 ---
 
@@ -115,6 +115,7 @@ Development relied heavily on AI throughout the whole cycle: as an engine to spe
 
 **Iván Gómez Dell'Osa**
 
+- Web: [ivangomezdellosa.com.ar](https://www.ivangomezdellosa.com.ar)
 - Email: [ivangomezdellosa@gmail.com](mailto:ivangomezdellosa@gmail.com)
 - LinkedIn: [linkedin.com/in/ivangomezdellosa](https://www.linkedin.com/in/ivangomezdellosa/)
 - GitHub: [IvanGomezDellOsa](https://github.com/IvanGomezDellOsa)

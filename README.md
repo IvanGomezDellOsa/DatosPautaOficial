@@ -11,15 +11,15 @@
 
 Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **540.413 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
 
-**Es la única web que existe que hizo esto.** No hay otro sitio ni medio que haya consolidado, normalizado y publicado estos datos de forma unificada y consultable. La postura es estrictamente informativa: sin denuncia ni opinión.
+La postura es estrictamente informativa: sin denuncia ni opinión.
 
 ---
 
 ## 🔍 El diferencial: datos que no existían en ningún otro lado
 
-**Ninguna otra web unificó los datos de pauta oficial argentina en un solo lugar.** Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
+Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
 
-**Además, PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución — más de 500 resoluciones procesadas** — para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Ninguna otra web ni medio tiene estos datos.
+**PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución — más de 500 resoluciones procesadas** — para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Son datos que no existen en ningún portal de datos abiertos.
 
 ---
 
@@ -39,7 +39,7 @@ Los huecos de cobertura se muestran de forma explícita en la web: nunca se pres
 
 ## 🏗️ Arquitectura
 
-El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~173 MB) vive en Cloudflare R2 partida en chunks, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`. Costo operativo: prácticamente cero.
+El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~173 MB) vive en Cloudflare R2 partida en chunks, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
@@ -107,7 +107,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 📝 Notas de Desarrollo
 
-Desarrollo apoyado fuertemente en IA a lo largo de todo el ciclo: como motor para acelerar la producción, como segunda opinión ante decisiones técnicas y como complemento de conocimiento en áreas fuera de mi expertise.
+Desarrollo apoyado fuertemente en IA a lo largo de todo el ciclo: como motor para acelerar la producción y como segunda opinión ante decisiones técnicas. Las decisiones de producto, arquitectura y tratamiento de datos son propias.
 
 ---
 
@@ -115,6 +115,7 @@ Desarrollo apoyado fuertemente en IA a lo largo de todo el ciclo: como motor par
 
 **Iván Gómez Dell'Osa**
 
+- Web: [ivangomezdellosa.com.ar](https://www.ivangomezdellosa.com.ar)
 - Email: [ivangomezdellosa@gmail.com](mailto:ivangomezdellosa@gmail.com)
 - LinkedIn: [linkedin.com/in/ivangomezdellosa](https://www.linkedin.com/in/ivangomezdellosa/)
 - GitHub: [IvanGomezDellOsa](https://github.com/IvanGomezDellOsa)
