@@ -9,6 +9,13 @@ Chequea:
   - jurisdicciones fuera del set esperado
   - top-10 valores de `medio` que parecen TIPOS en vez de nombres
     (heuristica: todo mayusculas + < 3 palabras + sin puntos/guiones)
+  - montos atipicos (SOLO INFORMA: no descarta ni modifica filas):
+      a) orden >= RATIO_ATIPICO x la mediana de su (proveedor, jurisdiccion, anio).
+         Firma de un monto crudo con 3 decimales ("1160879.808") que normalizar_monto
+         lee como miles (x1000), p.ej. CABA 2016/2017.
+      b) archivos donde, en filas sin fecha (pivots/agregados), la mayoria de los
+         proveedores tiene un monto que es exactamente la suma de los demas: "Total
+         general" del pivot cargado como una orden mas, p.ej. Nacion 2010 y 2012.
 
 Uso:  python3 etl/validar.py            (valida el v2 por defecto)
       python3 etl/validar.py <ruta.csv>
@@ -17,8 +24,9 @@ Uso:  python3 etl/validar.py            (valida el v2 por defecto)
 import csv
 import os
 import re
+import statistics
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extractores"))
 import comun  # noqa: E402
@@ -39,6 +47,59 @@ def _parece_tipo(medio):
     if len(s.split()) >= 3:
         return False
     return s.upper() == s and any(c.isalpha() for c in s)
+
+
+RATIO_ATIPICO = 1000
+
+
+def _grupos_monto(filas, clave):
+    """Agrupa (id, monto) por clave(fila). id = numero de fila de datos 1-based (= orders.id)."""
+    grupos = defaultdict(list)
+    for i, r in enumerate(filas, start=1):
+        k = clave(r)
+        if k is None:
+            continue
+        try:
+            grupos[k].append((i, float(r["monto"])))
+        except (ValueError, TypeError):
+            pass
+    return grupos
+
+
+def _atipicos(filas):
+    """Ordenes >= RATIO_ATIPICO x la mediana de su (proveedor, jurisdiccion, anio)."""
+    grupos = _grupos_monto(filas, lambda r: (r["proveedor"], r["jurisdiccion"], r["anio"])
+                           if r["proveedor"] else None)
+    out = []
+    for k, vals in grupos.items():
+        med = statistics.median(v for _, v in vals)
+        out += [(i, k, v, med) for i, v in vals if med > 0 and v >= RATIO_ATIPICO * med]
+    return sorted(out, key=lambda x: -x[2])
+
+
+TASA_TOTAL_DUP = 0.5
+
+
+def _totales_duplicados(filas):
+    """Archivos donde, en filas sin fecha, el monto mayor de cada (proveedor, anio) es
+    exactamente la suma de los demas: "Total general" de un pivot cargado como orden.
+
+    Un caso suelto puede ser legitimo (dos ordenes iguales), por eso solo se informan
+    los archivos donde el patron se da en >= TASA_TOTAL_DUP de los grupos con 2+ filas.
+    Devuelve [(archivo, grupos_evaluados, [(id, proveedor, anio, monto), ...])]."""
+    grupos = _grupos_monto(filas, lambda r: (r["archivo_origen"], r["proveedor"], r["anio"])
+                           if r["proveedor"] and not r["fecha"] else None)
+    evaluados, dup = Counter(), defaultdict(list)
+    for (arch, prov, anio), vals in grupos.items():
+        if len(vals) < 2:
+            continue
+        evaluados[arch] += 1
+        cents = [(i, round(v * 100)) for i, v in vals]
+        i_max, mx = max(cents, key=lambda x: x[1])
+        if mx == sum(c for _, c in cents) - mx:
+            dup[arch].append((i_max, prov, anio, mx / 100))
+    return [(arch, evaluados[arch], d) for arch, d in sorted(dup.items(), key=lambda x: -len(x[1]))
+            if len(d) >= TASA_TOTAL_DUP * evaluados[arch]]
 
 
 def validar(ruta=None):
@@ -79,6 +140,9 @@ def validar(ruta=None):
 
     por_juris = Counter(r["jurisdiccion"] for r in filas)
 
+    atipicos = _atipicos(filas)
+    totales_dup = _totales_duplicados(filas)
+
     # ----- escribir reporte -----
     L = []
     L.append("# Reporte de validacion — pauta_oficial_unificado\n")
@@ -118,12 +182,26 @@ def validar(ruta=None):
     else:
         L.append("- ninguno detectado ✅")
 
+    L.append("\n## Montos atipicos (solo informa: no se descarta ni modifica ninguna fila)\n")
+    L.append(f"- ⚠️ ordenes >= {RATIO_ATIPICO}x la mediana de su (proveedor, jurisdiccion, anio): "
+             f"{len(atipicos)} (suma {sum(a[2] for a in atipicos):,.2f} nominal)")
+    for i, (prov, jur, anio), v, med in atipicos:
+        L.append(f"  - id {i}: {jur} {anio} `{prov}` monto={v:,.2f} mediana={med:,.2f}")
+    n_dup = sum(len(d) for _, _, d in totales_dup)
+    L.append(f"- ⚠️ archivos con 'Total general' de pivot probablemente cargado como orden: "
+             f"{len(totales_dup)} ({n_dup} filas, suma "
+             f"{sum(t[3] for _, _, d in totales_dup for t in d):,.2f} nominal)")
+    for arch, evaluados, d in totales_dup:
+        L.append(f"  - `{arch}`: {len(d)} de {evaluados} proveedores "
+                 f"(ids de ejemplo: {[t[0] for t in d[:5]]})")
+
     REPORTE.write_text("\n".join(L) + "\n", encoding="utf-8")
 
     # ----- resumen a stderr -----
     log(f"[validar] total={total} | prov_null={prov_null} medio_null={medio_null} "
         f"ambos_null={ambos_null} | montos_malos={len(montos_malos)} "
-        f"fechas_malas={len(fechas_malas)} juris_malas={sum(juris_malas.values())}")
+        f"fechas_malas={len(fechas_malas)} juris_malas={sum(juris_malas.values())} | "
+        f"atipicos={len(atipicos)} archivos_total_dup={len(totales_dup)}")
     log(f"[validar] reporte -> {REPORTE}")
     return total
 
