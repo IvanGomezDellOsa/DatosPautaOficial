@@ -23,6 +23,10 @@ en `etl/extractores/`. Tu tarea es **ejecutarlos, verificar el output y dejarlo 
   ```
 
 ## Orden de ejecución (desde la raíz del repo)
+0. **Tests de los extractores** (montos y pivots; no necesitan los crudos):
+   ```
+   python -m unittest discover -s etl/tests
+   ```
 1. **Generar el CSV unificado:**
    ```
    python etl/unificar.py

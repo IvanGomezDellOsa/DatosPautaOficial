@@ -22,6 +22,9 @@ Formatos reales:
      Cada linea es un unico campo entre comillas con columnas alineadas por espacios.
      Se detectan posiciones de columna en el header y se asigna cada numero a la
      columna mas cercana por posicion (maneja celdas vacias).
+     En los pivots por rubro el "Total general" de cada fila se reconoce por aritmetica
+     (ultimo numero = suma de los anteriores) y la tabla se concilia contra su Total
+     general: las paginas sin encabezado vienen corridas (ver _pivot_rubro).
      Dedup de versiones duplicadas: se prefieren los archivos "(nuevo v2)".
 """
 
@@ -33,7 +36,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    DIR_NACION, DIR_CURADO, registro, normalizar_monto, normalizar_fecha,
+    DIR_NACION, DIR_CURADO, registro, normalizar_fecha, parser_montos,
     limpiar_str, leer_dicts, leer_texto, anio_de_texto, Contador, log,
 )
 
@@ -89,9 +92,11 @@ def _parse_limpio(path, cont):
     c_fecha = buscar("periodo", "fecha")
     c_res = buscar("orden_de_publicidad", "orden")
     anio_archivo = anio_de_texto(path.name)
+    leer_monto = parser_montos((r.get(c_monto) for r in filas) if c_monto else (),
+                               f"[Nación] {path.name}")
 
     for r in filas:
-        monto = normalizar_monto(r.get(c_monto)) if c_monto else None
+        monto = leer_monto(r.get(c_monto)) if c_monto else None
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -130,8 +135,10 @@ def _parse_2011(path, cont):
     c_prov = b("razon social", "razon", "proveedor")
     c_rubro = b("rubro")
     c_monto = b("importe", "total")
+    leer_monto = parser_montos((r.get(c_monto) for r in filas) if c_monto else (),
+                               f"[Nación] {path.name}")
     for r in filas:
-        monto = normalizar_monto(r.get(c_monto)) if c_monto else None
+        monto = leer_monto(r.get(c_monto)) if c_monto else None
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -165,6 +172,25 @@ def _unquote(l):
     return l
 
 
+def _es_fila_total(prov, modo):
+    """Filas de totales del pivot, que no son proveedores.
+
+    En los pivots por mes (proveedor x medio) Excel intercala subtotales "Total <proveedor>",
+    asi que se salta toda fila que empiece con "total". En los pivots por rubro no hay
+    subtotales: solo la fila "Total general", y un proveedor puede llamarse "TOTAL PUBLIVIA SA"
+    (antes se descartaba)."""
+    p = prov.strip().lower()
+    if p.startswith("suma de"):
+        return True
+    if modo == "mes":
+        return p.startswith("total")
+    return re.fullmatch(r"total( general)?", p) is not None
+
+
+def _centavos(monto):
+    return round(monto * 100)
+
+
 def _parse_pivot(path, anio, cont):
     out = []
     txt, _ = leer_texto(path)
@@ -191,6 +217,7 @@ def _parse_pivot(path, anio, cont):
         return out
     val_cols = cols[n_text:]   # incluye "Total general" para absorber ese token
 
+    filas, total_tabla = [], None
     for l in lineas[h + 1:]:
         if not l.strip():
             continue
@@ -198,7 +225,9 @@ def _parse_pivot(path, anio, cont):
         if len(toks) <= 1:
             continue
         prov = toks[0][1]
-        if prov and prov.strip().lower().startswith(("total", "suma de")):
+        if _es_fila_total(prov, modo):
+            if modo == "rubro" and prov.strip().lower().startswith("total"):
+                total_tabla = toks[-1][1]   # Total general de la tabla, para conciliar
             continue
         # Saltar filas donde prov parece un numero (totales de columna scrapeados
         # como si fueran nombres de proveedor, ej: "116.778.592,23").
@@ -206,10 +235,17 @@ def _parse_pivot(path, anio, cont):
             cont.descartar("fila_total_numerica")
             continue
         medio = toks[1][1] if (modo == "mes" and len(toks) > 1) else None
-        nums = toks[n_text:]
+        filas.append((prov, medio, toks[n_text:]))
+
+    leer_monto = parser_montos((tv for _, _, nums in filas for _, tv in nums),
+                               f"[Nación] {path.name}")
+    if modo == "rubro":
+        return _pivot_rubro(path, anio, filas, val_cols, leer_monto, total_tabla, cont)
+
+    for prov, medio, nums in filas:
         emitio = False
         for ts, tv in nums:
-            monto = normalizar_monto(tv)
+            monto = leer_monto(tv)
             if monto is None:
                 continue
             # columna mas cercana por posicion
@@ -217,19 +253,80 @@ def _parse_pivot(path, anio, cont):
             lab = col[1]
             if "total" in lab.lower():
                 continue   # token de Total general -> descartar
-            if modo == "rubro":
-                out.append(registro(
-                    JURIS, anio, monto, path.name,
-                    proveedor=limpiar_str(prov), tipo_de_medio=_canon_rubro(lab)))
-            else:
-                fecha = normalizar_fecha(lab, anio)
-                out.append(registro(
-                    JURIS, anio, monto, path.name,
-                    fecha=fecha, proveedor=limpiar_str(prov), medio=limpiar_str(medio)))
+            fecha = normalizar_fecha(lab, anio)
+            out.append(registro(
+                JURIS, anio, monto, path.name,
+                fecha=fecha, proveedor=limpiar_str(prov), medio=limpiar_str(medio)))
             cont.ok()
             emitio = True
         if not emitio:
             cont.descartar("fila_sin_valores")
+    return out
+
+
+def _pivot_rubro(path, anio, filas, val_cols, leer_monto, total_tabla, cont):
+    """Pivot por rubro: una fila por proveedor con un monto por rubro y el "Total general".
+
+    El total de cada fila se reconoce por aritmetica: es el ultimo numero y es igual a la suma
+    de los anteriores. No se usa su posicion porque en los textos convertidos desde PDF las
+    paginas sin encabezado quedan corridas (hasta 4 columnas y de forma no uniforme en
+    2010-S2): por posicion el total caia en "Web" o "Via Publica" y se cargaba como orden.
+
+    El rubro solo sale de la posicion. Si en alguna fila el total no cae en la columna
+    "Total general", o dos montos caen en la misma columna, las posiciones del archivo no
+    siguen al encabezado: el rubro de todo el archivo queda vacio y se avisa. Es preferible
+    no tener el rubro a publicar uno equivocado; el PDF oficial si permite leerlo.
+
+    Al final se concilia la suma de lo cargado contra el Total general de la tabla."""
+    i_total = next(k for k, (_, lab) in enumerate(val_cols) if "total" in lab.lower())
+
+    def col(ts):
+        # columna cuyo encabezado empieza mas cerca del numero
+        return min(range(len(val_cols)), key=lambda k: abs(val_cols[k][0] - ts))
+
+    out, lecturas, corridas = [], [], 0
+    for prov, _, toks in filas:
+        nums = [(col(ts), m) for ts, tv in toks for m in [leer_monto(tv)] if m is not None]
+        if not nums:
+            cont.descartar("fila_sin_valores")
+            continue
+        *rubros, (c_tot, m_tot) = nums
+        if rubros and _centavos(m_tot) == sum(_centavos(m) for _, m in rubros):
+            cs = [c for c, _ in rubros] + [c_tot]
+            if c_tot != i_total or any(a >= b for a, b in zip(cs, cs[1:])):
+                corridas += 1
+        else:
+            # la fila no concilia: se usa la posicion (lo que cae en "Total general" no se carga)
+            cont.avisar("pivot_fila_no_concilia")
+            rubros = [(c, m) for c, m in nums if c != i_total]
+        if not rubros:
+            cont.descartar("fila_sin_valores")
+            continue
+        lecturas.append((prov, rubros))
+
+    rubro_confiable = corridas == 0
+    if not rubro_confiable:
+        log(f"  [Nación] {path.name}: ADVERTENCIA en {corridas} filas las columnas no siguen al "
+            f"encabezado; el rubro (tipo_de_medio) queda vacio en todo el archivo")
+        cont.avisar("pivot_rubro_sin_dato", sum(len(r) for _, r in lecturas))
+    for prov, rubros in lecturas:
+        for c, monto in rubros:
+            out.append(registro(
+                JURIS, anio, monto, path.name, proveedor=limpiar_str(prov),
+                tipo_de_medio=_canon_rubro(val_cols[c][1]) if rubro_confiable else None))
+            cont.ok()
+
+    suma = sum(_centavos(r["monto"]) for r in out)
+    total = leer_monto(total_tabla) if total_tabla else None
+    if total is None:
+        log(f"  [Nación] {path.name}: ADVERTENCIA sin fila 'Total general': no se puede conciliar")
+        cont.avisar("pivot_sin_total_general")
+    elif suma != _centavos(total):
+        log(f"  [Nación] {path.name}: ADVERTENCIA NO concilia: filas cargadas suman "
+            f"{suma / 100:,.2f} y el Total general es {total:,.2f}")
+        cont.avisar("pivot_no_concilia_total_general")
+    else:
+        log(f"  [Nación] {path.name}: concilia con el Total general ({total:,.2f})")
     return out
 
 
@@ -252,8 +349,11 @@ def _parse_curado(path, cont):
     """Lee un CSV curado de Nación (cols: proveedor, semestre, importe, tipo_de_medio).
     Usado como fallback para años sin fuente cruda en Datos crudos Pauta Oficial."""
     out = []
-    for d in leer_dicts(path):
-        monto = normalizar_monto(d.get("importe") or d.get("total"))
+    filas = leer_dicts(path)
+    leer_monto = parser_montos((d.get("importe") or d.get("total") for d in filas),
+                               f"[Nación] {path.name}")
+    for d in filas:
+        monto = leer_monto(d.get("importe") or d.get("total"))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -322,6 +422,9 @@ def _parse_enero2013(path, cont):
     i_rubro = ci("rubro")
     i_prov  = ci("nombre") or ci("razon social")
     i_fecha = ci("prest")
+    leer_monto = parser_montos(
+        (row[i_monto] for row in rows[1:] if i_monto is not None and i_monto < len(row)),
+        f"[Nación] {path.name}")
 
     for row in rows[1:]:
         if i_fecha is None or i_fecha >= len(row):
@@ -332,7 +435,7 @@ def _parse_enero2013(path, cont):
         if not fecha or not fecha.startswith("2013"):
             cont.descartar("fila_no_2013")
             continue
-        monto = normalizar_monto(row[i_monto] if i_monto is not None else None)
+        monto = leer_monto(row[i_monto] if i_monto is not None else None)
         if monto is None:
             cont.descartar("monto_invalido")
             continue

@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    DIR_PBA, DIR_PBA_NUEVOS, DIR_CURADO, registro, normalizar_monto,
+    DIR_PBA, DIR_PBA_NUEVOS, DIR_CURADO, registro, parser_montos,
     normalizar_fecha, limpiar_str, leer_dicts, leer_filas, detectar_sep,
     MESES, Contador, log,
 )
@@ -60,6 +60,7 @@ def _parse_tabula(path, cont):
 
     expediente = None
     idx = None  # indices de columnas una vez detectado el header
+    datos = []  # (expediente, idx, celdas) de las filas de datos, en orden
     for row in filas:
         celdas = [(c or "").strip() for c in row]
         linea = " ".join(celdas)
@@ -92,7 +93,14 @@ def _parse_tabula(path, cont):
         if not re.fullmatch(r"\d+", orden_val.strip()):
             cont.descartar("orden_no_numerico")
             continue
-        monto = normalizar_monto(celdas[idx["monto"]]) if idx["monto"] is not None and idx["monto"] < len(celdas) else None
+        datos.append((expediente, idx, celdas))
+
+    def celda_monto(idx, celdas):
+        return celdas[idx["monto"]] if idx["monto"] is not None and idx["monto"] < len(celdas) else None
+
+    leer_monto = parser_montos((celda_monto(i, c) for _, i, c in datos), f"[PBA] {path.name}")
+    for expediente, idx, celdas in datos:
+        monto = leer_monto(celda_monto(idx, celdas))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -118,10 +126,11 @@ def _parse_excel_2025(path, cont):
         return out
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb[wb.sheetnames[0]]
-    filas = ws.iter_rows(values_only=True)
-    header = next(filas, None)
+    filas = list(ws.iter_rows(values_only=True))
+    header = filas[0] if filas else None
     if not header:
         return out
+    filas = filas[1:]
     H = [(str(h).lower().strip() if h is not None else "") for h in header]
 
     def col(*claves):
@@ -140,11 +149,18 @@ def _parse_excel_2025(path, cont):
     i_monto = col("importe", "monto")
     i_res = col("resolución", "resolucion")
     i_fecha = col("mes asignado", "fecha documento gedo", "fecha")
+
+    def celda_monto(row):
+        return row[i_monto] if row is not None and i_monto is not None and i_monto < len(row) else None
+
+    # solo las celdas de texto pasan por el parser; las numericas ya vienen como numero
+    leer_monto = parser_montos((v for v in map(celda_monto, filas) if not isinstance(v, (int, float))),
+                               f"[PBA] {path.name}")
     for row in filas:
         if row is None:
             continue
-        val = row[i_monto] if i_monto is not None and i_monto < len(row) else None
-        monto = normalizar_monto(val) if not isinstance(val, (int, float)) else (abs(float(val)) if val else None)
+        val = celda_monto(row)
+        monto = leer_monto(val) if not isinstance(val, (int, float)) else (abs(float(val)) if val else None)
         if monto is None or monto == 0:
             cont.descartar("monto_invalido")
             continue
@@ -177,8 +193,10 @@ def _parse_curado(path, cont):
     resolucion, link_a_resolucion, tipo_de_medio.
     El anio se deriva de mes_asignado (no de fecha_documento_gedo)."""
     out = []
-    for d in leer_dicts(path):
-        monto = normalizar_monto(d.get("importe"))
+    filas = leer_dicts(path)
+    leer_monto = parser_montos((d.get("importe") for d in filas), f"[PBA] {path.name}")
+    for d in filas:
+        monto = leer_monto(d.get("importe"))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
