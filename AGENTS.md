@@ -1,7 +1,7 @@
 # Datos Pauta Oficial: guía para agentes de IA
 
 Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
-oficial argentina: ~540 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+oficial argentina: ~549 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
 montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
 Proyecto muy sensible: un número mal cargado se publica como dato oficial.
 
@@ -168,19 +168,28 @@ Ahí está también el reporte de auditoría por archivo.
   - el detalle de grupos con medio o proveedor vacío;
   - la paginación sin `OFFSET`;
   - los nombres de display en todos los modos.
-- **Corrección de datos en preparación** (rama `claude/actualizacion-datos-cab4d9`, aprobada por
-  el usuario):
+- **Actualización de datos publicada** (2026-10-15, aprobada por el usuario). Detalle y
+  evidencia en `CORRECCIONES.md` y `etl/actualizacion_2026-10-15/`:
   - montos ×1000 de CABA 2016-2017;
-  - doble conteo de los pivots de Nación 2009-2012;
-  - meses de 2009;
-  - Nación 2012-S2;
-  - CABA 2025.
-  - Cada archivo debe conciliar con su total oficial antes de publicarse.
+  - "Total general" de los pivots de Nación 2010 y 2012-S1 cargado como orden;
+  - meses de Nación 2009;
+  - se agregan Nación 2012-S2 y CABA 2025.
+  - Cada archivo concilia al centavo con su total oficial. 2009 difiere en centavos
+    porque la propia fuente redondeó su fila de totales.
+  - Las cifras escritas a mano del front (hero, cobertura, `DISPONIBILIDAD`, README)
+    ya reflejan 549.184 órdenes.
 - **Pendientes conocidos, sin corregir:**
   - Santa Fe: "Radio 2008 (II)" duplicado; medios faltantes en 2011 y 2013; Internet
     2016 sin OCR.
-  - Nación 2013: se toma el importe neto (sin IVA).
-  - Nación 2013-H1: suma ~14% menos que el PDF oficial.
+  - Nación 2013: la fuente da el importe neto (sin IVA); el resto de Nación es con IVA.
+    2013-H1 suma $87,9 M nominales menos que el PDF oficial. Se dejó como está: no hay
+    un factor único de IVA y corregirlo exige elegir entre perder el detalle por orden
+    o aclararlo en Metodología. Lo decide el usuario.
+  - CABA 2023: Gráfica, Cine y Medios vecinales solo en Excel; no están en la base.
+  - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
+    TV, Web y Vía pública). La web lo marca como parcial.
   - PBA: cobertura parcial en 2020-2022.
-  - R2: confirmar en el panel que no haya reglas de lifecycle que borren por
-    antigüedad, porque borrarían la versión en vivo.
+- **R2 (verificado en el panel el 2026-10-15):** el bucket `datospautaoficial-db` solo
+  tiene la regla por defecto "Default Multipart Abort Rule", que aborta subidas
+  multipart incompletas y no borra objetos. No agregar reglas que borren por
+  antigüedad: borrarían la versión en vivo.

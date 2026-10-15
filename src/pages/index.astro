@@ -90,15 +90,15 @@ const home = JSON.parse(
 
                     <div class="hero-stats">
                         <div class="stat">
-                            <span class="number" data-count="540413">540.413</span>
+                            <span class="number" data-count="549184">549.184</span>
                             <span class="label">pautas asignadas</span>
                         </div>
                         <div class="stat">
-                            <span class="number" data-count="15688">15.688</span>
+                            <span class="number" data-count="15719">15.719</span>
                             <span class="label">medios</span>
                         </div>
                         <div class="stat">
-                            <span class="number" data-count="6481">6.481</span>
+                            <span class="number" data-count="6487">6.487</span>
                             <span class="label"
                                 >proveedores que recibieron dinero</span
                             >
@@ -153,7 +153,7 @@ const home = JSON.parse(
         <div class="container-wide">
             <div class="section-head">
                 <h2>Todos los datos</h2>
-                <p>540.413 órdenes</p>
+                <p>549.184 órdenes</p>
             </div>
             <DataTable
                 client:only="react"
@@ -212,15 +212,21 @@ const home = JSON.parse(
                 {/* ── CABA ── */}
                 <div class="cov-card">
                     <div class="cov-juris-name">CABA</div>
-                    <div class="cov-period">2003 — 2024</div>
+                    <div class="cov-period">2003 — 2025</div>
                     <div class="cov-bar-wrap">
                         <div
                             class="cov-bar"
-                            title="CABA: 2003–2024 (escala 2003–2027)"
+                            title="CABA: 2003–2024 + 2025 parcial (escala 2003–2027)"
                         >
                             <div class="cov-seg cov-filled" style="flex:21">
                             </div>
-                            <div class="cov-seg cov-empty" style="flex:3"></div>
+                            <div
+                                class="cov-seg cov-filled-light"
+                                style="flex:1"
+                                title="2025 parcial: Radio, Gráfica, Medios vecinales y Cine"
+                            >
+                            </div>
+                            <div class="cov-seg cov-empty" style="flex:2"></div>
                         </div>
                         <div class="cov-axis">
                             <span style="left:0%">2003</span>
@@ -229,6 +235,10 @@ const home = JSON.parse(
                             <span style="left:71%">2020</span>
                             <span style="left:100%">2027</span>
                         </div>
+                    </div>
+                    <div class="cov-note">
+                        2025 parcial: la Ciudad publicó Radio, Gráfica, Medios
+                        vecinales y Cine. Todavía no publicó TV, Web ni Vía pública.
                     </div>
                 </div>
 

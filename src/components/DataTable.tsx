@@ -53,7 +53,7 @@ import type { SeedTabla } from "../lib/home";
 // claves son JURISDICCIONES (url-state.ts), la lista que valida ?juris=.
 const DISPONIBILIDAD: Record<string, [number, number]> = {
   "Nación": [2009, 2022],
-  "CABA": [2003, 2024],
+  "CABA": [2003, 2025],
   "PBA": [2020, 2025],
   "Santa Fe": [2008, 2023],
 };

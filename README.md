@@ -9,7 +9,7 @@
 🌐 **Deploy en producción:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 🎬 **Video de presentación:** [Ver en YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
-Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **540.413 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
+Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **549.184 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
 
 La postura es estrictamente informativa: sin denuncia ni opinión.
 
@@ -27,26 +27,28 @@ Hasta este proyecto, la información estaba dispersa en portales de datos abiert
 
 | Jurisdicción | Período | Órdenes |
 |---|---|---|
-| Nación | 2009–2022 | 225.367 |
-| CABA | 2003–2024 | 209.877 |
+| Nación | 2009–2022 | 224.175 |
+| CABA | 2003–2025 (2025 parcial) | 219.840 |
 | Santa Fe | 2008–2023 | 61.187 |
 | PBA | 2020–2025 | 43.982 |
-| **Total** | **2003–2025** | **540.413** |
+| **Total** | **2003–2025** | **549.184** |
 
 Los huecos de cobertura se muestran de forma explícita en la web: nunca se presentan agregados que puedan engañar por cobertura incompleta.
+
+Cada corrección de datos queda registrada, con su evidencia, en [CORRECCIONES.md](CORRECCIONES.md).
 
 ---
 
 ## 🏗️ Arquitectura
 
-El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~173 MB) vive en Cloudflare R2 como un único archivo versionado, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`.
+El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~175 MB) vive en Cloudflare R2 como un único archivo versionado, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
 ↓
 Extractores Python (etl/extractores/extract_{caba,nacion,pba,santa_fe}.py)
 ↓
-unificar.py → CSV canónico (8 columnas, 540.413 filas) → validar.py
+unificar.py → CSV canónico (8 columnas, 549.184 filas) → validar.py
 ↓
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)
@@ -76,7 +78,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 🎯 Funcionalidades
 
-**Tabla explorable de 540 mil órdenes**
+**Tabla explorable de 549 mil órdenes**
 - Filtros cruzados por jurisdicción y año, agrupación por proveedor/medio con filas expandibles y paginación de 25 registros por página
 - Primer paint instantáneo: el estado inicial viene precomputado e inlineado por Astro (`home.json`) — sql.js se inicializa recién cuando el usuario interactúa
 - El dato mostrado es el **crudo exacto de la fuente oficial**, sin normalización
