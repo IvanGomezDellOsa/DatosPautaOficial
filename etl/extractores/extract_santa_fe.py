@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    CRUDOS_BASE, registro, normalizar_monto, normalizar_fecha, limpiar_str,
+    CRUDOS_BASE, registro, normalizar_fecha, limpiar_str, parser_montos,
     leer_dicts, anio_de_texto, Contador, log,
 )
 
@@ -72,9 +72,11 @@ def extraer():
     c_monto = b("monto", "importe", "total")
     c_res = b("resolucion", "resolución")
     c_org = b("archivo_origen", "origen")
+    leer_monto = parser_montos((r.get(c_monto) for r in filas) if c_monto else (),
+                               f"[Santa Fe] {fuente.name}")
 
     for r in filas:
-        monto = normalizar_monto(r.get(c_monto)) if c_monto else None
+        monto = leer_monto(r.get(c_monto)) if c_monto else None
         if monto is None:
             cont.descartar("monto_invalido")
             continue

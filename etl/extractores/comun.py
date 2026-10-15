@@ -83,6 +83,7 @@ class Contador:
         self.etiqueta = etiqueta
         self.extraidas = 0
         self.descartes = {}
+        self.avisos = {}
 
     def ok(self, n=1):
         self.extraidas += n
@@ -90,11 +91,18 @@ class Contador:
     def descartar(self, motivo, n=1):
         self.descartes[motivo] = self.descartes.get(motivo, 0) + n
 
+    def avisar(self, motivo, n=1):
+        """Filas que se cargan pero con algo para revisar (no son descartes)."""
+        self.avisos[motivo] = self.avisos.get(motivo, 0) + n
+
     def resumen(self):
         partes = [f"{self.etiqueta}: {self.extraidas} filas extraidas"]
         if self.descartes:
             det = ", ".join(f"{k}={v}" for k, v in sorted(self.descartes.items()))
             partes.append(f"descartadas: {det}")
+        if self.avisos:
+            det = ", ".join(f"{k}={v}" for k, v in sorted(self.avisos.items()))
+            partes.append(f"avisos: {det}")
         log("  " + " | ".join(partes))
 
 
@@ -122,35 +130,110 @@ def limpiar_str(s):
 # Montos
 # ---------------------------------------------------------------------------
 
-def normalizar_monto(raw):
+def _solo_numero(raw):
+    """Deja solo digitos y separadores ("$ (1.210,00)" -> "1.210,00"). '' si no queda nada."""
+    if raw is None:
+        return ""
+    s = str(raw).strip()
+    # parentesis contable => negativo
+    if s.startswith("(") and s.endswith(")"):
+        s = s[1:-1]
+    # signo se ignora (siempre positivo)
+    return "".join(ch for ch in s if ch.isdigit() or ch in ".,")
+
+
+def _voto_decimal(s):
+    """Separador decimal que delata una celda por si sola, o None si es ambigua.
+
+    "1.234,56" / "1,234.56": el de la derecha es el decimal. "1.234.567": el repetido es de
+    miles. "392120.34" / "6036629,5" / "1234.5678": un solo separador seguido de 1-2 o de 4+
+    digitos es el decimal. "1160879.808", "4.500" o "48000" no votan: un separador seguido de
+    exactamente 3 digitos puede ser de miles o decimal."""
+    if "." in s and "," in s:
+        return "," if s.rfind(",") > s.rfind(".") else "."
+    for sep, otro in ((".", ","), (",", ".")):
+        if sep in s:
+            if s.count(sep) > 1:
+                return otro
+            return None if len(s.split(sep)[1]) == 3 else sep
+    return None
+
+
+def votos_decimal(valores):
+    """Cuenta cuantas celdas de una columna delatan cada separador decimal."""
+    votos = {",": 0, ".": 0}
+    for raw in valores:
+        v = _voto_decimal(_solo_numero(raw))
+        if v:
+            votos[v] += 1
+    return votos
+
+
+# Votos minimos para decidir el separador de una columna: una celda mal tipeada sola no
+# alcanza para reinterpretar todas las celdas ambiguas.
+MIN_VOTOS_DECIMAL = 2
+
+
+def detectar_decimal(valores):
+    """Separador decimal ("," o ".") de una columna de montos, o None si no se puede decidir.
+
+    Decide solo con las celdas sin ambiguedad (ver _voto_decimal): al menos MIN_VOTOS_DECIMAL
+    a favor y ninguna en contra. Si la columna se contradice o no tiene celdas que decidan,
+    devuelve None y normalizar_monto aplica la regla celda por celda."""
+    votos = votos_decimal(valores)
+    for sep, otro in ((".", ","), (",", ".")):
+        if votos[sep] >= MIN_VOTOS_DECIMAL and votos[otro] == 0:
+            return sep
+    return None
+
+
+def parser_montos(valores, origen):
+    """Decide el separador decimal de una columna y devuelve la funcion raw -> monto.
+
+    Informa por log la decision cuando cambia la lectura de alguna celda respecto de la regla
+    celda por celda, y avisa si la columna se contradice (ahi se usa la regla por celda)."""
+    valores = list(valores)
+    votos = votos_decimal(valores)
+    dec = detectar_decimal(valores)
+    if dec:
+        cambian = sum(1 for v in valores if normalizar_monto(v, dec) != normalizar_monto(v))
+        if cambian:
+            log(f"  {origen}: separador decimal '{dec}' ({votos[dec]} celdas lo indican); "
+                f"{cambian} celdas ambiguas se leen como decimales")
+    elif votos[","] and votos["."]:
+        log(f"  {origen}: ADVERTENCIA separador decimal contradictorio ({votos[',']} celdas "
+            f"con ',' y {votos['.']} con '.'); se usa la regla celda por celda")
+    return lambda raw: normalizar_monto(raw, dec)
+
+
+def normalizar_monto(raw, decimal=None):
     """Convierte un monto en string a float positivo, o None.
 
-    Soporta:
+    decimal: separador decimal de la columna ("," o "."), decidido con detectar_decimal.
+    Con el separador conocido se parsea sin ambiguedad:
+      - decimal=".": "1160879.808" -> 1160879.808 ; "1,234.5" -> 1234.5
+      - decimal=",": "4.500" -> 4500.0 ; "1151594,994" -> 1151594.994
+    Sin el separador (None) se decide celda por celda:
       - europeo:  "1.210,00"  -> 1210.0
       - americano:"$ 28,991.36" -> 28991.36 ; "$ 300,000" -> 300000.0
       - limpio:   "10000.0" -> 10000.0
       - con $/espacios/comillas: " $  300,000 " -> 300000.0
+      - un solo separador + 3 digitos se toma como miles: "4.500" -> 4500.0 (por eso
+        conviene pasar `decimal`: en una columna con punto decimal, "1160879.808" es decimal)
       - parentesis o signo - => valor absoluto (los montos van siempre positivos)
     Devuelve None si vale 0, esta vacio o no parsea.
     """
-    if raw is None:
-        return None
-    s = str(raw).strip()
-    if not s:
-        return None
-    # parentesis contable => negativo
-    if s.startswith("(") and s.endswith(")"):
-        s = s[1:-1]
-    # quedarse solo con digitos , . -
-    s = "".join(ch for ch in s if ch.isdigit() or ch in ".,-")
-    s = s.replace("-", "")  # signo se ignora (siempre positivo)
+    s = _solo_numero(raw)
     if not s:
         return None
 
     has_dot = "." in s
     has_comma = "," in s
 
-    if has_dot and has_comma:
+    if decimal in (",", "."):
+        miles = "." if decimal == "," else ","
+        s = s.replace(miles, "").replace(decimal, ".")
+    elif has_dot and has_comma:
         # el separador mas a la derecha es el decimal
         if s.rfind(",") > s.rfind("."):
             s = s.replace(".", "").replace(",", ".")  # europeo

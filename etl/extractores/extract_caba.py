@@ -44,7 +44,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
 from comun import (  # noqa: E402
-    DIR_CABA, registro, normalizar_monto, normalizar_fecha, limpiar_str,
+    DIR_CABA, registro, normalizar_fecha, limpiar_str, parser_montos,
     leer_filas, detectar_sep, leer_texto, anio_de_texto, Contador, log,
 )
 
@@ -146,8 +146,9 @@ def _parse_viejo(path, anio, cont):
     i_medio = col("medio especifico", "medio")
     i_tipo = col("tipo de medio", "tipo de producto", "tipo")
     i_monto = col("importe", "neto", "total")
+    leer_monto = parser_montos((_cell(r, i_monto) for r in filas[1:]), f"[CABA] {path.name}")
     for row in filas[1:]:
-        monto = normalizar_monto(_cell(row, i_monto))
+        monto = leer_monto(_cell(row, i_monto))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -181,10 +182,13 @@ def _parse_2007(path, anio, cont):
     i_total = col("total")
     i_tipo = col("tipo de producto", "tipo")
     i_fecha = col("fecha de publicacion", "fecha")
+    neto, bruta, total = [
+        parser_montos([_cell(r, i) for r in filas[1:]], f"[CABA] {path.name} ({nombre})")
+        for i, nombre in ((i_neto, "neto"), (i_bruta, "bruta"), (i_total, "total"))]
     for row in filas[1:]:
-        monto = normalizar_monto(_cell(row, i_neto)) or normalizar_monto(_cell(row, i_bruta))
+        monto = neto(_cell(row, i_neto)) or bruta(_cell(row, i_bruta))
         if monto is None:
-            monto = normalizar_monto(_cell(row, i_total))
+            monto = total(_cell(row, i_total))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -229,8 +233,9 @@ def _parse_mes(path, anio, cont):
     i_tipo = col("TIPO")
     i_medio = col("MEDIO")
     i_total = col("TOTAL")
+    leer_monto = parser_montos((_cell(r, i_total) for r in filas[h_idx + 1:]), f"[CABA] {path.name}")
     for row in filas[h_idx + 1:]:
-        monto = normalizar_monto(_cell(row, i_total))
+        monto = leer_monto(_cell(row, i_total))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -264,8 +269,9 @@ def _parse_2010(path, anio, cont):
     i_medio = col("medio")
     i_fecha = col("fecha publicación", "fecha publicacion", "fecha")
     i_importe = col("importe")
+    leer_monto = parser_montos((_cell(r, i_importe) for r in filas[1:]), f"[CABA] {path.name}")
     for row in filas[1:]:
-        monto = normalizar_monto(_cell(row, i_importe))
+        monto = leer_monto(_cell(row, i_importe))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -311,8 +317,10 @@ def _parse_combinado(path, anio, cont):
     if idx is None:
         cont.descartar("sin_columna_importe")
         return out
+    leer_monto = parser_montos((_cell(r, idx["importe"]) for r in filas[h_idx + 1:]),
+                               f"[CABA] {path.name}")
     for row in filas[h_idx + 1:]:
-        monto = normalizar_monto(_cell(row, idx["importe"]))
+        monto = leer_monto(_cell(row, idx["importe"]))
         if monto is None:
             cont.descartar("monto_invalido")
             continue
@@ -370,8 +378,9 @@ def _parse_pertype(path, anio, cont):
     if idx["importe"] is None:
         cont.descartar("sin_columna_importe")
         return out
+    leer_monto = parser_montos((_cell(r, idx["importe"]) for r in filas[1:]), f"[CABA] {path.name}")
     for row in filas[1:]:
-        monto = normalizar_monto(_cell(row, idx["importe"]))
+        monto = leer_monto(_cell(row, idx["importe"]))
         if monto is None:
             cont.descartar("monto_invalido")
             continue

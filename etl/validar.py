@@ -95,7 +95,8 @@ def _totales_duplicados(filas):
             continue
         evaluados[arch] += 1
         cents = [(i, round(v * 100)) for i, v in vals]
-        i_max, mx = max(cents, key=lambda x: x[1])
+        # con un solo rubro, rubro y total valen lo mismo: el total es el ultimo de la fila
+        i_max, mx = max(cents, key=lambda x: (x[1], x[0]))
         if mx == sum(c for _, c in cents) - mx:
             dup[arch].append((i_max, prov, anio, mx / 100))
     return [(arch, evaluados[arch], d) for arch, d in sorted(dup.items(), key=lambda x: -len(x[1]))
