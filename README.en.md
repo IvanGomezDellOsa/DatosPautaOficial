@@ -39,7 +39,7 @@ Coverage gaps are shown explicitly on the website: aggregates that could mislead
 
 ## 🏗️ Architecture
 
-The project runs **100% without a backend or servers**: the full SQLite database (~173 MB) lives on Cloudflare R2 split into chunks, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
+The project runs **100% without a backend or servers**: the full SQLite database (~173 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
@@ -51,7 +51,7 @@ unificar.py → CSV canónico (8 columnas, 540.413 filas) → validar.py
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)
 ↓
-Chunks de 20 MiB en Cloudflare R2 (db.datospautaoficial.com.ar)
+Versioned file on Cloudflare R2 (db.datospautaoficial.com.ar)
 ↓
 Astro + React islands → consultas SQL desde el navegador (sql.js-httpvfs)
 ↓
@@ -69,7 +69,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 | **Framework** | Astro 6 (static output) + React 19 (islands) |
 | **Language** | TypeScript |
 | **Search** | MiniSearch (client-side index of suppliers and media outlets) |
-| **Hosting** | Cloudflare Pages + Cloudflare R2 (DB chunks) |
+| **Hosting** | Cloudflare Pages + Cloudflare R2 (database) |
 | **Deflation** | IPC INDEC (+ Eco Go series 2007–2015), amounts in constant pesos |
 
 ---

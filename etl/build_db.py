@@ -12,9 +12,11 @@ Entradas (en etl/data/):
   - aliases.csv                     OPCIONAL     normalizacion curada de nombres
 
 Salida:
-  - public/data/pauta.sqlite     base read-only (archivo unico, para uso local)
-  - public/data/pauta.sqlite.N   chunks de 20 MiB para Cloudflare Pages
-  - public/data/config.json      config de sql.js-httpvfs (serverMode: chunked)
+  - etl/build/pauta.sqlite       base read-only (archivo unico, para uso local)
+  - public/data/pauta.sqlite.0   la base en un solo chunk, la copia que se publica
+                                 en R2 (ver split_db)
+  - public/data/config.json      config de sql.js-httpvfs (serverMode: chunked; con
+                                 R2_PUBLIC_URL, urlPrefix apunta a R2 bajo v/<version>/)
   - public/data/search.json      entidades distintas (proveedor/medio) para
                                  la busqueda client-side con MiniSearch
 
@@ -27,6 +29,7 @@ Uso:  python3 etl/build_db.py
 """
 
 import csv
+import hashlib
 import json
 import math
 import os
@@ -41,8 +44,9 @@ from pathlib import Path
 ETL_DIR = Path(__file__).resolve().parent
 DATA_DIR = ETL_DIR / "data"
 OUT_DIR = ETL_DIR.parent / "public" / "data"
-# La DB monolitica va fuera de public/ para no superar el limite de 25 MiB
-# de Cloudflare Pages. Los chunks (.0-.5) y config.json siguen en OUT_DIR.
+# La DB de trabajo va fuera de public/. En OUT_DIR van la copia que se publica
+# (pauta.sqlite.0) y config.json; el build command la saca de dist/ porque Pages
+# rechaza archivos > 25 MiB: la base se sirve desde R2.
 BUILD_DIR = ETL_DIR / "build"
 OUT_DB = BUILD_DIR / "pauta.sqlite"
 
@@ -584,6 +588,9 @@ def crear_groups(con, top_n=None):
     pagina por vez. `rank` da el orden (por monto desc) para esa paginacion.
     top_n=None => sin tope; pasar un entero solo para debug.
 
+    rank debe quedar contiguo (1..N) dentro de cada clave: el front pagina con
+    `rank > ?` y toma el total de la clave del rank mas alto (queries.ts).
+
     Claves: jurisdiccion='*' = todas, anio=0 = todos. Solo cubre el caso SIN
     filtro de entidad; con proveedor/medio el set es chico y se agrupa en vivo.
     """
@@ -687,7 +694,7 @@ def crear_indices(con):
     # izquierdo de cada compuesto cubre tambien las consultas mas simples:
     #   - (jurisdiccion, anio, *) sirve para filtrar por jurisdiccion sola
     #     y por jurisdiccion+anio (tabla con filtros, ranking).
-    #   - (proveedor_norm, anio) / (medio_norm, anio) sirven el caso
+    #   - (proveedor, anio) / (medio, anio) sirven el caso
     #     "Cuanto recibio" (proveedor/medio-first), y su prefijo cubre la
     #     busqueda por proveedor/medio sin jurisdiccion.
     # Se omite a proposito un indice por (anio) solo: agregarlo unicamente si
@@ -718,12 +725,12 @@ def crear_indices(con):
     # sobre sql.js-httpvfs lo que duele son los round-trips HTTP, no el
     # tamano. Cuando las queries reales de agregacion existan, medir con
     # EXPLAIN QUERY PLAN y, si hacen saltos a la tabla, volver covering los
-    # indices de "Cuanto recibio" / ranking agregando monto y monto_deflactado
-    # para que la suma se resuelva leyendo solo el indice:
-    #   CREATE INDEX ix_prov_cover  ON orders(proveedor_norm, anio, jurisdiccion, monto, monto_deflactado);
-    #   CREATE INDEX ix_medio_cover ON orders(medio_norm, anio, jurisdiccion, monto, monto_deflactado);
-    #   CREATE INDEX ix_juris_anio_prov_cov  ON orders(jurisdiccion, anio, proveedor_norm, monto_deflactado);
-    #   CREATE INDEX ix_juris_anio_medio_cov ON orders(jurisdiccion, anio, medio_norm, monto_deflactado);
+    # indices de "Cuanto recibio" / ranking agregando monto (ya deflactado)
+    # para que la suma se resuelva leyendo solo el indice. Hoy esas dos vistas
+    # leen totals_cache / rankings_cache, no orders, asi que la nota solo
+    # aplicaria a las consultas en vivo con filtro de entidad:
+    #   CREATE INDEX ix_prov_cover  ON orders(proveedor, anio, jurisdiccion, monto);
+    #   CREATE INDEX ix_medio_cover ON orders(medio, anio, jurisdiccion, monto);
     # (reemplazarian a los compuestos de arriba; pagan tamano por menos round-trips).
 
 
@@ -744,21 +751,72 @@ def cargar_governments(con):
     return len(filas)
 
 
-def split_db():
-    """Parte la SQLite en chunks de CHUNK_SIZE bytes para Cloudflare Pages.
+def version_db(data, generado, chunk_size):
+    """Version de la base para el prefijo de R2 (v/<version>/pauta.sqlite.N).
 
-    Cloudflare Pages rechaza archivos > 25 MiB. La DB de ~106 MB se parte en
-    pauta.sqlite.0, pauta.sqlite.1, ... + config.json.
+    Incluye el tamano de chunk: con los mismos bytes pero otro particionado los
+    objetos en R2 son otros, asi que tiene que ser otra version (si no,
+    upload_r2.mjs encontraria un manifest incompatible y cortaria el deploy).
 
-    El front carga los chunks con serverMode='chunked' de sql.js-httpvfs:
+    Es el sha256 de los bytes de la SQLite con el texto de meta.generado puesto
+    en ceros. generado (la hora del build) es lo unico que cambia entre dos
+    builds con las mismas entradas en el mismo entorno (verificado: dos builds
+    seguidos difieren solo en esos bytes); sin enmascararlo cada deploy
+    publicaria una version nueva aunque los datos no cambien. Cualquier otro
+    byte distinto (un dato, un indice, otra version de SQLite) da otra version.
+
+    La posicion de generado entra al hash: dos bases con la misma version solo
+    difieren en esos 25 bytes de texto de largo fijo, asi que mezclar chunks de
+    las dos sigue dando una base valida.
+
+    Si generado no aparece exactamente una vez, se hashea el archivo tal cual:
+    version nueva en cada build (mas subidas), nunca una version ambigua.
+    """
+    marca = generado.encode("utf-8")
+    pos = data.find(marca)
+    h = hashlib.sha256()
+    h.update(f"chunk={chunk_size}\n".encode("ascii"))
+    if pos != -1 and data.find(marca, pos + 1) == -1:
+        vista = memoryview(data)
+        h.update(f"generado@{pos}\n".encode("ascii"))
+        h.update(vista[:pos])
+        h.update(bytes(len(marca)))
+        h.update(vista[pos + len(marca):])
+    else:
+        print("  AVISO: meta.generado no aparece una sola vez en la base; "
+              "la version se calcula sobre el archivo completo.")
+        h.update(data)
+    return h.hexdigest()[:16]
+
+
+def split_db(generado):
+    """Escribe la copia publicable de la SQLite (pauta.sqlite.0) + config.json.
+
+    Un solo chunk con la base entera. Antes se partia en chunks de 20 MiB por el
+    limite de 25 MiB por archivo de Cloudflare Pages, pero la base se sirve
+    desde R2, que no tiene ese limite. Partirla rompia consultas reales:
+    sql.js-httpvfs (modo chunked) manda cada lectura al chunk donde empieza;
+    cuando su lectura anticipada cruzaba el borde entre chunks el servidor la
+    cortaba en el fin del archivo y la pagina pedida no llegaba ("database disk
+    image is malformed" filtrando por infobae o lapoliticaonline). Con un chunk
+    no hay borde. El tope es el de `wrangler r2 object put` (300 MiB): si la
+    base lo supera hay que pasar a subida multipart, no volver a partirla.
+
+    El front la carga con serverMode='chunked' de sql.js-httpvfs:
       createDbWorker([{ from: 'jsonconfig', configUrl: '/data/config.json' }], ...)
 
-    Llama despues de que OUT_DB ya existe (al final de main()).
+    Llama despues de que OUT_DB ya existe (al final de main()). `generado` es
+    el valor de meta.generado (ver version_db).
     """
-    CHUNK_SIZE = 20 * 1024 * 1024  # 20 MiB — margen comodo bajo el limite de 25 MiB
+    WRANGLER_MAX = 300 * 1024 * 1024  # MAX_UPLOAD_SIZE_BYTES de wrangler (r2/constants.ts)
 
     data = OUT_DB.read_bytes()
     db_size = len(data)
+    if os.environ.get("R2_PUBLIC_URL", "").strip() and db_size > WRANGLER_MAX:
+        sys.exit(f"ERROR: la base pesa {db_size:,} bytes y wrangler sube como maximo "
+                 f"{WRANGLER_MAX:,} por objeto. Pasar upload_r2.mjs a subida multipart; "
+                 "partirla en chunks reintroduce el error de lectura entre chunks.")
+    CHUNK_SIZE = db_size  # un solo chunk: ver docstring
     n_chunks = math.ceil(db_size / CHUNK_SIZE)
     suffix_len = len(str(n_chunks - 1))  # digitos necesarios para el sufijo
 
@@ -776,9 +834,15 @@ def split_db():
     # completo en vez de 206), lo que rompe sql.js-httpvfs con "database disk image
     # is malformed". Por eso los chunks se sirven desde Cloudflare R2 (que SI
     # devuelve 206). Si R2_PUBLIC_URL esta seteada (build de Cloudflare), apunta
-    # ahi; si no (build local), cae a /data/ para poder testear con http-server.
+    # ahi, bajo un prefijo por version (v/<version>/): cada version se sube una
+    # sola vez y nunca se pisa, asi que una pestana abierta o un cache no pueden
+    # mezclar paginas de dos builds. El cambio de version lo hace config.json,
+    # que sale con el deploy de Pages. Si no (build local), cae a /data/ para
+    # poder testear con http-server.
+    version = version_db(data, generado, CHUNK_SIZE)
     r2_base = os.environ.get("R2_PUBLIC_URL", "").strip().rstrip("/")
-    url_prefix = f"{r2_base}/pauta.sqlite." if r2_base else "/data/pauta.sqlite."
+    url_prefix = (f"{r2_base}/v/{version}/pauta.sqlite." if r2_base
+                  else "/data/pauta.sqlite.")
 
     # Escribir config.json (lo lee el front con from: 'jsonconfig')
     config = {
@@ -793,13 +857,13 @@ def split_db():
     with config_path.open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
 
-    return n_chunks, suffix_len, db_size, config_path
+    return n_chunks, suffix_len, db_size, config_path, version, url_prefix
 
 
 def escribir_home(con, prov_disp):
     """Emite public/data/home.json: el estado inicial de la portada precomputado.
 
-    La vista inicial (PBA + anio_mas_reciente, ordenada por id ascendente) es FIJA,
+    La vista inicial (PBA + anio_mas_reciente, tabla agrupada) es FIJA,
     igual en cada carga. En vez de levantarla en vivo con sql.js-httpvfs --cientos de
     range-requests HTTP encadenados, ~8 s de spinners-- la calculamos aca y la
     servimos como JSON estatico que Astro inlinea como prop. Asi el primer paint
@@ -1164,7 +1228,7 @@ def main():
     # --- totales/conteos por (jurisdiccion, anio) para la filter-bar ---------
     crear_filtros(con)
 
-    # --- top-100 grupos (medio_norm x proveedor_norm) para el DataTable ------
+    # --- todos los pares (medio x proveedor) por clave, para el DataTable ----
     crear_groups(con)
 
     # --- grupos mediaticos (holdings) para el toggle "Grupo mediatico" -------
@@ -1180,7 +1244,7 @@ def main():
     con.close()
 
     # --- split chunked para Cloudflare Pages ------------------------------
-    n_chunks, suffix_len, db_size, config_path = split_db()
+    n_chunks, suffix_len, db_size, config_path, version, url_prefix = split_db(meta["generado"])
 
     # --- indice de busqueda client-side -----------------------------------
     out_busq, n_prov, n_medio = escribir_busqueda(prov_disp, medio_disp)
@@ -1189,7 +1253,8 @@ def main():
     # --- reporte ----------------------------------------------------------
     tam_mb = OUT_DB.stat().st_size / (1024 * 1024)
     print(f"OK  {OUT_DB}  ({tam_mb:.1f} MB)")
-    print(f"OK  {config_path}  ({n_chunks} chunks x 20 MiB, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
+    print(f"OK  {config_path}  ({n_chunks} chunk, suffixLen={suffix_len}, " + f"{db_size:,}" + " bytes)")
+    print(f"    version {version}  urlPrefix {url_prefix}")
     print(f"OK  {out_busq}  ({tam_busq_mb:.2f} MB; "
           f"{n_prov} proveedores, {n_medio} medios)")
     print(f"OK  {out_grupos}  ({n_grupos} grupos, {n_grupos_cub} con datos, "

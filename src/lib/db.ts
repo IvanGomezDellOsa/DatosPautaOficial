@@ -3,7 +3,7 @@
  *
  * Inicializa el worker UNA sola vez (lazy) y lo reutiliza en toda la app.
  * El worker carga la SQLite en modo chunked desde /data/config.json
- * (chunks de 20 MiB, bajo el límite de 25 MiB de Cloudflare Pages).
+ * (un solo chunk servido desde R2; ver split_db en etl/build_db.py).
  *
  * Solo usar desde componentes React con directiva client:* en Astro.
  */
@@ -49,7 +49,7 @@ export function getDb(): Promise<WorkerHttpvfs> {
  *
  * @example
  *   const rows = await query<{ total: number }>(
- *     "SELECT SUM(monto_deflactado) as total FROM orders WHERE proveedor_norm = ?",
+ *     "SELECT SUM(monto) as total FROM orders WHERE proveedor = ?",
  *     ["clarin"]
  *   );
  */
