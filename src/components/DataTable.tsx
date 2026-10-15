@@ -217,27 +217,53 @@ type SeedGob =
   | { juris: string | null; anio: number | null; value: { name: string; role: string } | null }
   | null;
 
+/** Una gestión dentro del año; `desde` (dd/mm) solo si asumió durante ese año. */
+type Gestion = { name: string; role: string; desde: string | null };
+
+/**
+ * Gestiones que gobernaron durante el año, en orden. Los traspasos son el 10/12:
+ * mostrar solo la entrante le atribuía el año a quien gobernó 21 días (p. ej.
+ * Nación 2015 figuraba como Macri). Una reelección (misma persona, otra fila)
+ * se muestra una sola vez.
+ */
+function gestionesDelAnio(
+  rows: { name: string; role: string; date_from: string }[],
+  anio: number,
+): Gestion[] {
+  const out: Gestion[] = [];
+  for (const r of rows) {
+    if (out.length && out[out.length - 1].name === r.name) continue;
+    const [a, m, d] = r.date_from.split("-");
+    out.push({ name: r.name, role: r.role, desde: out.length && Number(a) === anio ? `${d}/${m}` : null });
+  }
+  return out;
+}
+
 function useGobierno(juris: string | null, anio: number | null, seedGob: SeedGob) {
+  // El seed de home.json trae una sola gestión: vale para el año por defecto,
+  // que no es de traspaso (si lo fuera, regenerarlo con las dos).
   const seedMatch = !!seedGob && seedGob.juris === juris && seedGob.anio === anio;
-  const [gov, setGov] = useState<{ name: string; role: string } | null>(
-    () => (seedMatch ? seedGob!.value : null),
+  const [gov, setGov] = useState<Gestion[]>(
+    () => (seedMatch && seedGob!.value ? [{ ...seedGob!.value, desde: null }] : []),
   );
   const first = useRef(true);
+  const seq = useRef(0);
   useEffect(() => {
+    const id = ++seq.current;
     if (first.current) {
       first.current = false;
       if (seedMatch) return;
     }
-    if (!juris || !anio) { setGov(null); return; }
-    query<{ name: string; role: string }>(
-      `SELECT name, role FROM governments
+    if (!juris || !anio) { setGov([]); return; }
+    query<{ name: string; role: string; date_from: string }>(
+      `SELECT name, role, date_from FROM governments
        WHERE jurisdiccion = ?
          AND CAST(substr(date_from,1,4) AS INTEGER) <= ?
          AND (date_to IS NULL OR CAST(substr(date_to,1,4) AS INTEGER) >= ?)
-       ORDER BY date_from DESC LIMIT 1`,
+       ORDER BY date_from`,
       [juris, anio, anio],
-    ).then((rows) => setGov(rows[0] ?? null))
-     .catch(() => setGov(null));
+    ).then((rows) => { if (id === seq.current) setGov(gestionesDelAnio(rows, anio)); })
+     .catch(() => { if (id === seq.current) setGov([]); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [juris, anio]);
   return gov;
@@ -550,11 +576,21 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
           )}
         </div>
 
-        {gobierno && (
+        {gobierno.length > 0 && (
           <div className="row3">
             <span className="governance-tag">
               <span className="label">Gestión</span>
-              <strong>{gobierno.name}</strong> — {gobierno.role}
+              {gobierno.length === 1 ? (
+                <><strong>{gobierno[0].name}</strong> — {gobierno[0].role}</>
+              ) : (
+                gobierno.map((g, i) => (
+                  <Fragment key={g.name}>
+                    {i > 0 && " → "}
+                    <strong>{g.name}</strong>
+                    {g.desde && ` (desde el ${g.desde})`}
+                  </Fragment>
+                ))
+              )}
             </span>
           </div>
         )}
