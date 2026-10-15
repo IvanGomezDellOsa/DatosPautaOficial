@@ -13,6 +13,7 @@ terminan los montos de cada columna en el PDF. fixtures/ tiene dos PDFs oficiale
 Uso:  python -m unittest discover -s etl/tests -v      (desde la raiz del repo)
 """
 
+import hashlib
 import os
 import shutil
 import sys
@@ -98,6 +99,36 @@ TORNEOS = linea(("TORNEOS", 53.1, 92.8), ("Y", 95.1, 100.5), ("COMPETENCIAS", 10
                 ("S.A.", 386.1, 401.5))
 
 
+# --- 2012-S2 (2dosemestre2012_01_prov_rubro.pdf; 2013-S1 tiene el mismo formato) ------------
+# antes del encabezado, "RUBRO" sobre las columnas de montos (2013-S1 lo repite en otras paginas)
+RUBRO_2012_S2 = linea(("RUBRO", 470.3, 502.5))
+ENC_2012_S2 = linea(
+    ("CODIGO", 19.8, 55.4), ("DENOMINACION", 67.0, 136.3), ("O", 138.7, 145.5), ("RAZON", 148.0, 178.8),
+    ("SOCIAL", 181.2, 213.9), ("CABLE", 259.1, 288.9), ("CINE", 334.3, 355.3), ("GRAFICA", 396.1, 435.7),
+    ("RADIO", 472.6, 500.4), ("TV", 551.6, 562.8), ("VIA", 600.5, 615.1), ("PUBLICA", 617.0, 656.1),
+    ("WEB", 688.6, 709.0), ("Total", 742.3, 763.2), ("general", 765.6, 797.0))
+X1_2012_S2 = [307.1, 377.9, 448.7, 519.5, 590.3, 661.1, 731.9, 802.7]
+
+
+def fila_2012_s2(codigo, nombre, montos):
+    ws, x = [(codigo, 27.7, 47.3)], 67.0
+    for p in nombre.split():
+        ws.append((p, x, x + 5 * len(p)))
+        x += 5 * len(p) + 2
+    return linea(*ws, *[(t, x1 - 40, x1) for t, x1 in zip(montos, X1_2012_S2)])
+
+
+COPEGRAF = fila_2012_s2("1001", "EL INDEPENDIENTE COPEGRAF LTDA", [
+    "0,00", "0,00", "564.861,21", "104.975,00", "0,00", "0,00", "0,00", "669.836,21"])
+CRONISTA = fila_2012_s2("1117", "EL CRONISTA COMERCIAL S.A.", [
+    "10.890,00", "0,00", "2.312.297,82", "0,00", "0,00", "0,00", "0,00", "2.323.187,82"])
+PIE_2012_S2 = linea(("Página", 390.5, 416.3), ("1", 418.4, 423.3))
+# "Total general" empieza a la izquierda de CODIGO
+TOTALES_2012_S2 = linea(("Total", 10.9, 31.4), ("general", 33.6, 63.4), *[
+    (t, x1 - 40, x1) for t, x1 in zip(["10.890,00", "0,00", "2.877.159,03", "104.975,00", "0,00", "0,00",
+                                       "0,00", "2.993.024,03"], X1_2012_S2)])
+
+
 def con(fila, **cambios):
     """Copia de una linea cambiando el texto o el x1 de algunas palabras: {indice: (texto, x1)}."""
     out = [dict(w) for w in fila]
@@ -158,6 +189,35 @@ class TablaPdfRubro(unittest.TestCase):
 
     def test_sin_encabezado(self):
         self.assertEqual(extract_nacion._tabla_pdf([MOSCA, MOVIEGROUP])[3], ["sin encabezado"])
+
+
+class TablaPdfConCodigo(unittest.TestCase):
+    """2012-S2 y 2013-S1: CODIGO y DENOMINACION O RAZON SOCIAL antes de los rubros."""
+
+    def test_codigo_y_denominacion(self):
+        modo, cols, filas, problemas = extract_nacion._tabla_pdf([
+            RUBRO_2012_S2, ENC_2012_S2, COPEGRAF, PIE_2012_S2, RUBRO_2012_S2, ENC_2012_S2, CRONISTA,
+            TOTALES_2012_S2])
+        self.assertEqual((modo, problemas), ("rubro", []))
+        self.assertEqual(cols, ["CABLE", "CINE", "GRAFICA", "RADIO", "TV", "VIA PUBLICA", "WEB",
+                                "Total general"])
+        # el codigo no va al proveedor
+        self.assertEqual([(p, m, [(cols[c], t) for c, t in cs if t != "0,00"]) for p, m, cs in filas], [
+            ("EL INDEPENDIENTE COPEGRAF LTDA", None, [("GRAFICA", "564.861,21"), ("RADIO", "104.975,00"),
+                                                      ("Total general", "669.836,21")]),
+            ("EL CRONISTA COMERCIAL S.A.", None, [("CABLE", "10.890,00"), ("GRAFICA", "2.312.297,82"),
+                                                  ("Total general", "2.323.187,82")]),
+        ])
+
+    def test_codigo_que_no_es_un_numero(self):
+        problemas = extract_nacion._tabla_pdf([
+            ENC_2012_S2, con(COPEGRAF, w0=("10O1", 47.3)), CRONISTA, TOTALES_2012_S2])[3]
+        self.assertEqual(len(problemas), 1)
+        self.assertTrue(problemas[0].startswith("codigo de proveedor que no es un numero"), problemas)
+
+    def test_sin_columna_de_texto(self):
+        problemas = extract_nacion._tabla_pdf([ENC_2012_S2[5:], CRONISTA])[3]
+        self.assertTrue(problemas[0].startswith("encabezado sin columnas de texto"), problemas)
 
 
 class TablaPdfMes(unittest.TestCase):
@@ -263,6 +323,36 @@ class ExtraerPrefiereElPdf(unittest.TestCase):
 
     def test_sin_pdf_lee_el_texto(self):
         self.assertEqual(len(self._extraer(None)), 1)
+
+
+@unittest.skipUnless(HAY_PDFPLUMBER, "falta pdfplumber (pip install pdfplumber)")
+class ExtraerPdfSinCsv(unittest.TestCase):
+    """PDF_SIN_CSV: pivots publicados solo en PDF (2do semestre 2012). Se prueba con el PDF de
+    2010-S1 de fixtures/ en una carpeta sin CSV."""
+
+    def _extraer(self, pdf_bytes):
+        sha = hashlib.sha256(PDF_2010_S1.read_bytes()).hexdigest()
+        with tempfile.TemporaryDirectory() as d:
+            ydir = Path(d) / "Nacion" / "2012"
+            ydir.mkdir(parents=True)
+            (ydir / PDF_2010_S1.name).write_bytes(pdf_bytes)
+            with mock.patch.object(extract_nacion, "DIR_NACION", ydir.parent), \
+                    mock.patch.object(extract_nacion, "DIR_CURADO", Path(d) / "no_existe"), \
+                    mock.patch.object(extract_nacion, "PDF_SIN_CSV", {PDF_2010_S1.name: sha}):
+                return extract_nacion.extraer()
+
+    def test_lee_el_pdf_revisado(self):
+        regs = self._extraer(PDF_2010_S1.read_bytes())
+        self.assertEqual(len(regs), 884)
+        self.assertEqual({(r["anio"], r["archivo_origen"]) for r in regs}, {(2012, PDF_2010_S1.name)})
+
+    def test_otro_pdf_no_se_carga(self):
+        self.assertEqual(self._extraer(PDF_2010_S1.read_bytes() + b"\n"), [])
+
+    def test_el_pdf_de_2012_s2_es_el_revisado(self):
+        self.assertEqual(extract_nacion.PDF_SIN_CSV, {
+            "2dosemestre2012_01_prov_rubro.pdf":
+                "1451a067db26898e126b85704f6b966d84eb477307d1261df10663328149026f"})
 
 
 if __name__ == "__main__":

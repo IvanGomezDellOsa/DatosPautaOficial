@@ -29,7 +29,8 @@ Formatos reales:
 
   4) PDF oficial de esos pivots: si esta en la carpeta del año junto al CSV (ver PDF_DE_PIVOT),
      se lee el PDF por coordenadas en lugar del texto, que no permite saber la columna (rubro
-     o mes) de cada monto. Ver _parse_pivot_pdf.
+     o mes) de cada monto. Ver _parse_pivot_pdf. Los pivots publicados solo en PDF (2do semestre
+     2012) se leen del PDF si esta en la carpeta del año (ver PDF_SIN_CSV).
 """
 
 import hashlib
@@ -362,6 +363,15 @@ PDF_DE_PIVOT = {
         "a1bd51106c8f2844678d78c64505aee562c932f6fa14b065d640a39f421c5448"),
 }
 
+# Pivots publicados solo en PDF (no hay CSV "(nuevo v2)" que reemplazar): se leen si estan en la
+# carpeta del año, son el revisado y concilian; si no, se avisa y no se carga nada. archivo_origen
+# es el nombre del PDF. El 1er semestre 2013 (1ersemestre2013_01_prov_rubro_2.pdf) no va: 2013 ya
+# se carga por orden desde DatosPublicidadOficialEnero2013_Mayo2014.csv.
+PDF_SIN_CSV = {
+    "2dosemestre2012_01_prov_rubro.pdf":
+        "1451a067db26898e126b85704f6b966d84eb477307d1261df10663328149026f",
+}
+
 _RE_NUM_PDF = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}")
 _RE_MES = re.compile(r"[A-Za-z]{3}-\d{2}")
 
@@ -400,8 +410,8 @@ def _tabla_pdf(lineas):
 
     El encabezado es la primera linea con "Total general" (pivot por rubro) o con meses
     ("may-09", pivot por mes). Sus etiquetas son las palabras separadas por menos de 6 puntos;
-    la primera (o las dos primeras en el pivot por mes: DENOMINACION y MEDIO) son de texto y el
-    resto son las columnas de montos. Los montos estan alineados a la derecha: la columna de
+    las anteriores al primer mes o rubro son de texto (RAZON SOCIAL; DENOMINACION y MEDIO;
+    CODIGO y DENOMINACION O RAZON SOCIAL) y el resto son las columnas de montos. Los montos estan alineados a la derecha: la columna de
     cada uno es la ultima cuyo encabezado empieza antes de donde termina el numero.
 
     Devuelve (modo, columnas, filas, problemas): columnas = [etiqueta], filas =
@@ -420,6 +430,7 @@ def _tabla_pdf(lineas):
         columna no entra en la tolerancia."""
     modo = enc = None
     filas, totales, problemas = [], None, []
+    antes = set()   # lineas previas al encabezado (titulos, "RUBRO"): se repiten en otras paginas
     bordes = {}   # columna -> x1 de sus montos
     for l in lineas:
         txt = " ".join(w["text"] for w in l)
@@ -429,6 +440,7 @@ def _tabla_pdf(lineas):
             elif any(_RE_MES.fullmatch(w["text"]) for w in l):
                 modo = "mes"
             else:
+                antes.add(txt)
                 continue
             etiquetas = []
             for w in l:
@@ -436,14 +448,23 @@ def _tabla_pdf(lineas):
                     etiquetas[-1] = (etiquetas[-1][0], etiquetas[-1][1] + " " + w["text"], w["x1"])
                 else:
                     etiquetas.append((w["x0"], w["text"], w["x1"]))
-            n_texto = 2 if modo == "mes" else 1
-            x_medio = etiquetas[1][0] if modo == "mes" else None
+            # columnas de texto: las anteriores al primer mes o rubro. Por mes: DENOMINACION y
+            # MEDIO. Por rubro: RAZON SOCIAL, o CODIGO y DENOMINACION O RAZON SOCIAL (2012-S2 y
+            # 2013-S1; el codigo de proveedor no se carga: el esquema no tiene donde)
+            n_texto = next((k for k, (_, lab, _) in enumerate(etiquetas)
+                            if (_RE_MES.fullmatch(lab) if modo == "mes" else
+                                "total" in lab.lower() or _canon_rubro(lab) in RUBRO_CANON.values())),
+                           len(etiquetas))
+            textos_enc = [(x0, lab.upper()) for x0, lab, _ in etiquetas[:n_texto]]
             xs = [x0 for x0, _, _ in etiquetas[n_texto:]]
             columnas = [lab for _, lab, _ in etiquetas[n_texto:]]
+            if not textos_enc or not columnas:
+                problemas.append(f"encabezado sin columnas de texto o de montos: {txt!r}")
+                return modo, columnas, [], problemas
             enc = txt
             continue
-        if txt == enc:
-            continue   # encabezado repetido en cada pagina
+        if txt == enc or txt in antes or re.fullmatch(r"P[áa]gina \d+", txt):
+            continue   # encabezado, titulos y pie de pagina repetidos en cada pagina
         nums = [w for w in l if w["x1"] >= xs[0] and _RE_NUM_PDF.fullmatch(w["text"])]
         textos = [w for w in l if w["x1"] < xs[0] and w["text"] != "$"]
         otros = [w["text"] for w in l if w["x1"] >= xs[0] and w not in nums
@@ -451,12 +472,23 @@ def _tabla_pdf(lineas):
         if otros:
             problemas.append(f"texto en la zona de montos: {txt!r}")
         if not nums:
-            continue   # titulo, pie de pagina o fila sin montos (todo "-")
-        prov = " ".join(w["text"] for w in textos if x_medio is None or w["x0"] < x_medio - 2)
-        medio = " ".join(w["text"] for w in textos if x_medio is not None and w["x0"] >= x_medio - 2)
+            continue   # titulo o fila sin montos (todo "-")
+        # cada palabra va a la ultima columna de texto que empieza antes que ella
+        campos = {}
+        for w in textos:
+            k = max([i for i, (x0, _) in enumerate(textos_enc) if x0 - 2 <= w["x0"]], default=0)
+            campos.setdefault(textos_enc[k][1], []).append(w["text"])
+        campos = {lab: " ".join(ws) for lab, ws in campos.items()}
+        codigo = next((v for lab, v in campos.items() if lab.startswith("CODIGO")), None)
+        medio = next((v for lab, v in campos.items() if lab == "MEDIO"), "")
+        prov = " ".join(v for lab, v in campos.items() if lab != "MEDIO" and not lab.startswith("CODIGO"))
         celdas = [(max(k for k, x in enumerate(xs) if x <= w["x1"]), w["text"]) for w in nums]
         for (c, _), w in zip(celdas, nums):
             bordes.setdefault(c, []).append(w["x1"])
+        if not prov and re.fullmatch(r"total( general)?", codigo or "", re.I):
+            prov, codigo = codigo, None   # "Total general" empieza a la izquierda de CODIGO
+        if codigo is not None and not codigo.isdigit():
+            problemas.append(f"codigo de proveedor que no es un numero: {txt!r}")
         if not prov or re.fullmatch(r"total( general)?", prov, re.I):
             if totales is not None:
                 problemas.append(f"dos filas de totales: {txt!r}")
@@ -549,8 +581,12 @@ def _parse_pivot_pdf(path, anio, archivo, cont):
 def _pdf_oficial(csv_path):
     """PDF oficial del pivot que esta en la carpeta del CSV y es el revisado, o None."""
     nombre, sha = PDF_DE_PIVOT.get(csv_path.name, (None, None))
-    pdf = csv_path.parent / nombre if nombre else None
-    if pdf is None or not pdf.exists():
+    return _pdf_revisado(csv_path.parent / nombre, sha) if nombre else None
+
+
+def _pdf_revisado(pdf, sha):
+    """pdf si existe y su SHA-256 es sha, o None (y se avisa si es otro archivo)."""
+    if not pdf.exists():
         return None
     real = hashlib.sha256(pdf.read_bytes()).hexdigest()
     if real != sha:
@@ -704,6 +740,13 @@ def extraer():
     # --- subcarpetas de años pivot / 2011 ---
     for ydir in sorted(p for p in DIR_NACION.iterdir() if p.is_dir() and re.fullmatch(r"\d{4}", p.name)):
         anio = int(ydir.name)
+        for nombre, sha in PDF_SIN_CSV.items():
+            pdf = _pdf_revisado(ydir / nombre, sha)
+            if pdf:
+                regs = _parse_pivot_pdf(pdf, anio, nombre, cont)
+                if regs is None:
+                    log(f"  [Nación] {nombre}: no hay CSV que leer en su lugar; no se carga")
+                registros += regs or []
         csvs = sorted(ydir.glob("*.csv"))
         if not csvs:
             continue
