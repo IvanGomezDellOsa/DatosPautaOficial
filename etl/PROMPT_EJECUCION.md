@@ -9,9 +9,10 @@ El repo `Repositorio DatosPautaOficial` contiene un ETL en `etl/` que reconstruy
 en `etl/extractores/`. Tu tarea es **ejecutarlos, verificar el output y dejarlo listo**.
 
 ## Requisitos
-- Python 3.8+ y la dependencia `openpyxl` (solo para el Excel de PBA 2025):
+- Python 3.8+ y las dependencias `openpyxl` (solo para el Excel de PBA 2025) y `pdfplumber`
+  (para los PDFs oficiales de los pivots de Nación, ver abajo):
   ```
-  pip install openpyxl
+  pip install openpyxl pdfplumber
   ```
 - Los datos crudos deben estar en:
   `C:\Users\IvanGomezD\Desktop\0\ClaudeCoWork\DatosPautaOficial\`
@@ -21,9 +22,29 @@ en `etl/extractores/`. Tu tarea es **ejecutarlos, verificar el output y dejarlo 
   ```
   set DATOS_CRUDOS_BASE=D:\ruta\a\DatosPautaOficial      (Windows CMD)
   ```
+- **PDFs oficiales de los pivots de Nación 2009, 2010 y 2012.** El texto "(nuevo v2)" de esos
+  pivots viene corrido en las páginas sin encabezado: de ahí no se puede leer el rubro
+  (`tipo_de_medio`) ni el mes (`fecha`) de cada monto. Si el PDF está en la carpeta del año,
+  junto a su CSV, el extractor lo lee por coordenadas y concilia cada fila y cada columna.
+  Si falta, si su SHA-256 no es el revisado o si no concilia, avisa y lee el texto: el rubro
+  queda vacío y el mes sale de la posición, que en 2009 está mal en cerca de la mitad de las filas.
+  `archivo_origen` sigue siendo el nombre del CSV. Se bajan de
+  `https://www.argentina.gob.ar/sites/default/files/<pdf>`:
+
+  | Carpeta `Nacion\` | PDF | SHA-256 | Reemplaza al texto |
+  |---|---|---|---|
+  | `2009\` | `pauta_por_proveedor_con_iva_2009.pdf` | `8fd2e1d3…c1c3b4` | `(nuevo v2) Pauta_por_Proveedor_conIVA-_-2009-mayo-oct.csv` |
+  | `2009\` | `pauta_por_proveedor_coniva_nov_dic_2009.pdf` | `8fd88ffc…56098b` | `(nuevo v2) Pauta_por_proveedor_conIVA_nov_dic_2009.csv` |
+  | `2010\` | `pauta_por_proveedor_coniva_ene_jun_2010.pdf` | `e9d500b6…59a783` | `(nuevo v2Pauta_por_proveedor_conIVA_ene_jun_2010.csv` |
+  | `2010\` | `segundo_semestre_prov_rubro_2010.pdf` | `e0bee281…3aead3` | `(nuevo v2)segundo_semestre_prov_rubro-2010.csv` |
+  | `2012\` | `inversion_1er_semestre_2012_proveedor_rubro.pdf` | `a1bd5110…1c5448` | `inversion_1er_Semestre_2012_proveedor_rubro.csv` |
+
+  Los SHA-256 completos están en `PDF_DE_PIVOT` (`etl/extractores/extract_nacion.py`).
+  En el log, cada PDF leído dice "se lee el PDF oficial, que concilia".
 
 ## Orden de ejecución (desde la raíz del repo)
-0. **Tests de los extractores** (montos y pivots; no necesitan los crudos):
+0. **Tests de los extractores** (montos y pivots; no necesitan los crudos; los del PDF usan
+   los dos PDFs oficiales de `etl/tests/fixtures/`):
    ```
    python -m unittest discover -s etl/tests
    ```

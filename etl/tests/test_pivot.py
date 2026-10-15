@@ -125,6 +125,14 @@ class PivotRubro(unittest.TestCase):
         _, cont = self._parse(PAGINA_1)
         self.assertEqual(cont.avisos, {"pivot_sin_total_general": 1})
 
+    def test_desescapa_las_comillas_del_campo(self):
+        # cada linea es un campo CSV entre comillas: las comillas internas vienen duplicadas
+        regs, _ = self._parse([
+            alineada('ASOC.CIV.S/FIN.LUCRO""NOSOTROS""', [("RADIO", "25.700,00"), ("Total general", "25.700,00")]),
+            total_general("25.700,00"),
+        ])
+        self.assertEqual(regs, [('ASOC.CIV.S/FIN.LUCRO"NOSOTROS"', "Radio", 25700.0)])
+
     def test_fila_que_no_concilia_usa_la_posicion(self):
         # falta el total: no se puede reconocer por aritmetica, se usa la posicion
         regs, cont = self._parse([

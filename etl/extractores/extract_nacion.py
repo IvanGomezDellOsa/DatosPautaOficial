@@ -26,8 +26,13 @@ Formatos reales:
      (ultimo numero = suma de los anteriores) y la tabla se concilia contra su Total
      general: las paginas sin encabezado vienen corridas (ver _pivot_rubro).
      Dedup de versiones duplicadas: se prefieren los archivos "(nuevo v2)".
+
+  4) PDF oficial de esos pivots: si esta en la carpeta del año junto al CSV (ver PDF_DE_PIVOT),
+     se lee el PDF por coordenadas en lugar del texto, que no permite saber la columna (rubro
+     o mes) de cada monto. Ver _parse_pivot_pdf.
 """
 
+import hashlib
 import io
 import os
 import re
@@ -166,9 +171,11 @@ def _split_pos(linea):
 
 
 def _unquote(l):
+    """Cada linea es un unico campo CSV entre comillas: se sacan las comillas envolventes y se
+    desescapan las internas ('LUCRO""NOSOTROS""' -> 'LUCRO"NOSOTROS"')."""
     l = l.rstrip("\r")
     if len(l) >= 2 and l[0] == '"' and l[-1] == '"':
-        l = l[1:-1]
+        l = l[1:-1].replace('""', '"')
     return l
 
 
@@ -330,6 +337,229 @@ def _pivot_rubro(path, anio, filas, val_cols, leer_monto, total_tabla, cont):
     return out
 
 
+# ---------------------------------------------------------------------------
+# 4) PIVOT desde el PDF oficial (por coordenadas)
+# ---------------------------------------------------------------------------
+
+# PDF oficial de cada pivot y su SHA-256: argentina.gob.ar/sites/default/files/<pdf> (pagina
+# "Pauta oficial", argentina.gob.ar/node/1759). Solo se lee el PDF revisado: si el archivo de la
+# carpeta es otro (otra version publicada, el "sin IVA"), se avisa y se lee el texto.
+PDF_DE_PIVOT = {
+    "(nuevo v2) Pauta_por_Proveedor_conIVA-_-2009-mayo-oct.csv": (
+        "pauta_por_proveedor_con_iva_2009.pdf",
+        "8fd2e1d35b8210a3bc43e64d966d3a23e879b64ecb3fae5a23a9894553c1c3b4"),
+    "(nuevo v2) Pauta_por_proveedor_conIVA_nov_dic_2009.csv": (
+        "pauta_por_proveedor_coniva_nov_dic_2009.pdf",
+        "8fd88ffc3a05fb493e20629b8e1089ded00bd4c2e78eed9e0b6ae47b0156098b"),
+    "(nuevo v2Pauta_por_proveedor_conIVA_ene_jun_2010.csv": (
+        "pauta_por_proveedor_coniva_ene_jun_2010.pdf",
+        "e9d500b6f6c1bec06f971dc411ce9493327eab10eb841698e5188991b859a783"),
+    "(nuevo v2)segundo_semestre_prov_rubro-2010.csv": (
+        "segundo_semestre_prov_rubro_2010.pdf",
+        "e0bee281c2b33e71e6e985086eb61cbf391c1efd95a120aeaada44521a3aead3"),
+    "inversion_1er_Semestre_2012_proveedor_rubro.csv": (
+        "inversion_1er_semestre_2012_proveedor_rubro.pdf",
+        "a1bd51106c8f2844678d78c64505aee562c932f6fa14b065d640a39f421c5448"),
+}
+
+_RE_NUM_PDF = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}")
+_RE_MES = re.compile(r"[A-Za-z]{3}-\d{2}")
+
+
+def _lineas_pdf(pagina):
+    """Lineas de una pagina de pdfplumber: listas de palabras {text, x0, x1} de izquierda a
+    derecha. Une los pedazos pegados de un mismo numero (en 2010-S2 "169.860.514,46" viene
+    como "1" y "69.860.514,46")."""
+    filas = []
+    for w in sorted(pagina.extract_words(x_tolerance=1, y_tolerance=2),
+                    key=lambda w: (w["top"], w["x0"])):
+        if filas and abs(filas[-1][0] - w["top"]) <= 2:
+            filas[-1][1].append(w)
+        else:
+            filas.append((w["top"], [w]))
+    lineas = []
+    for _, ws in filas:
+        linea = []
+        for w in sorted(ws, key=lambda w: w["x0"]):
+            w = {"text": w["text"], "x0": w["x0"], "x1": w["x1"]}
+            if (linea and re.fullmatch(r"[\d.,]+", linea[-1]["text"])
+                    and re.fullmatch(r"[\d.,]+", w["text"]) and w["x0"] - linea[-1]["x1"] < 0.6):
+                linea[-1] = dict(linea[-1], text=linea[-1]["text"] + w["text"], x1=w["x1"])
+            else:
+                linea.append(w)
+        lineas.append(linea)
+    return lineas
+
+
+def _centavos_pdf(txt):
+    return int(txt.replace(".", "").replace(",", ""))
+
+
+def _tabla_pdf(lineas):
+    """Lee un pivot desde las lineas del PDF (todas las paginas, en orden) y lo concilia.
+
+    El encabezado es la primera linea con "Total general" (pivot por rubro) o con meses
+    ("may-09", pivot por mes). Sus etiquetas son las palabras separadas por menos de 6 puntos;
+    la primera (o las dos primeras en el pivot por mes: DENOMINACION y MEDIO) son de texto y el
+    resto son las columnas de montos. Los montos estan alineados a la derecha: la columna de
+    cada uno es la ultima cuyo encabezado empieza antes de donde termina el numero.
+
+    Devuelve (modo, columnas, filas, problemas): columnas = [etiqueta], filas =
+    [(proveedor, medio, [(columna, texto)])] sin la fila de totales. problemas es la lista de lo
+    que no concilia, vacia si todo concilia:
+      - en cada columna todos los montos terminan en el mismo x (+-1 punto): asi la columna de
+        cada numero no depende de las sumas (en los 5 PDFs varian 0,1 puntos);
+      - cada fila tiene un monto por columna y, si hay columna Total general, sus rubros suman
+        ese total al centavo;
+      - cada columna suma lo que dice la fila de totales (la "Total general" del pivot por
+        rubro; en el pivot por mes, la ultima, que no tiene nombre). En el pivot por rubro, al
+        centavo. Los pivots por mes (2009) no tienen total por fila y sus totales de columna se
+        calcularon antes de redondear cada celda: cada celda puede diferir medio centavo, asi que
+        se acepta hasta (celdas + 1) / 2 centavos. En 2009 la diferencia mayor es de 41 centavos
+        en 531 celdas (cota 2,66) y la celda mas chica es de 87,12: una celda perdida o en otra
+        columna no entra en la tolerancia."""
+    modo = enc = None
+    filas, totales, problemas = [], None, []
+    bordes = {}   # columna -> x1 de sus montos
+    for l in lineas:
+        txt = " ".join(w["text"] for w in l)
+        if modo is None:
+            if "total general" in txt.lower():
+                modo = "rubro"
+            elif any(_RE_MES.fullmatch(w["text"]) for w in l):
+                modo = "mes"
+            else:
+                continue
+            etiquetas = []
+            for w in l:
+                if etiquetas and w["x0"] - etiquetas[-1][2] < 6:
+                    etiquetas[-1] = (etiquetas[-1][0], etiquetas[-1][1] + " " + w["text"], w["x1"])
+                else:
+                    etiquetas.append((w["x0"], w["text"], w["x1"]))
+            n_texto = 2 if modo == "mes" else 1
+            x_medio = etiquetas[1][0] if modo == "mes" else None
+            xs = [x0 for x0, _, _ in etiquetas[n_texto:]]
+            columnas = [lab for _, lab, _ in etiquetas[n_texto:]]
+            enc = txt
+            continue
+        if txt == enc:
+            continue   # encabezado repetido en cada pagina
+        nums = [w for w in l if w["x1"] >= xs[0] and _RE_NUM_PDF.fullmatch(w["text"])]
+        textos = [w for w in l if w["x1"] < xs[0] and w["text"] != "$"]
+        otros = [w["text"] for w in l if w["x1"] >= xs[0] and w not in nums
+                 and w["text"] not in ("$", "-")]
+        if otros:
+            problemas.append(f"texto en la zona de montos: {txt!r}")
+        if not nums:
+            continue   # titulo, pie de pagina o fila sin montos (todo "-")
+        prov = " ".join(w["text"] for w in textos if x_medio is None or w["x0"] < x_medio - 2)
+        medio = " ".join(w["text"] for w in textos if x_medio is not None and w["x0"] >= x_medio - 2)
+        celdas = [(max(k for k, x in enumerate(xs) if x <= w["x1"]), w["text"]) for w in nums]
+        for (c, _), w in zip(celdas, nums):
+            bordes.setdefault(c, []).append(w["x1"])
+        if not prov or re.fullmatch(r"total( general)?", prov, re.I):
+            if totales is not None:
+                problemas.append(f"dos filas de totales: {txt!r}")
+            totales = celdas
+            continue
+        # "TOTAL F.M. S.R.L." o "TOTAL PUBLIVIA SA" son proveedores: los PDFs no tienen
+        # subtotales "Total <proveedor>" (si los tuvieran, las columnas no conciliarian)
+        filas.append((prov, medio or None, celdas))
+
+    if modo is None:
+        return None, [], [], ["sin encabezado"]
+    i_tot = next((k for k, lab in enumerate(columnas) if "total" in lab.lower()), None)
+    if modo == "rubro" and i_tot is None:
+        problemas.append("el encabezado no tiene la columna Total general")
+    for c, xs1 in sorted(bordes.items()):
+        if max(xs1) - min(xs1) > 1:
+            problemas.append(f"columna {columnas[c]}: los montos no estan alineados "
+                             f"(terminan entre x={min(xs1):.1f} y x={max(xs1):.1f})")
+    por_col, n_col = [0] * len(columnas), [0] * len(columnas)
+    for prov, _, celdas in filas:
+        cs = [c for c, _ in celdas]
+        if len(set(cs)) != len(cs):
+            problemas.append(f"{prov}: dos montos en la misma columna")
+        if i_tot is not None:
+            tot = [_centavos_pdf(t) for c, t in celdas if c == i_tot]
+            rubros = sum(_centavos_pdf(t) for c, t in celdas if c != i_tot)
+            if tot != [rubros]:
+                problemas.append(f"{prov}: los rubros suman {rubros / 100:,.2f} y el total es {tot}")
+        for c, t in celdas:
+            por_col[c] += _centavos_pdf(t)
+            n_col[c] += 1
+    if totales is None:
+        problemas.append("sin fila de totales")
+    else:
+        fila_tot = {}
+        for c, t in totales:
+            if c in fila_tot:
+                problemas.append(f"fila de totales: dos montos en {columnas[c]}")
+            fila_tot[c] = _centavos_pdf(t)
+        for c, lab in enumerate(columnas):
+            tolerancia = 0 if modo == "rubro" else (n_col[c] + 1) // 2
+            if abs(por_col[c] - fila_tot.get(c, 0)) > tolerancia:
+                problemas.append(f"columna {lab}: las filas suman {por_col[c] / 100:,.2f} y el "
+                                 f"total es {fila_tot.get(c, 0) / 100:,.2f}")
+    return modo, columnas, filas, problemas
+
+
+def _parse_pivot_pdf(path, anio, archivo, cont):
+    """Registros del pivot leidos del PDF oficial, o None si el PDF no concilia.
+
+    En el texto convertido desde el PDF las paginas sin encabezado vienen corridas (hasta 4
+    columnas, de forma no uniforme), asi que la columna de cada monto, que es el rubro o el mes,
+    no se puede leer de ahi. En el PDF cada palabra tiene su posicion real. Se carga solo si
+    toda la tabla concilia (ver _tabla_pdf): si no, el llamador lee el texto.
+    archivo: el archivo_origen de los registros (el nombre del CSV al que reemplaza)."""
+    try:
+        import pdfplumber
+    except ImportError:
+        raise SystemExit(f"[Nación] {path.name} necesita pdfplumber: pip install pdfplumber")
+    with pdfplumber.open(path) as pdf:
+        lineas = [l for p in pdf.pages for l in _lineas_pdf(p)]
+    modo, columnas, filas, problemas = _tabla_pdf(lineas)
+    if problemas:
+        log(f"  [Nación] {path.name}: ADVERTENCIA el PDF no concilia ({len(problemas)} problemas, "
+            f"p.ej. {problemas[0]}); se lee el texto")
+        cont.avisar("pivot_pdf_no_concilia")
+        return None
+    out = []
+    for prov, medio, celdas in filas:
+        n = len(out)
+        for c, t in celdas:
+            monto = comun.normalizar_monto(t, ",")
+            if monto is None or "total" in columnas[c].lower():
+                continue   # celda 0,00 o el Total general de la fila
+            if modo == "rubro":
+                out.append(registro(JURIS, anio, monto, archivo, proveedor=limpiar_str(prov),
+                                    tipo_de_medio=_canon_rubro(columnas[c])))
+            else:
+                out.append(registro(JURIS, anio, monto, archivo,
+                                    fecha=normalizar_fecha(columnas[c], anio),
+                                    proveedor=limpiar_str(prov), medio=limpiar_str(medio)))
+        if len(out) == n:
+            cont.descartar("fila_sin_valores")
+    cont.ok(len(out))
+    log(f"  [Nación] {path.name}: se lee el PDF oficial, que concilia "
+        f"({len(out)} celdas, {sum(_centavos(r['monto']) for r in out) / 100:,.2f})")
+    return out
+
+
+def _pdf_oficial(csv_path):
+    """PDF oficial del pivot que esta en la carpeta del CSV y es el revisado, o None."""
+    nombre, sha = PDF_DE_PIVOT.get(csv_path.name, (None, None))
+    pdf = csv_path.parent / nombre if nombre else None
+    if pdf is None or not pdf.exists():
+        return None
+    real = hashlib.sha256(pdf.read_bytes()).hexdigest()
+    if real != sha:
+        log(f"  [Nación] {pdf.name}: ADVERTENCIA no es el PDF revisado (SHA-256 {real}); se lee "
+            f"el texto")
+        return None
+    return pdf
+
+
 def _seleccionar_versiones(csvs):
     """Dedup: preferir '(nuevo v2)' > '(nuevo)' > nombre plano."""
     v2 = [f for f in csvs if "v2" in f.name.lower()]
@@ -482,7 +712,9 @@ def extraer():
                 registros += _parse_2011(f, cont)
             continue
         for f in _seleccionar_versiones(csvs):
-            registros += _parse_pivot(f, anio, cont)
+            pdf = _pdf_oficial(f)
+            regs = _parse_pivot_pdf(pdf, anio, f.name, cont) if pdf else None
+            registros += regs if regs is not None else _parse_pivot(f, anio, cont)
 
     # --- fallback: curado para años sin fuente cruda ---
     anios_cubiertos = {r["anio"] for r in registros if r["anio"]}
