@@ -120,10 +120,10 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
 
 ### Lo que sabemos y todavía no corregimos
 
-- **Nación, primer semestre de 2013.**
-  - La fuente que usamos para 2013 informa importes **sin IVA** ("importe neto"). El resto de Nación está con IVA.
-  - Contra el PDF oficial del semestre, la base suma $87,9 millones menos.
-  - Estamos evaluando cómo corregirlo sin perder el detalle por orden.
+- **Nación 2013: importes sin IVA.**
+  - La fuente que usamos para 2013 informa el **importe neto, sin IVA**. El PDF oficial del primer semestre, en cambio, está con IVA.
+  - Por eso, contra ese PDF, la base suma $87,9 millones menos en el primer semestre.
+  - Mantenemos el dato de la fuente, con su detalle por orden, y lo aclaramos en la cobertura de Nación del sitio.
 - **Nación, junio de 2009.** No figura en ninguna publicación oficial.
 - **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no están en la base.
 

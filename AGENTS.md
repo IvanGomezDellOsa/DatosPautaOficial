@@ -181,10 +181,13 @@ Ahí está también el reporte de auditoría por archivo.
 - **Pendientes conocidos, sin corregir:**
   - Santa Fe: "Radio 2008 (II)" duplicado; medios faltantes en 2011 y 2013; Internet
     2016 sin OCR.
-  - Nación 2013: la fuente da el importe neto (sin IVA); el resto de Nación es con IVA.
-    2013-H1 suma $87,9 M nominales menos que el PDF oficial. Se dejó como está: no hay
-    un factor único de IVA y corregirlo exige elegir entre perder el detalle por orden
-    o aclararlo en Metodología. Lo decide el usuario.
+  - Nación 2013: la fuente (`DatosPublicidadOficialEnero2013_Mayo2014.csv`, columna
+    `IMPORTE NETO`) da el importe sin IVA. 2013-H1 suma $87,9 M nominales menos que el
+    PDF oficial, que es con IVA. No hay un factor único de IVA. Se mantiene el dato
+    (opción B) y la tarjeta de cobertura de Nación lo aclara. La opción A, reemplazar
+    por las celdas del PDF, perdería el detalle por orden.
+  - IVA sin verificar en Nación 2014-2015 (columna `total`) y 2021-10 a 2022-04
+    (`total_general`). 2016-2021 usan `total_con_iva`; 2009-2013-H1 en PDF son con IVA.
   - CABA 2023: Gráfica, Cine y Medios vecinales solo en Excel; no están en la base.
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
