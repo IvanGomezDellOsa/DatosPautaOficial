@@ -149,21 +149,31 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     // Sin entidad: lookup puntual + PAGINADO en groups_cache (pre-computado en
     // el ETL, que ahora guarda TODAS las combinaciones, no un top-N). Evita el
     // GROUP BY sobre orders y permite recorrer la base entera agrupada sin traer
-    // miles de filas de golpe. ORDER BY rank usa idx_gcache; LIMIT/OFFSET pagina.
+    // miles de filas de golpe.
+    // rank es contiguo (1..N) dentro de cada clave (jurisdiccion, anio), así lo
+    // arma crear_groups en el ETL. Por eso el total es el rank más alto y la
+    // página se pide por rango de rank: ambos son un seek en idx_gcache. Con
+    // COUNT(*) y OFFSET se recorría el índice entero de la clave (la global
+    // tiene ~25.600 filas: ~640 KB sobre HTTP para llegar a la última página).
     if (!entidadNorm) {
-      const [{ total }] = await query<{ total: number }>(
-        `SELECT COUNT(*) as total FROM groups_cache WHERE jurisdiccion = ? AND anio = ?`,
-        [jurisdiccion ?? "*", anio ?? 0],
+      const jurisKey = jurisdiccion ?? "*";
+      const anioKey = anio ?? 0;
+      const [ultimo] = await query<{ rank: number }>(
+        `SELECT rank FROM groups_cache
+         WHERE jurisdiccion = ? AND anio = ?
+         ORDER BY rank DESC
+         LIMIT 1`,
+        [jurisKey, anioKey],
       );
       const filas = await query<OrdenAgrupada>(
         `SELECT medio_norm, proveedor_norm, medio, proveedor, total, n
          FROM groups_cache
-         WHERE jurisdiccion = ? AND anio = ?
+         WHERE jurisdiccion = ? AND anio = ? AND rank > ?
          ORDER BY rank
-         LIMIT ? OFFSET ?`,
-        [jurisdiccion ?? "*", anio ?? 0, porPagina, pagina * porPagina],
+         LIMIT ?`,
+        [jurisKey, anioKey, pagina * porPagina, porPagina],
       );
-      return { filas, totalFilas: Number(total) };
+      return { filas, totalFilas: Number(ultimo?.rank ?? 0) };
     }
     // Con entidad: el set es chico (un solo proveedor/medio), GROUP BY en vivo es
     // rapido. Igual se pagina por consistencia con la UI. HAVING excluye el grupo
@@ -194,11 +204,26 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     ? `id ${desc ? "DESC" : "ASC"}`
     : `monto ${desc ? "DESC" : "ASC"} NULLS LAST`;
 
-  // Count total para paginación (usa el mismo WHERE para ser consistente)
-  const [{ total }] = await query<{ total: number }>(
-    `SELECT COUNT(*) as total FROM orders ${where}`,
-    [...params],
-  );
+  // Total para la paginación. Sin filtro de entidad sale de filtros_cache (el
+  // mismo COUNT(*) pre-computado en el ETL): contar sobre orders sin filtros
+  // recorre un índice entero (~15 MB descargados sobre HTTP). Con entidad el
+  // set es chico y se cuenta en vivo con el mismo WHERE que las filas.
+  let totalFilas: number | null = null;
+  if (!entidadNorm) {
+    const [c] = await query<{ n: number }>(
+      `SELECT n_ordenes AS n FROM filtros_cache WHERE jurisdiccion = ? AND anio = ?`,
+      [jurisdiccion ?? "*", anio ?? 0],
+    );
+    if (c) totalFilas = Number(c.n);
+    // Si la combinación no está en cache (no tiene órdenes), cae al COUNT.
+  }
+  if (totalFilas === null) {
+    const [{ total }] = await query<{ total: number }>(
+      `SELECT COUNT(*) as total FROM orders ${where}`,
+      [...params],
+    );
+    totalFilas = Number(total);
+  }
 
   // Filas de la página
   const filas = await query<Orden>(
@@ -210,7 +235,7 @@ export async function getOrdenes(filtros: FiltrosTabla = {}): Promise<{
     [...params, porPagina, pagina * porPagina],
   );
 
-  return { filas, totalFilas: Number(total) };
+  return { filas, totalFilas };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,8 +266,15 @@ export async function getDetalleGrupo(
 
   if (jurisdiccion)   { wheres.push("jurisdiccion = ?");   params.push(jurisdiccion); }
   if (anio)           { wheres.push("anio = ?");            params.push(anio); }
-  if (medio_norm)     { wheres.push("medio = ?");      params.push(medio_norm); }
-  if (proveedor_norm) { wheres.push("proveedor = ?");  params.push(proveedor_norm); }
+  // El grupo es el par (medio, proveedor) exacto: un lado NULL significa
+  // "órdenes SIN medio/proveedor", no "cualquiera". Omitir la condición traía
+  // órdenes de otros grupos (CABA 2004, "america tv" sin medio: 13 de las
+  // primeras 15 tenían medio). IS NULL sigue resolviéndose por el índice
+  // cubriente idx_orders_juris_anio_medio_prov.
+  if (medio_norm == null)     { wheres.push("medio IS NULL"); }
+  else                        { wheres.push("medio = ?");     params.push(medio_norm); }
+  if (proveedor_norm == null) { wheres.push("proveedor IS NULL"); }
+  else                        { wheres.push("proveedor = ?"); params.push(proveedor_norm); }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : "";
   return query<Orden>(

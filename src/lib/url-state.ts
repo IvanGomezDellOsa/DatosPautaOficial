@@ -36,6 +36,9 @@ export interface DefaultsTabla {
 
 export const DEFAULTS_TABLA: DefaultsTabla = { jurisdiccion: "PBA", anio: 2025 };
 
+/** Jurisdicciones con datos, escritas igual que en la base (orders.jurisdiccion). */
+export const JURISDICCIONES = ["CABA", "Nación", "PBA", "Santa Fe"];
+
 export interface EstadoGenerador {
   norm: string | null;
   tipo: TipoEntidad;
@@ -60,8 +63,14 @@ export function leerEstadoTabla(defaults: DefaultsTabla = DEFAULTS_TABLA): Estad
   // anio no numérico en la URL (?anio=abc) → NaN rompería el seed y los
   // selects de disponibilidad; se cae al default.
   const anioNum = anioParam != null ? Number(anioParam) : NaN;
+  // Misma regla para juris: un valor desconocido (?juris=Cordoba) se cae al
+  // default. Antes pasaba tal cual y DataTable fallaba al buscar su rango de
+  // años (TypeError: la tabla entera desaparecía). Se toleran mayúsculas y
+  // tildes ("nacion" → "Nación"), la forma más común de romper un link.
+  const jurisTodas = jurisParam != null && sinTildes(jurisParam) === "todas";
+  const jurisValida = jurisParam != null ? resolverJurisdiccion(jurisParam) : null;
   return {
-    jurisdiccion: jurisParam === "todas" ? null : (jurisParam ?? defaults.jurisdiccion),
+    jurisdiccion: jurisTodas ? null : (jurisValida ?? defaults.jurisdiccion),
     anio:         anioParam  === "todos" ? null : (Number.isInteger(anioNum) ? anioNum : defaults.anio),
     entidadNorm: p.get("norm"),
     entidadTipo: p.get("tipo") === "medio" ? "medio" : "proveedor",
@@ -74,7 +83,8 @@ export function leerEstadoGenerador(): EstadoGenerador {
     typeof window !== "undefined" ? window.location.search : "",
   );
   const yRaw = p.get("y");
-  const anio = yRaw && yRaw !== "historico" && !isNaN(Number(yRaw))
+  // Solo años enteros (?y=2015); cualquier otro valor cae a "histórico".
+  const anio = yRaw && yRaw !== "historico" && Number.isInteger(Number(yRaw))
     ? Number(yRaw)
     : "historico";
   const modo = p.get("modo");
@@ -151,6 +161,16 @@ export function urlGenerador(estado: EstadoGenerador): string {
   if (estado.anio !== "historico") p.set("y", String(estado.anio));
   // El hash lleva al receptor directo a la sección "Cuánto recibió".
   return `https://datospautaoficial.com.ar/?${p.toString()}#cuanto-recibio`;
+}
+
+/** Jurisdicción válida para un valor de URL, ignorando mayúsculas y tildes. */
+function resolverJurisdiccion(valor: string): string | null {
+  const clave = sinTildes(valor);
+  return JURISDICCIONES.find((j) => sinTildes(j) === clave) ?? null;
+}
+
+function sinTildes(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 function setOrDel(p: URLSearchParams, key: string, val: string | null): void {

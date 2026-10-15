@@ -2,9 +2,10 @@
  * home.ts — tipo del estado inicial precomputado (public/data/home.json).
  *
  * home.json lo genera el ETL (build_db.py → escribir_home). Contiene TODO lo que
- * la portada muestra con los filtros por defecto (PBA 2025, orden por fecha asc),
- * ya resuelto. Astro lo inlinea como prop de los islands para que el primer paint
- * no dispare sql.js-httpvfs: cero WASM, cero worker, cero round-trips a la DB.
+ * la portada muestra con los filtros por defecto (jurisdicción seed + su año más
+ * reciente, tabla agrupada), ya resuelto. Astro lo inlinea como prop de los
+ * islands para que el primer paint no dispare sql.js-httpvfs: cero WASM, cero
+ * worker, cero round-trips a la DB.
  * sql.js recién se inicializa cuando el usuario cambia un filtro, busca u ordena.
  *
  * Si cambian las queries del front o el filtro por defecto, regenerar home.json.

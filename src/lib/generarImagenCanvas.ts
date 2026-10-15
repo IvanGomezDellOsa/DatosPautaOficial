@@ -264,7 +264,10 @@ export async function descargarPlaca(datos: DatosPlaca): Promise<void> {
       const slug = datos.nombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-");
       a.download = `pauta-oficial-${slug}.png`;
       a.click();
-      URL.revokeObjectURL(a.href);
+      // Revocar en el mismo tick que el click puede cortar la descarga en
+      // algunos navegadores; FileSaver.js espera 40 s por el mismo motivo.
+      const url = a.href;
+      setTimeout(() => URL.revokeObjectURL(url), 40_000);
       resolve();
     }, "image/png");
   });

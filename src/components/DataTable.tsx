@@ -8,6 +8,8 @@
  *  - Filtros activos se leen/escriben en la URL (url-state.ts).
  *  - getOrdenes() + getTotalesFiltro() traen los datos via sql.js-httpvfs.
  *  - MiniSearch (search.ts) resuelve texto → norm para el filtro SQL.
+ *  - search.json (search.ts) resuelve norm → nombre para las filas que salen
+ *    de orders, que guarda solo la clave (ver cargarNombres).
  *
  * Modos de vista:
  *  - Agrupado (default): muestra pares únicos (proveedor+medio) por monto,
@@ -28,9 +30,16 @@ import {
   leerEstadoTabla,
   escribirEstadoTabla,
   estadoAFiltros,
+  JURISDICCIONES,
   type EstadoTabla,
 } from "../lib/url-state";
-import { buscar, type EntidadBusqueda } from "../lib/search";
+import {
+  buscar,
+  entidadPorNorm,
+  getNombreDisplay,
+  type EntidadBusqueda,
+  type NombreDisplay,
+} from "../lib/search";
 import { query } from "../lib/db";
 import { useSugerenciasNav } from "../lib/useSugerenciasNav";
 import type { SeedTabla } from "../lib/home";
@@ -39,9 +48,9 @@ import type { SeedTabla } from "../lib/home";
 // Constantes
 // ---------------------------------------------------------------------------
 
-const JURISDICCIONES = ["CABA", "Nación", "PBA", "Santa Fe"];
 // Rango de años con datos por jurisdicción. ÚNICA fuente del rango de años en
-// este componente: al cargar datos nuevos, actualizar solo esta tabla.
+// este componente: al cargar datos nuevos, actualizar solo esta tabla. Sus
+// claves son JURISDICCIONES (url-state.ts), la lista que valida ?juris=.
 const DISPONIBILIDAD: Record<string, [number, number]> = {
   "Nación": [2009, 2022],
   "CABA": [2003, 2024],
@@ -62,6 +71,18 @@ const fmtNum = new Intl.NumberFormat("es-AR");
 function formatMonto(v: number | null): string {
   if (v == null) return "–";
   return `$ ${fmtARS.format(Math.round(v))}`;
+}
+
+/**
+ * orders guarda solo la clave normalizada de proveedor y medio ("uriarte
+ * german"). El modo individual y el agrupado con entidad leen de ahí (el
+ * agrupado sin entidad lee groups_cache, que ya trae el nombre), así que sus
+ * filas se resuelven al nombre como figura en la fuente ANTES de mostrarse:
+ * llegan junto con los datos y nunca se ve la clave. Si search.json no carga,
+ * se muestra la clave antes que dejar la tabla en error.
+ */
+function cargarNombres(): Promise<NombreDisplay> {
+  return getNombreDisplay().catch((): NombreDisplay => (_tipo, norm) => norm);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,12 +108,23 @@ function useTabla(filtros: FiltrosTabla, pagina: number, seed: SeedAgrupado) {
     setLoading(true);
     setError(false);
     try {
-      const [{ filas, totalFilas: total }, tots] = await Promise.all([
+      const [{ filas, totalFilas: total }, tots, nombre] = await Promise.all([
         getOrdenes({ ...filtros, agrupado: true, pagina, porPagina: POR_PAGINA }),
         getTotalesFiltro(filtros),
+        // Con entidad el GROUP BY corre en vivo sobre orders y trae claves; sin
+        // entidad groups_cache ya trae el nombre y no se descarga search.json.
+        filtros.entidadNorm ? cargarNombres() : null,
       ]);
       if (id !== seq.current) return;
-      setRows(filas as OrdenAgrupada[]);
+      setRows(
+        nombre
+          ? (filas as OrdenAgrupada[]).map((r) => ({
+              ...r,
+              medio: nombre("medio", r.medio_norm),
+              proveedor: nombre("proveedor", r.proveedor_norm),
+            }))
+          : (filas as OrdenAgrupada[]),
+      );
       setTotalFilas(Number(total));
       setTotalMonto(tots.montoTotal);
     } catch {
@@ -144,12 +176,17 @@ function useTablaIndividual(filtros: FiltrosTabla, pagina: number, activo: boole
     setLoading(true);
     setError(false);
     try {
-      const [{ filas, totalFilas: total }, tots] = await Promise.all([
+      const [{ filas, totalFilas: total }, tots, nombre] = await Promise.all([
         getOrdenes({ ...filtros, agrupado: false, pagina, porPagina: POR_PAGINA, ordenPor: "monto", desc: true }),
         getTotalesFiltro(filtros),
+        cargarNombres(),
       ]);
       if (id !== seq.current) return;
-      setRows(filas as Orden[]);
+      setRows((filas as Orden[]).map((o) => ({
+        ...o,
+        proveedor: nombre("proveedor", o.proveedor),
+        medio: nombre("medio", o.medio),
+      })));
       setTotalFilas(Number(total));
       setTotalMonto(tots.montoTotal);
     } catch {
@@ -253,6 +290,27 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
   const busqRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Nombre de display de la entidad filtrada, separado de textoBusq (el texto
+  // del input). Si el chip leía textoBusq, al escribir otra búsqueda decía
+  // "Medio: telefe" mientras la tabla seguía filtrando por Clarín.
+  const [entidadSel, setEntidadSel] = useState<{ norm: string; tipo: string; nombre: string } | null>(null);
+
+  // Entidad que llega por URL (recarga o link compartido): resolver su nombre
+  // de display; si no, el chip mostraba la clave normalizada ("clarin").
+  // Mientras search.json llega el chip dice "…"; la clave queda solo como
+  // respaldo si no figura o si search.json no carga.
+  useEffect(() => {
+    const { entidadNorm, entidadTipo } = estado;
+    if (!entidadNorm) return;
+    const fijar = (nombre: string) =>
+      setEntidadSel((prev) => prev ?? { norm: entidadNorm, tipo: entidadTipo, nombre });
+    entidadPorNorm(entidadNorm, entidadTipo)
+      .then((e) => fijar(e?.nombre ?? entidadNorm))
+      .catch(() => fijar(entidadNorm));
+    // Solo al montar: después el nombre lo fija elegirEntidad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Atajo "/" → foco en el buscador (el badge del input lo promete)
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -347,6 +405,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
     // La tabla sólo busca proveedores/medios (MiniSearch); nunca grupos.
     const entidadTipo = e.tipo === "medio" ? "medio" : "proveedor";
     setFiltro({ entidadNorm: e.norm, entidadTipo });
+    setEntidadSel({ norm: e.norm, tipo: entidadTipo, nombre: e.nombre });
     setTextoBusq(e.nombre);
     setMostrarSugs(false);
   };
@@ -361,6 +420,7 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
 
   const quitarEntidad = () => {
     setFiltro({ entidadNorm: null });
+    setEntidadSel(null);
     setTextoBusq("");
   };
 
@@ -480,7 +540,11 @@ export default function DataTable({ initial }: { initial?: SeedTabla }) {
           {estado.entidadNorm && (
             <button className="chip-active" aria-label="Quitar Entidad" onClick={quitarEntidad}>
               <span className="label">{estado.entidadTipo === "medio" ? "Medio:" : "Proveedor:"}</span>
-              <strong>{textoBusq || estado.entidadNorm}</strong>
+              <strong>
+                {entidadSel && entidadSel.norm === estado.entidadNorm && entidadSel.tipo === estado.entidadTipo
+                  ? entidadSel.nombre
+                  : "…"}
+              </strong>
               <span className="close" aria-hidden="true">×</span>
             </button>
           )}

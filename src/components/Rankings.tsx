@@ -6,7 +6,7 @@
  * Global: top de toda la base, sin filtros. Se calcula una vez al montar.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getRanking, type RankingItem } from "../lib/queries";
 import { leerEstadoTabla } from "../lib/url-state";
 import type { SeedRankings } from "../lib/home";
@@ -152,7 +152,14 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
   );
   const [loadingGlb, setLoadingGlb] = useState(!initial);
 
+  // Guard contra respuestas fuera de orden (mismo patrón que DataTable). Las
+  // consultas a la DB vuelven en orden, pero el camino del seed es sincrónico:
+  // si el usuario volvía a la vista sembrada con una consulta todavía en vuelo,
+  // esa respuesta llegaba después y dejaba otro ranking bajo el título actual.
+  const seqCtx = useRef(0);
+
   const cargarContextual = useCallback(async () => {
+    const id = ++seqCtx.current;
     // Mismos defaults que DataTable (home.json) para que ambos islands lean
     // la URL "limpia" como la misma vista.
     const estado = leerEstadoTabla(
@@ -188,11 +195,13 @@ export default function Rankings({ initial }: { initial?: SeedRankings }) {
         tipo: tipoCtx,
         limite: 5,
       });
+      if (id !== seqCtx.current) return;
       setItemsCtx(items);
     } catch {
+      if (id !== seqCtx.current) return;
       setItemsCtx([]); // falla de red/DB → "Sin datos para esta selección"
     } finally {
-      setLoadingCtx(false);
+      if (id === seqCtx.current) setLoadingCtx(false);
     }
   }, [tipoCtx, initial]);
 

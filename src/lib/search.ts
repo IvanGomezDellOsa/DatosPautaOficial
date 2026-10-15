@@ -4,6 +4,10 @@
  * Carga search.json (1,54 MB, 21.434 entidades) una sola vez y construye un
  * índice fuzzy/prefix en cliente. Las búsquedas devuelven la clave normalizada
  * (norm) que luego se usa como filtro SQL en getOrdenes/getCuantoRecibio.
+ *
+ * search.json es también el único mapa completo clave → nombre de display:
+ * orders guarda solo la clave, así que la tabla lo usa para mostrar sus filas
+ * (getNombreDisplay). Ese uso no necesita el índice, que es lo caro de armar.
  */
 
 import MiniSearch from "minisearch";
@@ -37,14 +41,20 @@ export interface GrupoInfo {
   miembros: GrupoMiembro[];
 }
 
-let _indexPromise: Promise<MiniSearch<EntidadBusqueda>> | null = null;
-// Documentos crudos del índice; lookup exacto por norm para los deeplinks
-// (?p=<norm>), donde no hay texto que buscar sino una clave que resolver.
-let _docs: EntidadBusqueda[] | null = null;
+interface Entidades {
+  docs: EntidadBusqueda[];
+  // Lookup exacto por eje: la misma clave puede ser proveedor y medio con
+  // nombres distintos ("clarin": "Clarin" como proveedor, "CLARIN" como medio).
+  porNorm: Record<"proveedor" | "medio", Map<string, EntidadBusqueda>>;
+}
 
-export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
-  if (!_indexPromise) {
-    _indexPromise = fetch("/data/search.json")
+let _entidadesPromise: Promise<Entidades> | null = null;
+let _indexPromise: Promise<MiniSearch<EntidadBusqueda>> | null = null;
+
+/** Descarga y parsea search.json una sola vez; no arma el índice. */
+function getEntidades(): Promise<Entidades> {
+  if (!_entidadesPromise) {
+    _entidadesPromise = fetch("/data/search.json")
       .then((r) => {
         if (!r.ok) throw new Error(`search.json: HTTP ${r.status}`);
         return r.json();
@@ -66,13 +76,31 @@ export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
             tipo: "medio" as const,
           })),
         ];
+        const porNorm: Entidades["porNorm"] = { proveedor: new Map(), medio: new Map() };
+        for (const d of docs) porNorm[d.tipo as "proveedor" | "medio"].set(d.norm, d);
+        return { docs, porNorm };
+      })
+      .catch((err) => {
+        // No cachear el fallo: el próximo uso reintenta la descarga.
+        _entidadesPromise = null;
+        throw err;
+      });
+  }
+  return _entidadesPromise;
+}
+
+export function getSearchIndex(): Promise<MiniSearch<EntidadBusqueda>> {
+  if (!_indexPromise) {
+    _indexPromise = getEntidades()
+      .then(({ docs }) => {
+        // Armar el índice de 21.434 entidades es lo caro (~80 ms en desktop,
+        // varias veces más en un celular): solo se paga al buscar.
         const ms = new MiniSearch<EntidadBusqueda>({
           fields: ["nombre"],
           storeFields: ["norm", "nombre", "n", "tipo"],
           searchOptions: { prefix: true, fuzzy: 0.2 },
         });
         ms.addAll(docs);
-        _docs = docs;
         return ms;
       })
       .catch((err) => {
@@ -93,8 +121,23 @@ export async function entidadPorNorm(
   norm: string,
   tipo: "proveedor" | "medio",
 ): Promise<EntidadBusqueda | null> {
-  await getSearchIndex();
-  return _docs?.find((d) => d.tipo === tipo && d.norm === norm) ?? null;
+  const { porNorm } = await getEntidades();
+  return porNorm[tipo].get(norm) ?? null;
+}
+
+/** Clave normalizada → nombre de display (ver getNombreDisplay). */
+export type NombreDisplay = (tipo: "proveedor" | "medio", norm: string | null) => string | null;
+
+/**
+ * Para mostrar filas que salen de orders, que guarda solo la clave normalizada
+ * ("uriarte german"): devuelve el nombre como figura en la fuente, la grafía
+ * cruda más frecuente de la entidad (la misma de groups_cache, los rankings y
+ * el buscador). Una clave que no figura en search.json se devuelve tal cual;
+ * null sigue siendo null.
+ */
+export async function getNombreDisplay(): Promise<NombreDisplay> {
+  const { porNorm } = await getEntidades();
+  return (tipo, norm) => (norm == null ? null : porNorm[tipo].get(norm)?.nombre ?? norm);
 }
 
 /** Busca en el índice y devuelve hasta `limite` sugerencias. */

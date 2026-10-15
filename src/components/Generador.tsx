@@ -245,20 +245,31 @@ export default function Generador({ initial }: GeneradorProps) {
     return () => document.removeEventListener("mousedown", fn);
   }, []);
 
+  // Guards contra respuestas fuera de orden: solo la última consulta / el
+  // último cambio de tipo pedido actualiza el estado.
+  const seqConsulta = useRef(0);
+  const seqTipo = useRef(0);
+  // Si el usuario ya eligió algo, un deeplink o demo que resuelve tarde (espera
+  // search.json, 1,5 MB) no debe pisar su elección.
+  const usuarioEligio = useRef(false);
+
   // Consultar cuando cambia la entidad o el año
   const consultar = useCallback(async (e: EntidadBusqueda) => {
+    const id = ++seqConsulta.current;
     setLoading(true);
     try {
       const res = await getCuantoRecibio(e.norm, e.tipo, e.nombre);
+      if (id !== seqConsulta.current) return;
       setResultado(res);
     } catch {
+      if (id !== seqConsulta.current) return;
       // Falla de red/DB: no dejar el resultado de la entidad anterior bajo el
       // nombre nuevo. El estado vacío genérico ya explica que puede no haber datos.
       setResultado(null);
       setToast("No se pudieron cargar los datos. Probá de nuevo.");
       setTimeout(() => setToast(""), 2200);
     } finally {
-      setLoading(false);
+      if (id === seqConsulta.current) setLoading(false);
     }
   }, []);
 
@@ -286,7 +297,7 @@ export default function Generador({ initial }: GeneradorProps) {
       return entidadPorNorm(deeplink.norm!, deeplink.tipo);
     };
     resolver().then((e) => {
-      if (e) {
+      if (e && !usuarioEligio.current) {
         setEntidadActual(e);
         setTextoBusq(e.nombre);
       }
@@ -301,7 +312,7 @@ export default function Generador({ initial }: GeneradorProps) {
   useEffect(() => {
     if (initial || conDeeplink) return;
     buscarGrupos("", 1).then((res) => {
-      if (res[0]) {
+      if (res[0] && !usuarioEligio.current) {
         setEntidadActual(res[0]);
         setTextoBusq(res[0].nombre);
       }
@@ -310,6 +321,7 @@ export default function Generador({ initial }: GeneradorProps) {
   }, []);
 
   const elegirEntidad = (e: EntidadBusqueda) => {
+    usuarioEligio.current = true;
     setEntidadActual(e);
     setTextoBusq(e.nombre);
     setMostrarSugs(false);
@@ -327,6 +339,12 @@ export default function Generador({ initial }: GeneradorProps) {
   // en modo grupo precarga el grupo más grande para que la vista no quede vacía.
   const cambiarTipo = (t: TipoEntidad) => {
     if (t === tipo) return;
+    usuarioEligio.current = true;
+    // Descarta la consulta en vuelo de la entidad anterior y el precargado de
+    // un cambio de tipo previo: si llegaban tarde, pisaban la vista nueva.
+    seqConsulta.current++;
+    const idTipo = ++seqTipo.current;
+    setLoading(false);
     setTipo(t);
     setEntidadActual(null);
     setResultado(null);
@@ -335,6 +353,7 @@ export default function Generador({ initial }: GeneradorProps) {
     setMostrarSugs(false);
     if (t === "grupo") {
       buscarGrupos("", 1).then((res) => {
+        if (idTipo !== seqTipo.current) return;
         if (res[0]) { setEntidadActual(res[0]); setTextoBusq(res[0].nombre); }
       }).catch(() => {});
     } else {
@@ -353,6 +372,24 @@ export default function Generador({ initial }: GeneradorProps) {
 
   const hayDatos = montoMostrado() > 0;
 
+  // Mientras llega la consulta de una entidad nueva, `resultado` sigue siendo
+  // el de la anterior (se muestra atenuado). Compartir en ese momento armaba
+  // la placa o el tweet con el nombre de una entidad y el monto de otra: solo
+  // se comparte un resultado que corresponde a la entidad elegida.
+  const resultadoVigente =
+    resultado && entidadActual &&
+    resultado.norm === entidadActual.norm && resultado.tipo === entidadActual.tipo
+      ? resultado
+      : null;
+  const puedeCompartir = !loading && resultadoVigente !== null && hayDatos;
+
+  // Un deeplink puede traer un año fuera de los pills fijos (?y=2015): se
+  // agrega como pill para que el período del monto quede marcado.
+  const anioDeeplink = conDeeplink && typeof deeplink.anio === "number" ? deeplink.anio : null;
+  const aniosPills = anioDeeplink !== null && !ANIOS_PILLS.includes(anioDeeplink)
+    ? [...ANIOS_PILLS, anioDeeplink].sort((a, b) => b - a)
+    : ANIOS_PILLS;
+
   // Compartir
   const compartirUrl = () => {
     if (!entidadActual) return "";
@@ -365,13 +402,13 @@ export default function Generador({ initial }: GeneradorProps) {
   };
 
   const onDescargarImagen = async () => {
-    if (!entidadActual || !resultado) return;
+    if (!entidadActual || !resultadoVigente) return;
     setGenerandoImg(true);
     try {
-      const filas = desglosePorJuris(resultado.porAnio, anioSel);
+      const filas = desglosePorJuris(resultadoVigente.porAnio, anioSel);
       const periodoImg =
-        anioSel === "historico" && resultado.porAnio.length > 0
-          ? `${Math.min(...resultado.porAnio.map((r) => r.anio))}–${Math.max(...resultado.porAnio.map((r) => r.anio))}`
+        anioSel === "historico" && resultadoVigente.porAnio.length > 0
+          ? `${Math.min(...resultadoVigente.porAnio.map((r) => r.anio))}–${Math.max(...resultadoVigente.porAnio.map((r) => r.anio))}`
           : String(anioSel);
       await descargarPlaca({
         nombre: entidadActual.nombre,
@@ -382,13 +419,17 @@ export default function Generador({ initial }: GeneradorProps) {
           periodo: f.anioMin === f.anioMax ? String(f.anioMin) : `${f.anioMin}–${f.anioMax}`,
         })),
       });
+    } catch {
+      // Sin catch, una falla (p. ej. el logo no carga) quedaba como promesa
+      // rechazada sin aviso: el botón volvía a su estado y no pasaba nada.
+      showToast("No se pudo generar la imagen. Probá de nuevo.");
     } finally {
       setGenerandoImg(false);
     }
   };
 
   const onShareX = () => {
-    if (!entidadActual) return;
+    if (!entidadActual || !resultadoVigente) return;
     const hum = humanizarMonto(montoMostrado());
     const montoTxt = hum ? `$${hum.num} ${hum.unidad}` : `$${formatMontoGrande(montoMostrado())}`;
     const periodoTxt = anioSel !== "historico" ? ` en ${anioSel}` : "";
@@ -518,7 +559,7 @@ export default function Generador({ initial }: GeneradorProps) {
       <div className="gen-controls-row">
         <div className="year-pills" role="group" aria-label="Período">
           <button className={anioSel === "historico" ? "year-pill on" : "year-pill"} aria-pressed={anioSel === "historico"} type="button" onClick={() => setAnioSel("historico")}>Histórico</button>
-          {ANIOS_PILLS.map((a) => (
+          {aniosPills.map((a) => (
             <button key={a} className={anioSel === a ? "year-pill on" : "year-pill"} aria-pressed={anioSel === a} type="button" onClick={() => setAnioSel(a)}>{a}</button>
           ))}
         </div>
@@ -532,7 +573,7 @@ export default function Generador({ initial }: GeneradorProps) {
             className="share-btn share-btn--primary"
             type="button"
             onClick={onDescargarImagen}
-            disabled={generandoImg || !hayDatos}
+            disabled={generandoImg || !puedeCompartir}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -541,13 +582,13 @@ export default function Generador({ initial }: GeneradorProps) {
             </svg>
             {generandoImg ? "Generando…" : "Descargar imagen"}
           </button>
-          <button className="share-btn" type="button" onClick={onShareX} disabled={!hayDatos}>
+          <button className="share-btn" type="button" onClick={onShareX} disabled={!puedeCompartir}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
             Compartir en X
           </button>
-          <button className="share-btn" type="button" onClick={onCopiarLink} disabled={!hayDatos}>
+          <button className="share-btn" type="button" onClick={onCopiarLink} disabled={!puedeCompartir}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>

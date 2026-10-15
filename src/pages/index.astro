@@ -90,24 +90,37 @@ const home = JSON.parse(
 
                     <div class="hero-stats">
                         <div class="stat">
-                            <span class="number" data-count="540413">0</span>
+                            <span class="number" data-count="540413">540.413</span>
                             <span class="label">pautas asignadas</span>
                         </div>
                         <div class="stat">
-                            <span class="number" data-count="15688">0</span>
+                            <span class="number" data-count="15688">15.688</span>
                             <span class="label">medios</span>
                         </div>
                         <div class="stat">
-                            <span class="number" data-count="6481">0</span>
+                            <span class="number" data-count="6481">6.481</span>
                             <span class="label"
                                 >proveedores que recibieron dinero</span
                             >
                         </div>
                         <div class="stat">
-                            <span class="number" data-count="4">0</span>
+                            <span class="number" data-count="4">4</span>
                             <span class="label">jurisdicciones</span>
                         </div>
                     </div>
+                    <script is:inline>
+                        // Las cifras reales vienen en el HTML (buscadores,
+                        // lectores de pantalla, sin JS). Con JS y sin "reducir
+                        // movimiento" se ponen en 0 acá, antes del primer paint,
+                        // para el count-up del final de la página.
+                        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                            document
+                                .querySelectorAll(".hero-stats .number[data-count]")
+                                .forEach(function (el) {
+                                    el.textContent = "0";
+                                });
+                        }
+                    </script>
                 </div>
             </div>
         </div>
@@ -271,7 +284,7 @@ const home = JSON.parse(
                         >
                             <div class="cov-seg cov-empty" style="flex:5">
                             </div>
-                            <div class="cov-seg cov-filled" style="flex:16">
+                            <div class="cov-seg cov-filled" style="flex:15">
                             </div>
                             <div class="cov-seg cov-empty" style="flex:4"></div>
                         </div>
@@ -455,6 +468,8 @@ const home = JSON.parse(
 <script is:inline>
     // ─────────── Count-up de cifras del hero ───────────
     (function () {
+        // Con "reducir movimiento" no se anima: el HTML ya trae las cifras finales.
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         var nums = document.querySelectorAll(".hero-stats .number[data-count]");
         var formatter = new Intl.NumberFormat("es-AR");
         function ease(p) {
@@ -516,7 +531,11 @@ const home = JSON.parse(
     // ─────────── Control tamaño de fuente (flotante) ───────────
     (function () {
         var sizes = ["", "lg", "xl"];
-        var current = localStorage.getItem("textSize") || "";
+        // localStorage lanza si el navegador bloquea el almacenamiento del
+        // sitio. Sin try/catch esa excepción cortaba todo este <script>: menú
+        // mobile, header y botón Compartir incluidos.
+        var current = "";
+        try { current = localStorage.getItem("textSize") || ""; } catch (e) {}
         var panel = document.getElementById("fsPanel");
         var floatBtn = document.getElementById("fsFloatBtn");
         var btnSm = document.getElementById("fsSm");
@@ -527,7 +546,7 @@ const home = JSON.parse(
             // Aplica al root (html) para escalar todas las medidas en 'rem' correctamente
             document.documentElement.style.fontSize =
                 size === "lg" ? "110%" : size === "xl" ? "125%" : "";
-            localStorage.setItem("textSize", size);
+            try { localStorage.setItem("textSize", size); } catch (e) {}
             [btnSm, btnLg, btnXl].forEach(function (b) {
                 b && b.classList.remove("on");
             });
