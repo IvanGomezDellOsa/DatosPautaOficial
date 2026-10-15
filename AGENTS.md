@@ -1,0 +1,186 @@
+# Datos Pauta Oficial: guía para agentes de IA
+
+Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
+oficial argentina: ~540 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
+Proyecto muy sensible: un número mal cargado se publica como dato oficial.
+
+## Reglas de trabajo (no negociables)
+
+1. **No cambiar datos publicados sin OK explícito del usuario.** Esto incluye
+   `etl/data/pauta_oficial_unificado_v2.csv`, la base y `public/data/home.json`.
+   Pedir OK solo para un sí/no real: aplicar un parche, re-ejecutar el ETL o
+   descargar archivos. No preguntar decisiones de formato: elegir la opción que deja
+   el dato como está hoy y decirlo.
+2. **Toda corrección de datos se verifica contra la fuente oficial vigente** y
+   concilia al centavo con su total oficial. Antes de cambiar algo, buscar la causa
+   raíz con los "5 porqués"; las sospechas sin evidencia no se aplican.
+3. **Push a `main` = deploy a producción.** No hacer push sin pedido.
+4. **Explicarle al usuario en lenguaje simple**: qué cambió en la web y por qué. Nada
+   de hashes, rutas ni jerga.
+5. **Decisiones ya tomadas por el usuario**:
+   - mantener los textos de metodología ("dato crudo", deflactación con IPC);
+   - la etiqueta "Gestión" muestra una sola gestión por año, la que tomaba
+     `ORDER BY date_from DESC`.
+
+## Arquitectura
+
+```
+Fuentes oficiales (CSV / XLSX / PDF por jurisdicción)
+  → etl/extractores/extract_{caba,nacion,pba,santa_fe}.py   (comun.py: montos, fechas)
+  → etl/unificar.py → etl/data/pauta_oficial_unificado_v2.csv  (CSV canónico, versionado)
+  → etl/validar.py  (solo informa: atípicos, totales de pivot duplicados)
+  → etl/build_db.py → etl/build/pauta.sqlite + public/data/{config,home,search,grupos}.json
+  → etl/upload_r2.mjs → Cloudflare R2 (db.datospautaoficial.com.ar/v/<version>/pauta.sqlite.0)
+  → Astro + React islands (src/) consultan la SQLite desde el navegador con sql.js-httpvfs
+  → Cloudflare Pages
+```
+
+En el deploy de Cloudflare **solo corre `build_db.py` sobre el CSV**: los
+extractores no corren. Los datos cambian únicamente si cambia el CSV versionado.
+
+## Mapa del repo
+
+| Ruta | Qué es |
+|---|---|
+| `etl/extractores/` | Un extractor por jurisdicción. `comun.py`: `normalizar_monto` y el separador decimal por columna. |
+| `etl/unificar.py` | Corre los extractores y escribe el CSV unificado (8 columnas + `archivo_origen`). |
+| `etl/build_db.py` | Normaliza nombres (`aliases.csv`), deflacta (`ipc_indec.csv`), crea `orders` y las caches, `home.json`, `search.json`, `grupos.json` y la copia publicable. |
+| `etl/check_build.py` | Valida config, tamaños y límites de Pages antes del deploy. |
+| `etl/upload_r2.mjs` | Sube la versión de la base a R2 si falta (`--dry-run` para probar). |
+| `etl/R2_SETUP.md` | Configuración de R2, versionado y migración. |
+| `etl/PROMPT_EJECUCION.md` | Cómo re-ejecutar el ETL completo con los crudos. |
+| `etl/tests/` | Tests del ETL (`python -m unittest discover -s etl/tests`). |
+| `src/lib/queries.ts` | Todas las consultas SQL del front. |
+| `src/lib/db.ts` | Singleton del worker de sql.js-httpvfs. |
+| `src/lib/search.ts` | `search.json`: búsqueda (MiniSearch) y clave → nombre de display. |
+| `src/lib/url-state.ts` | Estado de filtros en la URL; `JURISDICCIONES` es la lista única. |
+| `src/components/DataTable.tsx` | Tabla (modo agrupado y modo individual), filtros y "Gestión". |
+| `src/components/Generador.tsx` | "Cuánto recibió" e imagen para compartir. |
+| `src/components/Rankings.tsx` | Rankings contextual y global. |
+| `src/pages/index.astro` | Portada: hero, cobertura, scripts inline. |
+| `src/pages/metodologia.astro` | Metodología pública. |
+
+## Comandos
+
+```bash
+npm run dev                                  # dev server (http://localhost:4321)
+npx tsc --noEmit                             # typecheck
+npm run build                                # build estático en dist/
+python -m unittest discover -s etl/tests     # tests del ETL
+python etl/validar.py                        # reporte REPORTE_VALIDACION.md
+python etl/build_db.py                       # reconstruye la base (local: urlPrefix /data/)
+python etl/check_build.py                    # chequeos previos al deploy
+node etl/upload_r2.mjs --dry-run             # simula la subida (requiere R2_BUCKET y R2_PUBLIC_URL)
+```
+
+## Invariantes y trampas (leer antes de tocar código)
+
+- **`orders.id` es el número de fila (1-based) del CSV unificado.** Quitar, agregar
+  o reordenar filas cambia los `#id` visibles en la web.
+- **`orders.proveedor` y `orders.medio` guardan la clave normalizada** (minúsculas,
+  sin tildes, sin S.A., dominios recortados), no el texto de la fuente. El nombre de
+  display es la grafía más frecuente de la entidad: sale de `search.json`
+  (`getNombreDisplay`) o de `groups_cache` y `rankings_cache`.
+- **`monto` en la base ya está deflactado**: IPC INDEC, promedio anual del índice,
+  llevado a pesos del último mes de `ipc_indec.csv`. El nominal no está en la base.
+- **Caches de `build_db.py`.** En todas, `jurisdiccion = '*'` significa "todas" y
+  `anio = 0` "todos".
+  - `totals_cache` alimenta "Cuánto recibió".
+  - `rankings_cache` guarda el top 5.
+  - `groups_cache` tiene **`rank` contiguo 1..N por clave**: el front pagina con
+    `rank > ?` y toma el total del rank máximo.
+  - `filtros_cache`: su `n_ordenes` es igual a `COUNT(*)`.
+- **`getDetalleGrupo`:** un medio o proveedor `NULL` se filtra con `IS NULL`. Significa
+  "sin medio", no "cualquiera".
+- **sql.js-httpvfs** (sin mantenimiento desde 2022) trae **SQLite 3.35** en el
+  navegador; el ETL usa la de Python. Usa XHR sincrónico en un worker, así que las
+  consultas se resuelven en orden. Página de 64 KiB = `requestChunkSize`.
+- **La base se publica en UN solo chunk** (`pauta.sqlite.0`). Con chunks de 20 MiB, la
+  lectura anticipada de la librería cruzaba el borde y fallaba ("database disk image is
+  malformed", p. ej. filtrando por infobae). Tope: 300 MiB, límite de
+  `wrangler r2 object put`; si la base lo supera, pasar a subida multipart, no volver a
+  partirla.
+- **Versionado en R2.** `v/<version>/` es el sha256 de la base, con `meta.generado` en
+  ceros y el tamaño de chunk incluido. Una versión nunca se pisa. `config.json` lo sirve
+  Pages con `max-age=0` y es el que cambia de versión en cada deploy.
+- **Cloudflare Pages no soporta Range requests** (responde 200): la base no puede
+  servirse desde Pages.
+- **`home.json` es el seed del primer paint**: PBA + su último año, modo agrupado,
+  ranking y demo del generador. Si cambian las consultas o el filtro por defecto,
+  regenerarlo con `build_db.py`.
+- **Datos escritos a mano en el front.** Hay que actualizarlos cuando cambian los datos:
+  - `DISPONIBILIDAD` en `DataTable.tsx`;
+  - `ANIOS_PILLS` en `Generador.tsx`;
+  - cifras del hero y barras de cobertura en `index.astro` (escala de 24 intervalos,
+    2003→2027);
+  - tabla del README.
+- **Windows: escribir archivos con LF.** `Path.write_text` convierte a CRLF y el diff
+  marca el archivo entero.
+
+## Deploy
+
+- Push a `main` dispara el build de Cloudflare Pages:
+  `python3 etl/build_db.py && node etl/upload_r2.mjs && npm run build && rm -f dist/data/pauta.sqlite.*`.
+  En `etl/R2_SETUP.md` está el build command recomendado, que agrega `check_build.py`.
+- Variables de entorno de Pages: `R2_BUCKET`, `R2_PUBLIC_URL`, `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`.
+- Verificar después del deploy (tarda ~4 min):
+  - `https://datospautaoficial.com.ar/data/config.json` apunta a `/v/<version>/`;
+  - el objeto de R2 responde 206 con `Cache-Control: ... immutable`;
+  - la tabla carga con un filtro de entidad (p. ej. `?norm=infobae&tipo=medio`).
+
+## Cómo verificar cambios
+
+- **Front.**
+  - Correr `npx tsc --noEmit` y `npm run build`.
+  - Probar en el navegador con el dev server (`.claude/launch.json`, config `dev`).
+  - En la consola del dev server se pueden importar los módulos reales, por ejemplo
+    `await import('/src/lib/queries.ts')`.
+  - Para medir la red:
+    `(await (await import('/src/lib/db.ts')).getDb()).worker.getStats()`.
+- **Datos.** Consultar `etl/build/pauta.sqlite` con Python en solo lectura (`mode=ro`)
+  y comparar contra las fuentes oficiales.
+
+## Fuentes oficiales
+
+| Jurisdicción | Fuente | Estado |
+|---|---|---|
+| CABA | https://data.buenosaires.gob.ar/dataset/pauta-publicitaria (archivos en `cdn.buenosaires.gob.ar/datosabiertos/datasets/pauta-publicitaria/`) | Anual. 2011-2025. Usa punto decimal; ojo con los montos de 3 decimales. API CKAN genérica. |
+| Nación 2014-2022 | https://datos.gob.ar/dataset/publicidad-oficial | CSV. Sin actualizar desde 08/2022; 2022 cubre solo enero-abril. |
+| Nación 2009-2013 | https://www.argentina.gob.ar/node/1759 | Solo PDF. Los "por proveedor y rubro" son pivots: no cargar la fila o columna de total. Junio 2009 no existe en la fuente. |
+| PBA | Resoluciones y anexos PDF (normas.gba.gob.ar) | 2020-2024 armado resolución por resolución; 2025 de la fuente oficial. Cobertura parcial. |
+| Santa Fe | Informes PDF | Curado en `santa_fe_curado.csv`. |
+
+**Control secundario (no es fuente):** La Nación, con datos de Jefatura de Gabinete,
+Poder Ciudadano y Fundación LED, publicó totales de Nación por semestre de 2009-H2 a
+2015-H1. Coinciden con los PDF oficiales de 2009-2013. Para 2014-2015 dan menos que el
+CSV oficial: se mantiene el oficial.
+
+**Crudos descargados** (con URL y SHA-256): fuera del repo, en
+`%APPDATA%\Claude\side-session-notes\local_70186434-a1ae-4d3d-a6cb-5e7b882c92e4\auditoria_fuentes\`.
+Ahí está también el reporte de auditoría por archivo.
+
+## Estado al 2026-10-15
+
+- Ya se arregló y está publicado:
+  - el error de lectura entre chunks;
+  - el detalle de grupos con medio o proveedor vacío;
+  - la paginación sin `OFFSET`;
+  - los nombres de display en todos los modos.
+- **Corrección de datos en preparación** (rama `claude/actualizacion-datos-cab4d9`, aprobada por
+  el usuario):
+  - montos ×1000 de CABA 2016-2017;
+  - doble conteo de los pivots de Nación 2009-2012;
+  - meses de 2009;
+  - Nación 2012-S2;
+  - CABA 2025.
+  - Cada archivo debe conciliar con su total oficial antes de publicarse.
+- **Pendientes conocidos, sin corregir:**
+  - Santa Fe: "Radio 2008 (II)" duplicado; medios faltantes en 2011 y 2013; Internet
+    2016 sin OCR.
+  - Nación 2013: se toma el importe neto (sin IVA).
+  - Nación 2013-H1: suma ~14% menos que el PDF oficial.
+  - PBA: cobertura parcial en 2020-2022.
+  - R2: confirmar en el panel que no haya reglas de lifecycle que borren por
+    antigüedad, porque borrarían la versión en vivo.
