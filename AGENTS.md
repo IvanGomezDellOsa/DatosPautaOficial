@@ -1,7 +1,7 @@
 # Datos Pauta Oficial: guía para agentes de IA
 
 Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
-oficial argentina: ~567 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+oficial argentina: ~570 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
 montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
 Proyecto muy sensible: un número mal cargado se publica como dato oficial.
 
@@ -220,13 +220,23 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
   - las filas nuevas van al final del bloque de PBA, con la URL de la resolución en
     `resolucion` y el nombre del PDF en `archivo_origen`;
   - la tabla por resolución está en `resoluciones.tsv`.
+- **Santa Fe corregido: publicado** (2026-10-16, aprobado por el usuario). Detalle en
+  `CORRECCIONES.md` y `etl/actualizacion_2026-10-15_santafe/`:
+  - sale el duplicado de Radio 2008 (564 filas);
+  - se agregan los medios faltantes de 2011, TV 2013, Internet 2016, Vía pública 2017 y
+    celdas sueltas de 2009, 2015 y 2016 (+3.190 filas);
+  - cada año y tipo corregido concilia con el resumen oficial de Santa Fe. 2008, 2009 y
+    2011 difieren en centavos por redondeo de la fuente.
+  - `corregir.py` exige como entrada el CSV previo a PBA (SHA-256 `dbe7b01f…`). Se
+    aplicó sobre ese CSV y después se reinsertaron las 13.136 filas de PBA, que son
+    contiguas, en su lugar. Las filas fuera de Santa Fe quedaron idénticas.
 - **PBA etapa 2: en la rama `claude/youthful-lewin-0bda30`, sin publicar.** Se agregan
   33/2023, 45/2023 y 274/2024 (227 órdenes, $299,4 M nominales). El mes sale del texto
   oficial de cada resolución, bajado con permiso del usuario (`manifest_textos_resoluciones.tsv`;
   crudos en `side-session-notes\local_5cee6ed6-…\pba_resoluciones_sin_mes_2026-10-16\`).
   `agregar.py --etapa 2` verifica el SHA-256 del texto, el mes y el total de su artículo 1.
-- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 567.384
-  órdenes (con la etapa 2 de PBA; en producción, 567.157).
+- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 570.010
+  órdenes (con la etapa 2 de PBA; en producción, 569.783).
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
     puede tener errores y no debe tomarse como fuente única;
@@ -236,12 +246,10 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     pauta de PBA en 2020-2024 (456 con 2025);
   - formulario de contacto en vez del mail (ver "Formulario de contacto").
 - **Pendientes conocidos, sin corregir:**
-  - Santa Fe (montos nominales):
-    - `Radio 2008 (II).pdf` es el mismo cuadro que `Radio 2008.pdf`: 564 filas
-      cargadas dos veces ($4,73 M);
-    - el curado omitió medios enteros en 2011 (−$25,2 M) y en 2013 (−$42,8 M);
-    - falta Internet 2016 (−$10,6 M; el PDF necesita OCR);
-    - falta PUBLICIDAD SARMIENTO en 2017 (−$2,4 M).
+  - Santa Fe, Gráfica 2013: faltan 97 medios ($35,2 M nominales). El detalle del PDF
+    concilia con su propia fila de totales, pero suma $1.925,25 más que el resumen
+    oficial por tipo de medio, todo en julio. Por eso no se carga (`grafica2013` en
+    `etl/actualizacion_2026-10-15_santafe/corregir.py`).
   - Nación 2013: la fuente (`DatosPublicidadOficialEnero2013_Mayo2014.csv`, columna
     `IMPORTE NETO`) da el importe sin IVA. 2013-H1 suma $87,9 M nominales menos que el
     PDF oficial, que es con IVA. No hay un factor único de IVA. Se mantiene el dato

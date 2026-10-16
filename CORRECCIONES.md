@@ -25,6 +25,46 @@ En la carga anterior de PBA quedaron afuera tres resoluciones porque ni su resum
 
 **Número de orden (#).** Las órdenes de Santa Fe cambian de número otra vez; el resto lo conserva.
 
+## 16 de octubre de 2026: Santa Fe corregido
+
+Revisamos los datos de Santa Fe contra los informes oficiales en PDF de la provincia. Había errores de carga: un informe cargado dos veces y medios que no se habían cargado.
+
+**En números:**
+- Salen 564 órdenes repetidas y entran 3.190 que faltaban: Santa Fe pasa de 61.187 a 63.813 órdenes.
+- Se suman $41,1 millones nominales, que son $10.867 millones en pesos de abril de 2026.
+- Solo cambia Santa Fe. El resto de la base queda igual, fila por fila.
+
+| | Qué cambió | Monto de la época |
+|---|---|---:|
+| 1 | Radio 2008: el portal publica dos PDF con el mismo cuadro y se habían cargado los dos | −$4,73 millones |
+| 2 | 2011: faltaban medios en Gráfica, Internet, Radio y TV | +$25,18 millones |
+| 3 | TV 2013: faltaban 10 canales | +$7,62 millones |
+| 4 | Internet 2016: no estaba cargado | +$10,63 millones |
+| 5 | Vía pública 2017: faltaba PUBLICIDAD SARMIENTO | +$2,40 millones |
+| 6 | Celdas sueltas de Vía pública 2009 y de Radio 2015 y 2016 | +$0,04 millones |
+
+**Evidencia.** Cada año corregido coincide con el resumen oficial de inversión de Santa Fe:
+
+| Año | Qué se compara | Base | Resumen oficial |
+|---|---|---:|---:|
+| 2008 | total del año | $25.282.795,57 | $25.282.795,60 |
+| 2009 | total del año | $29.290.267,70 | $29.290.267,73 |
+| 2011 | total del año | $59.409.808,02 | $59.409.807,95 |
+| 2013 | TV | $40.883.724,16 | $40.883.724,16 |
+| 2015 | Radio | $37.947.573,28 | $37.947.573,28 |
+| 2016 | Internet | $10.631.199,48 | $10.631.199,48 |
+| 2016 | Radio | $26.831.358,05 | $26.831.358,05 |
+| 2017 | Vía pública | $74.026.533,22 | $74.026.533,22 |
+
+- Las diferencias de centavos en 2008, 2009 y 2011 vienen de la fuente: sus propios totales están redondeados.
+- Internet 2016 está publicado con una tipografía que reemplaza cada letra y cada número por otro signo. Se decodificó, y cada monto se controló contra la suma de su fila y contra el resumen oficial.
+
+**Lo que no se cargó.** Gráfica 2013 (97 medios, $35,2 millones): el detalle del PDF suma $1.925,25 más que el resumen oficial, todo en julio, y con la fuente no se puede saber qué renglón difiere. Queda pendiente.
+
+**Número de orden (#).** Las órdenes de Santa Fe cambian de número; las de CABA, Nación y PBA no.
+
+**Cómo verificarlo.** En [`etl/actualizacion_2026-10-15_santafe/`](etl/actualizacion_2026-10-15_santafe/LEEME.md) están el programa que hizo la corrección, cada PDF usado con su huella digital (SHA-256) y la conciliación por archivo y por año.
+
 ## 16 de octubre de 2026: PBA completo con los anexos publicados
 
 Los datos de la Provincia de Buenos Aires se arman resolución por resolución, desde los anexos que publica [normas.gba.gob.ar](https://normas.gba.gob.ar). Faltaban muchos: en 2020 la base tenía el 38 % de lo publicado y en 2021, el 45 %. Leímos los 427 anexos publicados y sumamos las órdenes que no estaban.
@@ -57,7 +97,7 @@ Los datos de la Provincia de Buenos Aires se arman resolución por resolución, 
 
 **Lo que no se pudo cargar.**
 - 5 resoluciones con anexo publicado:
-  - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales; se cargaron después, ver la entrada de arriba);
+  - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales; se cargaron después, ver la entrada "PBA, tres resoluciones más");
   - en una la suma de las órdenes no da el total impreso;
   - y otra no imprime total.
 - 3 anexos de 2022 y 2023 están publicados en un formato que no se puede leer como texto.
@@ -242,11 +282,7 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
   - Mantenemos el dato de la fuente, con su detalle por orden, y lo aclaramos en la cobertura de Nación del sitio.
 - **Nación, junio de 2009.** No figura en ninguna publicación oficial.
 - **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no estaban en la base. Se agregaron después: ver «CABA 2023 completo», más arriba.
-- **Santa Fe.** Montos de la época:
-  - El informe de Radio 2008 está cargado dos veces, porque el portal lo publica en dos archivos con el mismo cuadro: suma $4,7 millones de más.
-  - Faltan algunos medios en 2011 ($25,2 millones) y 2013 ($42,8 millones).
-  - Falta Internet 2016 ($10,6 millones).
-  - Falta un proveedor de vía pública de 2017 ($2,4 millones).
+- **Santa Fe.** Se corrigió el 16 de octubre: ver «Santa Fe corregido», más arriba. Queda Gráfica 2013 ($35,2 millones de la época), que no coincide con el resumen oficial.
 - **Provincia de Buenos Aires.** Faltaban resoluciones publicadas, sobre todo en 2020-2022. Se agregaron el 16 de octubre: ver «PBA completo con los anexos publicados», más arriba, con lo que todavía no se pudo cargar.
 
 ### Cómo verificarlo

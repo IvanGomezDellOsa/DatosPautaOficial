@@ -56,12 +56,14 @@ Ni el resumen ni el anexo de estas tres resoluciones dicen de qué mes son las �
   - que el total del anexo sea el mismo, y las mismas condiciones que la etapa 1.
 - Con el CSV de la etapa 1, `cruzar.py` da las 78 resoluciones de la etapa 1 como "cargada": las filas agregadas emparejan con su anexo.
 - La etapa 1 se sigue reproduciendo igual: con el CSV de antes da otra vez `e9ac121a…cddf`.
-- **Resultado:** +227 órdenes (567.157 → 567.384), +299.441.069,00 nominales, +1.259,6 M de abril de 2026 (6.835.675,5 M → 6.836.935,1 M). Van al final del bloque de PBA (`#id` 505.971 a 506.197); Santa Fe corre su número en 227 más.
-- CSV final: SHA-256 `58c868021b0ce3d98176071d40baf34eab3adb59291feb57c4bc1e2c1d7ec360`. `git diff --numstat`: 227 líneas agregadas, 0 quitadas.
+- **Resultado:** +227 órdenes, +299.441.069,00 nominales, +1.259,6 M de abril de 2026. Van al final del bloque de PBA (`#id` 505.971 a 506.197); Santa Fe corre su número en 227 más.
+  - Sobre el CSV de la etapa 1: 567.157 → 567.384 órdenes (SHA-256 `58c86802…c360`).
+  - Integrado con la corrección de Santa Fe de `main` (d8f6377), que solo cambió el bloque de Santa Fe: 569.783 → 570.010 órdenes y 6.846.542,4 M → 6.847.802,0 M de abril de 2026. Se verificó que el CSV integrado es exactamente el de `main` con las 227 filas en su lugar (SHA-256 `a1faee49…739a`).
+- `git diff --numstat`: 227 líneas agregadas, 0 quitadas.
 - PBA por año: 2022 pasa de 10.761 a 10.907 órdenes (84.139,4 M → 84.972,1 M de abril de 2026) y 2024 de 7.170 a 7.251 (47.780,3 M → 48.207,3 M).
 - Cobertura de lo publicado y legible: 2020 95,5 %; 2021 a 2025, 100 %.
 - `conciliacion_etapa2.tsv` y `validacion_despues_etapa2.md` (11 atípicos, igual que antes).
-- Proveedores y medios normalizados no cambian (6.521 y 15.941).
+- Proveedores y medios normalizados no cambian (6.521; 16.022 medios con Santa Fe corregido).
 
 ## Fuente
 

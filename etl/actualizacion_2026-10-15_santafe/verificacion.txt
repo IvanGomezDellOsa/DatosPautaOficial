@@ -1,0 +1,5 @@
+entrada: 554021 filas, SHA-256 dbe7b01fc41e9051972b237799ad8de24c475fe10ba0f3f1b02e5dfbb431c74a
+correcciones: radio2008, sf2011, tv2013, vp2017, internet2016, chicos
+salida: 556647 filas, SHA-256 4b54dcf80c4315c7069570e90dbc452e1bf1bb539c97df56ecc23a95160b6401
+filas que salen: 564; filas que entran: 3190
+las 553457 filas que quedan de la entrada siguen idénticas byte a byte y en el mismo orden; SHA-256 b985fce25e5613cdce82b59394ea354600eb7062104e030aa21bf5a3ae15a41d

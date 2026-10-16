@@ -9,7 +9,7 @@
 🌐 **Production deploy:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 🎬 **Presentation video:** [Watch on YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
-A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **567,384 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
+A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **570,010 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
 
 The stance is strictly informative: no accusation, no opinion.
 
@@ -29,9 +29,9 @@ Until this project, the information was scattered across open data portals, spre
 |---|---|---|
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 partial) | 224.677 |
-| Santa Fe | 2008–2023 | 61.187 |
+| Santa Fe | 2008–2023 | 63.813 |
 | PBA | 2020–2025 (partial) | 57.345 |
-| **Total** | **2003–2025** | **567.384** |
+| **Total** | **2003–2025** | **570.010** |
 
 Coverage gaps are shown explicitly on the website: aggregates that could mislead due to incomplete coverage are never presented.
 
@@ -41,14 +41,14 @@ Every data correction is logged, with its evidence, in [CORRECCIONES.md](CORRECC
 
 ## 🏗️ Architecture
 
-The data runs **100% without a backend or servers**: the full SQLite database (~181 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. The only server-side piece is the contact form: a Cloudflare Worker (`workers/contacto`) that forwards the message through Email Routing without exposing the destination address.
+The data runs **100% without a backend or servers**: the full SQLite database (~182 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. The only server-side piece is the contact form: a Cloudflare Worker (`workers/contacto`) that forwards the message through Email Routing without exposing the destination address.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
 ↓
 Extractores Python (etl/extractores/extract_{caba,nacion,pba,santa_fe}.py)
 ↓
-unificar.py → CSV canónico (8 columnas, 567.384 filas) → validar.py
+unificar.py → CSV canónico (8 columnas, 570.010 filas) → validar.py
 ↓
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)
@@ -78,7 +78,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 🎯 Features
 
-**Explorable table of 567 thousand orders**
+**Explorable table of 569 thousand orders**
 - Cross filters by jurisdiction and year, grouping by supplier/media outlet with expandable rows and pagination of 25 records per page
 - Instant first paint: the initial state is precomputed and inlined by Astro (`home.json`) — sql.js initializes only when the user interacts
 - The displayed value is the **exact raw value from the official source**, without normalization
