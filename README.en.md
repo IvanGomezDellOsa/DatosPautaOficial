@@ -41,7 +41,7 @@ Every data correction is logged, with its evidence, in [CORRECCIONES.md](CORRECC
 
 ## 🏗️ Architecture
 
-The project runs **100% without a backend or servers**: the full SQLite database (~176 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
+The data runs **100% without a backend or servers**: the full SQLite database (~176 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. The only server-side piece is the contact form: a Cloudflare Worker (`workers/contacto`) that forwards the message through Email Routing without exposing the destination address.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
@@ -93,6 +93,9 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 **Share the website**
 - Button in the navbar (desktop and integrated into the hamburger menu on mobile) with two options: share directly on X or copy the link to the clipboard
+
+**Contact**
+- Form at `/contacto`: messages arrive by email without the address appearing on the site
 
 **Methodology page**
 - Sources, deflation criteria and normalization criteria documented publicly

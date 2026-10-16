@@ -1,0 +1,296 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+// El formulario envía a /api/contacto (functions/api/contacto.js), que lo pasa al
+// Worker de workers/contacto. La dirección de destino no figura en el sitio.
+---
+
+<Layout
+    title="Contacto — Datos Pauta Oficial"
+    description="Escribime para reportar errores, sugerir mejoras, aportar datos o hacer una consulta sobre el proyecto."
+>
+    {/* ═══════ NAV ═══════ */}
+    <nav class="site-nav" aria-label="Navegación">
+        <div class="container-wide nav-inner">
+            <div class="nav-brand-area">
+                <a
+                    href="/"
+                    style="display:inline-flex; align-items:center; gap:10px; text-decoration:none;"
+                >
+                    <svg class="nav-logo" viewBox="0 0 16 10" aria-hidden="true">
+                        <rect width="16" height="3.33" y="0" fill="#74acdf"
+                        ></rect>
+                        <rect width="16" height="3.34" y="3.33" fill="#ffffff"
+                        ></rect>
+                        <rect width="16" height="3.33" y="6.67" fill="#74acdf"
+                        ></rect>
+                    </svg>
+                    <span class="wordmark">Datos Pauta Oficial</span>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">← Volver a los datos</a>
+            </div>
+        </div>
+    </nav>
+
+    {/* ═══════ CONTENIDO ═══════ */}
+    <main class="contacto">
+        <div class="contacto-wrap">
+            <header class="contacto-head">
+                <h1>Contacto</h1>
+                <p class="lede">
+                    Escribime para reportar errores, sugerir mejoras, aportar
+                    datos o por cualquier consulta sobre el proyecto.
+                </p>
+            </header>
+
+            <form id="form-contacto" class="contacto-form" novalidate>
+                <div class="campo">
+                    <label for="c-nombre">Nombre <span class="opcional">(opcional)</span></label>
+                    <input id="c-nombre" name="nombre" type="text" maxlength="100" autocomplete="name" />
+                </div>
+                <div class="campo">
+                    <label for="c-email">Tu email <span class="opcional">(opcional, para poder responderte)</span></label>
+                    <input id="c-email" name="email" type="email" maxlength="200" autocomplete="email" />
+                </div>
+                <div class="campo">
+                    <label for="c-mensaje">Mensaje</label>
+                    <textarea id="c-mensaje" name="mensaje" rows="8" required minlength="10" maxlength="5000"></textarea>
+                </div>
+                {/* Trampa para bots: oculto para personas y lectores de pantalla. */}
+                <div class="trampa" aria-hidden="true">
+                    <label for="c-sitio">Sitio web</label>
+                    <input id="c-sitio" name="sitio" type="text" tabindex="-1" autocomplete="off" />
+                </div>
+                <div class="contacto-acciones">
+                    <button type="submit" class="contacto-btn">Enviar</button>
+                    <p id="c-estado" class="contacto-estado" role="status" aria-live="polite"></p>
+                </div>
+                <p class="contacto-nota">
+                    Tu mensaje me llega por correo. Si dejás tu email, lo uso solo
+                    para responderte.
+                </p>
+                <noscript>
+                    <p class="contacto-estado error">Para enviar el mensaje hace falta JavaScript.</p>
+                </noscript>
+            </form>
+
+            <div id="c-enviado" class="contacto-enviado" hidden>
+                <strong>¡Gracias! Tu mensaje fue enviado.</strong>
+                <p>Si dejaste tu email, te respondo ahí.</p>
+                <a href="/" class="contacto-btn">Volver a los datos</a>
+            </div>
+        </div>
+    </main>
+
+    {/* ═══════ FOOTER ═══════ */}
+    <footer class="site-footer">
+        <div class="container-wide footer-topbar">
+            <a
+                class="brand"
+                href="/"
+                style="display:inline-flex; align-items:center; gap:10px;"
+            >
+                <svg viewBox="0 0 16 10" width="20" height="13" style="border-radius:2px">
+                    <rect width="16" height="3.33" y="0" fill="#74acdf"></rect>
+                    <rect width="16" height="3.34" y="3.33" fill="#ffffff"></rect>
+                    <rect width="16" height="3.33" y="6.67" fill="#74acdf"></rect>
+                </svg>
+                <span class="wordmark">Datos Pauta Oficial</span>
+            </a>
+            <div class="footer-links">
+                <a href="/metodologia" class="footer-contact-btn">Metodología y aviso legal</a>
+            </div>
+        </div>
+    </footer>
+</Layout>
+
+<script>
+    const ERRORES: Record<string, string> = {
+        mensaje_corto: "El mensaje es muy corto: escribí al menos 10 caracteres.",
+        mensaje_largo: "El mensaje supera los 5.000 caracteres.",
+        email: "Revisá tu email: no parece válido.",
+    };
+    const GENERICO = "No se pudo enviar el mensaje. Probá de nuevo en unos minutos.";
+
+    const form = document.getElementById("form-contacto") as HTMLFormElement;
+    const estado = document.getElementById("c-estado") as HTMLParagraphElement;
+    const enviado = document.getElementById("c-enviado") as HTMLDivElement;
+    const boton = form.querySelector("button[type=submit]") as HTMLButtonElement;
+    // Tiempo en la página: el Worker descarta los envíos instantáneos (bots).
+    const inicio = performance.now();
+
+    function mostrarError(texto: string) {
+        estado.textContent = texto;
+        estado.classList.add("error");
+    }
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        estado.textContent = "";
+        estado.classList.remove("error");
+        const datos = new FormData(form);
+        const mensaje = String(datos.get("mensaje") ?? "").trim();
+        if (mensaje.length < 10) return mostrarError(ERRORES.mensaje_corto);
+        const email = String(datos.get("email") ?? "").trim();
+        const campoEmail = form.elements.namedItem("email") as HTMLInputElement;
+        if (email && !campoEmail.checkValidity()) return mostrarError(ERRORES.email);
+
+        boton.disabled = true;
+        boton.textContent = "Enviando…";
+        try {
+            const r = await fetch("/api/contacto", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    nombre: datos.get("nombre"),
+                    email,
+                    mensaje,
+                    sitio: datos.get("sitio"),
+                    ms: Math.round(performance.now() - inicio),
+                }),
+            });
+            const res = await r.json().catch(() => ({ ok: false }));
+            if (r.ok && res.ok) {
+                form.hidden = true;
+                enviado.hidden = false;
+                return;
+            }
+            mostrarError(ERRORES[res.error] ?? GENERICO);
+        } catch {
+            mostrarError(GENERICO);
+        }
+        boton.disabled = false;
+        boton.textContent = "Enviar";
+    });
+</script>
+
+<style>
+    .contacto {
+        padding: clamp(2.5rem, 6vw, 4.5rem) 0 4rem;
+    }
+    .contacto-wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 0 1.25rem;
+    }
+    .contacto-head h1 {
+        font-size: var(--text-h2);
+        color: var(--color-fg-strong);
+        margin: 0 0 0.5rem;
+        line-height: 1.15;
+    }
+    .contacto-head .lede {
+        color: var(--color-fg-muted);
+        font-size: var(--text-body);
+        line-height: 1.6;
+        margin: 0 0 2rem;
+    }
+    .contacto-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.1rem;
+    }
+    .contacto-form[hidden] {
+        display: none;
+    }
+    .campo {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .campo label {
+        color: var(--color-fg-strong);
+        font-size: var(--text-small);
+        font-weight: 600;
+    }
+    .campo .opcional {
+        color: var(--color-fg-subtle);
+        font-weight: 400;
+    }
+    .campo input,
+    .campo textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.65rem 0.8rem;
+        background: var(--color-bg-elev-1);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        color: var(--color-fg);
+        font: inherit;
+        font-size: var(--text-body);
+        line-height: 1.5;
+    }
+    .campo textarea {
+        resize: vertical;
+        min-height: 9rem;
+    }
+    .campo input:focus,
+    .campo textarea:focus {
+        outline: none;
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px var(--color-accent-glow);
+    }
+    .trampa {
+        position: absolute;
+        left: -10000px;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+    }
+    .contacto-acciones {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+    }
+    .contacto-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.6rem 1.25rem;
+        background: var(--color-accent);
+        color: var(--color-bg);
+        font: inherit;
+        font-weight: 600;
+        font-size: var(--text-small);
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .contacto-btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+    }
+    .contacto-estado {
+        margin: 0;
+        color: var(--color-fg-muted);
+        font-size: var(--text-small);
+    }
+    .contacto-estado.error {
+        color: #fca5a5;
+    }
+    .contacto-nota {
+        margin: 0;
+        color: var(--color-fg-subtle);
+        font-size: var(--text-micro);
+        line-height: 1.5;
+    }
+    .contacto-enviado {
+        padding: 1.25rem;
+        background: var(--color-bg-elev-1);
+        border: 1px solid var(--color-border);
+        border-left: 3px solid var(--color-accent);
+        border-radius: 8px;
+        color: var(--color-fg);
+    }
+    .contacto-enviado strong {
+        color: var(--color-fg-strong);
+    }
+    .contacto-enviado p {
+        margin: 0.5rem 0 1rem;
+        color: var(--color-fg-muted);
+        font-size: var(--text-small);
+    }
+</style>

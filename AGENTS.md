@@ -60,6 +60,9 @@ extractores no corren. Los datos cambian únicamente si cambia el CSV versionado
 | `src/components/Rankings.tsx` | Rankings contextual y global. |
 | `src/pages/index.astro` | Portada: hero, cobertura, scripts inline. |
 | `src/pages/metodologia.astro` | Metodología pública. |
+| `src/pages/contacto.astro` | Formulario de contacto (envía a `/api/contacto`). |
+| `functions/api/contacto.js` | Pages Function: pasa el formulario al Worker por el service binding `CONTACTO`. |
+| `workers/contacto/` | Worker `datospautaoficial-contacto`: valida y reenvía el mensaje por Email Routing. |
 
 ## Comandos
 
@@ -129,6 +132,22 @@ node etl/upload_r2.mjs --dry-run             # simula la subida (requiere R2_BUC
   - `https://datospautaoficial.com.ar/data/config.json` apunta a `/v/<version>/`;
   - el objeto de R2 responde 206 con `Cache-Control: ... immutable`;
   - la tabla carga con un filtro de entidad (p. ej. `?norm=infobae&tipo=medio`).
+
+## Formulario de contacto
+
+- El sitio no muestra la dirección de mail del autor: `/contacto` envía a `/api/contacto`.
+- Recorrido del mensaje:
+  1. la Pages Function lo pasa por el service binding `CONTACTO` (configurado en el panel de Pages) al Worker `datospautaoficial-contacto`;
+  2. el Worker lo envía con el binding `send_email` (`CORREO`) a `DESTINO`.
+- `DESTINO` es un secreto del Worker cargado en el panel de Cloudflare. No va en el repo.
+- Email Routing está activo en `datospautaoficial.com.ar` (registros MX, SPF y DKIM gestionados por Cloudflare), y `DESTINO` es una dirección verificada.
+- Enviar a una dirección verificada es gratis en cualquier plan.
+- El Worker lo despliega Workers Builds desde `workers/contacto` en cada push a `main`. No tiene URL pública (`workers_dev: false`).
+- Anti-spam:
+  - campo trampa `sitio` y tiempo mínimo en la página (`ms`), que se descartan en silencio;
+  - control de `Origin`;
+  - límites de largo.
+- Si llega spam, el paso siguiente es Turnstile. Su clave secreta la carga el usuario, no un agente.
 
 ## Cómo verificar cambios
 
