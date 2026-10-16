@@ -2,6 +2,49 @@
 
 Acá registramos cada corrección de los datos publicados en Datos Pauta Oficial: qué cambió, por qué y con qué evidencia.
 
+## 15 de octubre de 2026: CABA 2023 completo
+
+CABA 2023 estaba incompleto. La Ciudad publicó Gráfica, Cine y Medios vecinales de ese año solo en planillas de Excel, y nuestro programa leía solo archivos CSV. Ahora las lee, y esos datos se suman a la base.
+
+**En números:**
+- Se agregan **4.837 órdenes** por **$2.654 millones** nominales, que son **$15.263 millones** en pesos de abril de 2026.
+- CABA 2023 pasa de 19.906 a 24.743 órdenes, y su total sube un 7,3 %.
+- El total histórico, en pesos de abril de 2026, sube un 0,2 %: de $6,728 billones a $6,744 billones.
+- Solo cambia CABA 2023. El resto de la base queda igual, fila por fila.
+
+| Planilla oficial (BA Data) | Órdenes | Suma de la planilla | Lo que suma la base | En pesos de abril de 2026 |
+|---|---:|---:|---:|---:|
+| [Medios vecinales 2023](https://cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/BA_DATA_2023_Medios_Vecinales.xlsx) | 3.826 | $805.453.597,20 | $805.453.597,20 | $4.632 millones |
+| [Cine 2023](https://cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/pauta-publicitaria-cine-2023.xlsx) | 56 | $141.569.332,46 | $141.569.332,46 | $814 millones |
+| [Gráfica 2023](https://cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/pauta-publicitaria-medios-graficos-2023.xlsx) | 955 | $1.707.224.428,28 | $1.707.224.428,28 | $9.817 millones |
+
+**Evidencia.**
+- Cada planilla coincide al centavo con lo cargado.
+- Además, comparamos cada orden con su fila de la planilla: fecha, medio y monto.
+- Medios vecinales 2023 está publicado dos veces en el portal, en agosto de 2024 y en abril de 2025. Los dos archivos son idénticos; usamos el más reciente.
+- Las planillas no tienen filas de totales ni montos con tres decimales.
+- Hay 25 órdenes repetidas exactas (mismo medio, fecha y monto), tal como las publica la Ciudad. Se mantienen, igual que en los demás años.
+
+**Otros cambios que se ven en el sitio.**
+- **Rankings.** Suben los montos de quienes recibieron pauta en gráfica en 2023, por ejemplo Clarín (+$1.267 millones), La Nación, Perfil y Crónica.
+  - Los rankings históricos no cambian de orden.
+  - En el ranking de 2023 de todas las jurisdicciones cambian dos puestos:
+    - entre los grupos, Grupo América entra 5.º y sale Grupo Infobae;
+    - entre los medios, Crónica pasa al 4.º lugar y YouTube al 5.º.
+- **Nombres de medios.** El sitio muestra cada medio con la forma de escribirlo más frecuente en los datos.
+  - Con estas planillas cambia cómo se muestra el nombre de 31 medios.
+  - Casi todos solo pasan a mayúsculas, como las escriben las planillas. Por ejemplo, "www.mibelgrano.com.ar" pasa a "WWW.MIBELGRANO.COM.AR".
+  - Algunos toman otra forma que ya usaba la Ciudad: "PALERMO'S" pasa a "PALERMO S", que es como lo escribe desde 2017, y "www.hoornik.com.ar" pasa a "HOORNIK".
+  - Aparecen 9 medios nuevos, todos de Gráfica.
+- **Número de orden (#).**
+  - Las órdenes de CABA hasta 2022 conservan su número.
+  - Las que vienen después (CABA 2023 a 2025, Nación, PBA y Santa Fe) cambian de número.
+
+**Cómo verificarlo.** En [`etl/actualizacion_2026-10-15_caba2023/`](etl/actualizacion_2026-10-15_caba2023/LEEME.md) están:
+- cada planilla usada, con su dirección y su huella digital (SHA-256);
+- la conciliación de cada planilla;
+- el programa que agregó las órdenes.
+
 ## 15 de octubre de 2026
 
 Revisamos, celda por celda, los datos cargados contra los archivos oficiales de cada organismo. Encontramos errores **de carga, no de las fuentes**: los archivos oficiales estaban bien, pero nuestro programa había leído mal algunos. Los corregimos y, además, sumamos datos nuevos.
@@ -125,7 +168,7 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
   - Por eso, contra ese PDF, la base suma $87,9 millones menos en el primer semestre.
   - Mantenemos el dato de la fuente, con su detalle por orden, y lo aclaramos en la cobertura de Nación del sitio.
 - **Nación, junio de 2009.** No figura en ninguna publicación oficial.
-- **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no están en la base.
+- **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no estaban en la base. Se agregaron después: ver «CABA 2023 completo», más arriba.
 
 ### Cómo verificarlo
 
