@@ -1,6 +1,6 @@
 # PBA: anexos oficiales que faltaban (15-16/10/2026)
 
-Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. La etapa 1 (78 resoluciones) está publicada desde el 16/10/2026. La etapa 2 (3 resoluciones más, ver abajo) todavía no.
+Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. La etapa 1 (78 resoluciones) y la etapa 2 (3 resoluciones más, ver abajo) están publicadas desde el 16/10/2026.
 
 La fe de erratas para publicar está en [`CORRECCIONES.md`](../../CORRECCIONES.md). Este archivo es el detalle técnico para revisar la rama. Repite el método de [`etl/actualizacion_2026-10-15/`](../actualizacion_2026-10-15/LEEME.md): cada fuente verificada por SHA-256, conciliación al centavo y el resto del CSV idéntico byte a byte.
 

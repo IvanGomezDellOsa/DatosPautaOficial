@@ -230,13 +230,13 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
   - `corregir.py` exige como entrada el CSV previo a PBA (SHA-256 `dbe7b01f…`). Se
     aplicó sobre ese CSV y después se reinsertaron las 13.136 filas de PBA, que son
     contiguas, en su lugar. Las filas fuera de Santa Fe quedaron idénticas.
-- **PBA etapa 2: en la rama `claude/youthful-lewin-0bda30`, sin publicar.** Se agregan
+- **PBA etapa 2: publicado** (2026-10-16, aprobado por el usuario). Se agregan
   33/2023, 45/2023 y 274/2024 (227 órdenes, $299,4 M nominales). El mes sale del texto
   oficial de cada resolución, bajado con permiso del usuario (`manifest_textos_resoluciones.tsv`;
   crudos en `side-session-notes\local_5cee6ed6-…\pba_resoluciones_sin_mes_2026-10-16\`).
   `agregar.py --etapa 2` verifica el SHA-256 del texto, el mes y el total de su artículo 1.
 - Las cifras escritas a mano del front (hero, cobertura, README) reflejan 570.010
-  órdenes (con la etapa 2 de PBA; en producción, 569.783).
+  órdenes.
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
     puede tener errores y no debe tomarse como fuente única;
