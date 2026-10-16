@@ -220,8 +220,13 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
   - las filas nuevas van al final del bloque de PBA, con la URL de la resolución en
     `resolucion` y el nombre del PDF en `archivo_origen`;
   - la tabla por resolución está en `resoluciones.tsv`.
-- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 567.157
-  órdenes.
+- **PBA etapa 2: en la rama `claude/youthful-lewin-0bda30`, sin publicar.** Se agregan
+  33/2023, 45/2023 y 274/2024 (227 órdenes, $299,4 M nominales). El mes sale del texto
+  oficial de cada resolución, bajado con permiso del usuario (`manifest_textos_resoluciones.tsv`;
+  crudos en `side-session-notes\local_5cee6ed6-…\pba_resoluciones_sin_mes_2026-10-16\`).
+  `agregar.py --etapa 2` verifica el SHA-256 del texto, el mes y el total de su artículo 1.
+- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 567.384
+  órdenes (con la etapa 2 de PBA; en producción, 567.157).
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
     puede tener errores y no debe tomarse como fuente única;
@@ -247,8 +252,7 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
   - PBA, después de la carga de los anexos (ver `etl/actualizacion_2026-10-15_pba/LEEME.md`):
-    - no se cargan 33/2023, 45/2023 y 274/2024 (sin mes: hace falta el texto de la
-      resolución), 79/2020 (sin total impreso) y 17/2021 (no concilia por $76.422);
+    - no se cargan 79/2020 (sin total impreso) y 17/2021 (no concilia por $76.422);
     - 257/2022, 138/2023 y 142/2023 tienen el anexo ilegible (OCR);
     - 2023: 2.159 filas de 16 `tabula-*` no tienen anexo publicado. **No son
       duplicados:** los pares que comparten filas son meses distintos con órdenes
