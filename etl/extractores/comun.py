@@ -380,6 +380,101 @@ def leer_dicts(path, sep=None):
 
 
 # ---------------------------------------------------------------------------
+# Lectura de XLSX (solo libreria estandar)
+# ---------------------------------------------------------------------------
+
+_NS_XLSX = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_NS_REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+# formatos de fecha predefinidos de Excel (ECMA-376, 18.8.30)
+_FMT_FECHA = {14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47}
+
+
+def _es_formato_fecha(codigo):
+    """True si un formato numerico propio (p.ej. 'yyyy\\-mm\\-dd;@') muestra una fecha."""
+    sin_literales = re.sub(r'"[^"]*"|\[[^\]]*\]|\\.|_.', "", codigo.split(";")[0])
+    return bool(re.search(r"[dmy]", sin_literales, re.I))
+
+
+def _texto_xlsx(si):
+    """Texto visible de un <si> o <is>: un <t> directo o los <t> de cada tramo <r> (sin las
+    guias foneticas <rPh>)."""
+    partes = si.findall(f"{_NS_XLSX}t") + [t for r in si.findall(f"{_NS_XLSX}r")
+                                           for t in r.findall(f"{_NS_XLSX}t")]
+    return "".join(t.text or "" for t in partes)
+
+
+def _columna_xlsx(ref):
+    """'C12' -> 2 (columnas desde 0)."""
+    col = 0
+    for ch in re.match(r"[A-Z]+", ref).group():
+        col = col * 26 + ord(ch) - 64
+    return col - 1
+
+
+def leer_xlsx(path):
+    """Devuelve las filas de la primera hoja de un XLSX (lista de celdas, como leer_filas).
+
+    Las celdas de texto quedan como str; las numericas como float (el valor guardado, sin el
+    formato de pantalla), salvo las que tienen formato de fecha, que quedan como date. Las
+    celdas vacias son None y se saltean las filas sin ningun valor."""
+    import xml.etree.ElementTree as ET
+    import zipfile
+    from datetime import timedelta
+
+    with zipfile.ZipFile(path) as z:
+        nombres = set(z.namelist())
+        libro = ET.fromstring(z.read("xl/workbook.xml"))
+        rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+        hoja = libro.find(f"{_NS_XLSX}sheets/{_NS_XLSX}sheet")
+        destino = next(r.get("Target") for r in rels if r.get("Id") == hoja.get(_NS_REL_ID))
+        destino = destino[1:] if destino.startswith("/") else "xl/" + destino
+        textos = []
+        if "xl/sharedStrings.xml" in nombres:
+            textos = [_texto_xlsx(si) for si in
+                      ET.fromstring(z.read("xl/sharedStrings.xml")).findall(f"{_NS_XLSX}si")]
+        estilo_fecha = []
+        if "xl/styles.xml" in nombres:
+            estilos = ET.fromstring(z.read("xl/styles.xml"))
+            propios = {int(f.get("numFmtId")): f.get("formatCode")
+                       for f in estilos.iter(f"{_NS_XLSX}numFmt")}
+            xfs = estilos.find(f"{_NS_XLSX}cellXfs")
+            for xf in (xfs if xfs is not None else []):
+                fmt = int(xf.get("numFmtId", 0))
+                estilo_fecha.append(fmt in _FMT_FECHA
+                                    or (fmt in propios and _es_formato_fecha(propios[fmt])))
+        pr = libro.find(f"{_NS_XLSX}workbookPr")
+        base = (date(1904, 1, 1) if pr is not None and pr.get("date1904") in ("1", "true")
+                else date(1899, 12, 30))
+        datos = ET.fromstring(z.read(destino))
+
+    filas = []
+    for row in datos.iter(f"{_NS_XLSX}row"):
+        celdas, col = {}, -1
+        for c in row.findall(f"{_NS_XLSX}c"):
+            col = _columna_xlsx(c.get("r")) if c.get("r") else col + 1
+            t, v = c.get("t"), c.find(f"{_NS_XLSX}v")
+            if t == "inlineStr":
+                celdas[col] = _texto_xlsx(c.find(f"{_NS_XLSX}is"))
+            elif v is None or v.text is None:
+                continue
+            elif t == "s":
+                celdas[col] = textos[int(v.text)]
+            elif t in ("str", "e", "d"):
+                celdas[col] = v.text
+            elif t == "b":
+                celdas[col] = "VERDADERO" if v.text == "1" else "FALSO"
+            else:
+                valor = float(v.text)
+                s = int(c.get("s", 0))
+                if s < len(estilo_fecha) and estilo_fecha[s]:
+                    valor = base + timedelta(days=int(valor))
+                celdas[col] = valor
+        if celdas:
+            filas.append([celdas.get(i) for i in range(max(celdas) + 1)])
+    return filas
+
+
+# ---------------------------------------------------------------------------
 # Registro canonico
 # ---------------------------------------------------------------------------
 

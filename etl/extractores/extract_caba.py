@@ -25,8 +25,10 @@ Formatos reales detectados (no coinciden 1:1 con el catalogo del prompt):
        - subcarpetas 2015/2016/2017: pauta-publicitaria-YYYY[-total].csv (incluye RAZON_SOCIAL=proveedor)
      Se detecta Via Publica FILA A FILA por el valor de la columna TIPO.
 
-  F) Moderno por-tipo (2018-2024): un archivo por categoria (Fecha,Medio,Importe).
+  F) Moderno por-tipo (2018-2025): un archivo por categoria (Fecha,Medio,Importe).
      El tipo sale del NOMBRE del archivo. Via Publica -> medio=None.
+     2023: Cine, Medios Graficos y Medios Vecinales se publicaron solo en XLSX; se leen los
+     XLSX revisados de XLSX_SIN_CSV con el mismo criterio que los CSV.
 
 REGLA ANTI-DUPLICADO: para 2015/2016/2017 existen combinado Y por-tipo. Se usa SOLO el
 combinado (mas rico: trae proveedor). Para 2018-2024 solo hay por-tipo. Para 2011-2014
@@ -37,9 +39,11 @@ REGLA VIA PUBLICA: se colapsa TODO Via Publica a medio="Via Publica" y tipo_de_m
 sea agrupable bajo un unico medio.
 """
 
+import hashlib
 import os
 import re
 import sys
+from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import comun  # noqa: E402
@@ -49,6 +53,21 @@ from comun import (  # noqa: E402
 )
 
 JURIS = "CABA"
+
+# Tipos de medio que BA Data (data.buenosaires.gob.ar/dataset/pauta-publicitaria) publico solo en
+# XLSX, sin CSV, y su SHA-256. Se leen si estan en la carpeta del año y son el archivo revisado;
+# si la carpeta trae otro, se avisa y no se cargan. archivo_origen es el nombre del XLSX. Los
+# demas XLSX del portal repiten un CSV y no se leen. Medios Vecinales 2023 esta publicado dos
+# veces con el mismo contenido: se usa la publicacion del 14/04/2025 (la del 09/08/2024 es
+# "BA DATA 2023 - Medios Vecinales.xlsx").
+XLSX_SIN_CSV = {
+    "BA_DATA_2023_Medios_Vecinales.xlsx":
+        "e68cbe3e1f6f361081e113c771e81ac9fea5b2108d8b810281446e4c90865ba1",
+    "pauta-publicitaria-cine-2023.xlsx":
+        "d3c0b944c1716d532ffe5625eecf98511fe6f7e029c6e939d181a5910f7c8d37",
+    "pauta-publicitaria-medios-graficos-2023.xlsx":
+        "6dd545a9be4b1ec989f9754a461917cb4851e7ec8498262d98eae90162541f10",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +109,7 @@ def _tipo_desde_nombre(nombre):
 
 def _indices(header):
     """Devuelve dict con indices de columnas relevantes (case-insensitive)."""
-    H = [(h or "").strip().upper() for h in header]
+    H = [("" if h is None else str(h)).strip().upper() for h in header]
     idx = {"fecha": None, "importe": None, "tipo": None, "medio": None, "razon": None}
     for i, h in enumerate(H):
         hn = h.replace("Ó", "O").replace("Á", "A").replace("Í", "I")
@@ -119,6 +138,21 @@ def _cell(row, i):
     if i is None or i >= len(row):
         return None
     return row[i]
+
+
+def _xlsx_revisados(ydir):
+    """XLSX de XLSX_SIN_CSV que estan en la carpeta y son el revisado."""
+    out = []
+    for nombre, sha in XLSX_SIN_CSV.items():
+        f = ydir / nombre
+        if not f.exists():
+            continue
+        real = hashlib.sha256(f.read_bytes()).hexdigest()
+        if real != sha:
+            log(f"  [CABA] {nombre}: ADVERTENCIA no es el XLSX revisado (SHA-256 {real}); no se carga")
+            continue
+        out.append(f)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -359,8 +393,10 @@ def _parse_pertype(path, anio, cont):
     out = []
     tipo_archivo = _tipo_desde_nombre(path.name)
     es_vp = (tipo_archivo == "Via Publica")
-    sep = detectar_sep(path)
-    filas = leer_filas(path, sep)
+    if path.suffix.lower() == ".xlsx":
+        filas = comun.leer_xlsx(path)
+    else:
+        filas = leer_filas(path, detectar_sep(path))
     if len(filas) < 2:
         return out
     # Algunos archivos (p.ej. medios-graficos-2022.csv, cine-2022.csv) tienen
@@ -378,13 +414,20 @@ def _parse_pertype(path, anio, cont):
     if idx["importe"] is None:
         cont.descartar("sin_columna_importe")
         return out
-    leer_monto = parser_montos((_cell(r, idx["importe"]) for r in filas[1:]), f"[CABA] {path.name}")
+    # en un XLSX los montos numericos ya son numeros: solo las celdas de texto pasan por el parser
+    leer_texto_monto = parser_montos(
+        (v for v in (_cell(r, idx["importe"]) for r in filas[1:]) if not isinstance(v, float)),
+        f"[CABA] {path.name}")
     for row in filas[1:]:
-        monto = leer_monto(_cell(row, idx["importe"]))
+        valor = _cell(row, idx["importe"])
+        monto = (abs(valor) or None) if isinstance(valor, float) else leer_texto_monto(valor)
         if monto is None:
             cont.descartar("monto_invalido")
             continue
-        fecha = normalizar_fecha(_cell(row, idx["fecha"]), anio)
+        valor_fecha = _cell(row, idx["fecha"])
+        if isinstance(valor_fecha, date):
+            valor_fecha = valor_fecha.isoformat()
+        fecha = normalizar_fecha(valor_fecha, anio)
         medio = limpiar_str(_cell(row, idx["medio"]))
         prov = limpiar_str(_cell(row, idx["razon"]))
         if es_vp:
@@ -475,8 +518,8 @@ def extraer():
             for f in combinados:
                 registros += _parse_combinado(f, anio, cont)
         else:
-            # 2018-2024: per-tipo
-            for f in csvs:
+            # 2018-2025: per-tipo (con los XLSX publicados sin CSV, en el orden de los nombres)
+            for f in sorted(csvs + _xlsx_revisados(ydir)):
                 registros += _parse_pertype(f, anio, cont)
 
     cont.resumen()

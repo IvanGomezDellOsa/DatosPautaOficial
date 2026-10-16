@@ -41,6 +41,14 @@ en `etl/extractores/`. Tu tarea es **ejecutarlos, verificar el output y dejarlo 
 
   Los SHA-256 completos están en `PDF_DE_PIVOT` (`etl/extractores/extract_nacion.py`).
   En el log, cada PDF leído dice "se lee el PDF oficial, que concilia".
+- **XLSX de CABA 2023.** Cine, Medios Gráficos y Medios Vecinales 2023 se publicaron solo en
+  XLSX. El extractor los lee si están en la carpeta `CABA\2023\`, junto a los CSV, y si su
+  SHA-256 es el revisado (`XLSX_SIN_CSV` en `etl/extractores/extract_caba.py`). Si falta
+  alguno, CABA 2023 sale incompleto. Se bajan de
+  `https://cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/<xlsx>`:
+  `BA_DATA_2023_Medios_Vecinales.xlsx`, `pauta-publicitaria-cine-2023.xlsx` y
+  `pauta-publicitaria-medios-graficos-2023.xlsx`. Los demás XLSX del portal repiten un CSV:
+  no hace falta bajarlos, y el extractor no los lee.
 
 ## Orden de ejecución (desde la raíz del repo)
 0. **Tests de los extractores** (montos y pivots; no necesitan los crudos; los del PDF usan
