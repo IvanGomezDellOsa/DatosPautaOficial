@@ -146,7 +146,7 @@ node etl/upload_r2.mjs --dry-run             # simula la subida (requiere R2_BUC
 
 | Jurisdicción | Fuente | Estado |
 |---|---|---|
-| CABA | https://data.buenosaires.gob.ar/dataset/pauta-publicitaria (archivos en `cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/`) | Anual. 2011-2025. Usa punto decimal; ojo con los montos de 3 decimales. API CKAN genérica. 2023: Cine, Gráfica y Medios vecinales solo en XLSX; el extractor lee los revisados (`XLSX_SIN_CSV`). |
+| CABA | https://data.buenosaires.gob.ar/dataset/pauta-publicitaria (archivos en `cdn.buenosaires.gob.ar/datosabiertos/datasets/pauta-publicitaria/`, los recientes bajo `.../datasets/secretaria-de-medios/pauta-publicitaria/`) | Anual. 2011-2025. Usa punto decimal; ojo con los montos de 3 decimales. API CKAN genérica. 2023: Cine, Gráfica y Medios vecinales solo en XLSX; el extractor lee los revisados (`XLSX_SIN_CSV`). |
 | Nación 2014-2022 | https://datos.gob.ar/dataset/publicidad-oficial | CSV. Sin actualizar desde 08/2022; 2022 cubre solo enero-abril. |
 | Nación 2009-2013 | https://www.argentina.gob.ar/node/1759 | Solo PDF. Los "por proveedor y rubro" son pivots: no cargar la fila o columna de total. Junio 2009 no existe en la fuente. |
 | PBA | Resoluciones y anexos PDF (normas.gba.gob.ar) | 2020-2024 armado resolución por resolución; 2025 de la fuente oficial. Cobertura parcial. |
@@ -176,7 +176,7 @@ Ahí está también el reporte de auditoría por archivo.
   - se agregan Nación 2012-S2 y CABA 2025.
   - Cada archivo concilia al centavo con su total oficial. 2009 difiere en centavos
     porque la propia fuente redondeó su fila de totales.
-- **CABA 2023 completo** (2026-10-15, aprobado por el usuario, sin publicar todavía).
+- **CABA 2023 completo publicado** (2026-10-15, aprobado por el usuario).
   Detalle en `CORRECCIONES.md` y `etl/actualizacion_2026-10-15_caba2023/`:
   - se agregan Cine, Gráfica y Medios vecinales 2023, publicados solo en XLSX: 4.837
     órdenes;
