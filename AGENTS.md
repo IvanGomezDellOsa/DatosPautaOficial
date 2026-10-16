@@ -180,6 +180,27 @@ Poder Ciudadano y Fundación LED, publicó totales de Nación por semestre de 20
 2015-H1. Coinciden con los PDF oficiales de 2009-2013. Para 2014-2015 dan menos que el
 CSV oficial: se mantiene el oficial.
 
+**APIs de Nación (revisadas el 2026-10-16).** Responden con 502 intermitentes: reintentar
+y mandar un `User-Agent`.
+- **CKAN de datos.gob.ar:**
+  - `https://datos.gob.ar/api/3/action/package_search?q=publicidad` lista el dataset
+    `publicidad-oficial`. Sirve para detectar si aparece un recurso nuevo.
+  - Al 2026-10-16 sigue con `dataset_modified` 2022-08-30 y los mismos 14 CSV que ya usa
+    el extractor.
+  - El diccionario de datos está en `https://infra.datos.gob.ar/catalog/jgm/data.json`
+    (`distribution[].field`). Para 2014, 2015 y 2016-S1, `total` dice "Monto total
+    establecido en la orden", sin aclarar el IVA, así que no resuelve esa duda.
+- **Series de Tiempo** (`https://apis.datos.gob.ar/series/api/`):
+  - IPC nacional, nivel general: `148.3_INIVELNAL_DICI_M_26:percent_change`.
+  - Coincide con `ipc_indec.csv` y llega hasta 2026-07 (este llega hasta 2026-04).
+  - Tiene huecos: 2025-12 a 2026-02 vienen vacíos. Sirve para extender `ipc_indec.csv`,
+    no para reemplazarlo.
+  - Agregar meses cambia todos los montos deflactados de la web (cambia el mes base):
+    requiere OK del usuario.
+- **Otros datasets.** En datos.gob.ar, que también reúne a los portales federados, buscar
+  "publicidad oficial" devuelve solo `publicidad-oficial`. Georef-AR (normalización
+  geográfica) no aplica: la base no tiene ubicaciones.
+
 **Crudos descargados**: fuera del repo y solo en la máquina del autor, bajo
 `%APPDATA%\Claude\side-session-notes\`:
 - `local_70186434-a1ae-4d3d-a6cb-5e7b882c92e4\auditoria_fuentes\`: crudos del
