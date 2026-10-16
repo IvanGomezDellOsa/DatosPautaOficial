@@ -19,7 +19,7 @@ La postura es estrictamente informativa: sin denuncia ni opinión.
 
 Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
 
-**PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución — más de 500 resoluciones procesadas** — para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Son datos que no existen en ningún portal de datos abiertos.
+**PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución**, desde los anexos publicados en [normas.gba.gob.ar](https://normas.gba.gob.ar), para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Son datos que no existen en ningún portal de datos abiertos. La cobertura es parcial: no todas las resoluciones publicadas están cargadas, sobre todo en 2020–2022.
 
 ---
 
@@ -30,7 +30,7 @@ Hasta este proyecto, la información estaba dispersa en portales de datos abiert
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 parcial) | 224.677 |
 | Santa Fe | 2008–2023 | 61.187 |
-| PBA | 2020–2025 | 43.982 |
+| PBA | 2020–2025 (parcial) | 43.982 |
 | **Total** | **2003–2025** | **554.021** |
 
 Los huecos de cobertura se muestran de forma explícita en la web: nunca se presentan agregados que puedan engañar por cobertura incompleta.
@@ -41,7 +41,7 @@ Cada corrección de datos queda registrada, con su evidencia, en [CORRECCIONES.m
 
 ## 🏗️ Arquitectura
 
-El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~175 MB) vive en Cloudflare R2 como un único archivo versionado, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`.
+El proyecto corre **100% sin backend ni servidores**: la base de datos SQLite completa (~176 MB) vive en Cloudflare R2 como un único archivo versionado, y el navegador consulta solo los bytes que necesita vía HTTP Range Requests gracias a `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)

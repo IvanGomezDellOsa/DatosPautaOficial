@@ -19,7 +19,7 @@ The stance is strictly informative: no accusation, no opinion.
 
 Until this project, the information was scattered across open data portals, spreadsheets and PDFs from each jurisdiction, in formats incompatible with one another and with no way to compare amounts across years or governments.
 
-**PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution — more than 500 resolutions processed** — to reconstruct the detail of each order (supplier, media outlet, amount, file number). This data does not exist in any open data portal.
+**PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution**, from the annexes published on [normas.gba.gob.ar](https://normas.gba.gob.ar), to reconstruct the detail of each order (supplier, media outlet, amount, file number). This data does not exist in any open data portal. Coverage is partial: not every published resolution is loaded, especially in 2020–2022.
 
 ---
 
@@ -30,7 +30,7 @@ Until this project, the information was scattered across open data portals, spre
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 partial) | 224.677 |
 | Santa Fe | 2008–2023 | 61.187 |
-| PBA | 2020–2025 | 43.982 |
+| PBA | 2020–2025 (partial) | 43.982 |
 | **Total** | **2003–2025** | **554.021** |
 
 Coverage gaps are shown explicitly on the website: aggregates that could mislead due to incomplete coverage are never presented.
@@ -41,7 +41,7 @@ Every data correction is logged, with its evidence, in [CORRECCIONES.md](CORRECC
 
 ## 🏗️ Architecture
 
-The project runs **100% without a backend or servers**: the full SQLite database (~175 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
+The project runs **100% without a backend or servers**: the full SQLite database (~176 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
