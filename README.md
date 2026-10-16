@@ -9,7 +9,7 @@
 🌐 **Deploy en producción:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 🎬 **Video de presentación:** [Ver en YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
-Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **570.010 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
+Web pública, neutral y open source que consolida los datos de publicidad oficial (pauta) de Argentina en un solo lugar: **571.011 órdenes de publicidad** de cuatro jurisdicciones (Nación, CABA, Provincia de Buenos Aires y Santa Fe), período 2003–2025, con montos deflactados por inflación para que las cifras sean comparables entre años.
 
 La postura es estrictamente informativa: sin denuncia ni opinión.
 
@@ -19,7 +19,7 @@ La postura es estrictamente informativa: sin denuncia ni opinión.
 
 Hasta este proyecto, la información estaba dispersa en portales de datos abiertos, planillas y PDFs de cada jurisdicción, con formatos incompatibles entre sí y sin posibilidad de comparar montos entre años o gobiernos.
 
-**PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución**, desde los anexos publicados en [normas.gba.gob.ar](https://normas.gba.gob.ar), para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Son datos que no existen en ningún portal de datos abiertos. La cobertura es parcial: están cargados los anexos publicados que se pueden leer y conciliar con su total, pero algunas resoluciones no publican el detalle de las órdenes o lo publican ilegible, sobre todo en 2020.
+**PBA 2020–2024 es un dataset exclusivo de este proyecto.** La Provincia de Buenos Aires no publica sus órdenes de publicidad en datasets abiertos para ese período: la información estaba enterrada en resoluciones individuales en PDF. Mediante un script programado fui extrayendo los datos **resolución por resolución**, desde los anexos publicados en [normas.gba.gob.ar](https://normas.gba.gob.ar), para reconstruir el detalle de cada orden (proveedor, medio, monto, expediente). Son datos que no existen en ningún portal de datos abiertos. La cobertura es parcial: están cargados los anexos publicados que se pueden leer y conciliar con su total, pero algunas resoluciones no publican el detalle de las órdenes o lo publican sin un total que cierre, sobre todo en 2020.
 
 ---
 
@@ -29,9 +29,9 @@ Hasta este proyecto, la información estaba dispersa en portales de datos abiert
 |---|---|---|
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 parcial) | 224.677 |
-| Santa Fe | 2008–2023 | 63.813 |
-| PBA | 2020–2025 (parcial) | 57.345 |
-| **Total** | **2003–2025** | **570.010** |
+| Santa Fe | 2008–2023 | 64.585 |
+| PBA | 2020–2025 (parcial) | 57.574 |
+| **Total** | **2003–2025** | **571.011** |
 
 Los huecos de cobertura se muestran de forma explícita en la web: nunca se presentan agregados que puedan engañar por cobertura incompleta.
 
@@ -48,7 +48,7 @@ Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
 ↓
 Extractores Python (etl/extractores/extract_{caba,nacion,pba,santa_fe}.py)
 ↓
-unificar.py → CSV canónico (8 columnas, 570.010 filas) → validar.py
+unificar.py → CSV canónico (8 columnas, 571.011 filas) → validar.py
 ↓
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)
@@ -78,7 +78,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 🎯 Funcionalidades
 
-**Tabla explorable de 569 mil órdenes**
+**Tabla explorable de 571 mil órdenes**
 - Filtros cruzados por jurisdicción y año, agrupación por proveedor/medio con filas expandibles y paginación de 25 registros por página
 - Primer paint instantáneo: el estado inicial viene precomputado e inlineado por Astro (`home.json`) — sql.js se inicializa recién cuando el usuario interactúa
 - El dato mostrado es el **crudo exacto de la fuente oficial**, sin normalización

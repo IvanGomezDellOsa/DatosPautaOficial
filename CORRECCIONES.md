@@ -2,6 +2,36 @@
 
 Acá registramos cada corrección de los datos publicados en Datos Pauta Oficial: qué cambió, por qué y con qué evidencia.
 
+## 16 de octubre de 2026: Santa Fe gráfica 2013 y tres anexos de PBA
+
+Dos faltantes que habían quedado afuera de las cargas anteriores.
+
+**Santa Fe, gráfica 2013.** Faltaban 97 de los 127 medios gráficos de 2013 ($35,2 millones de la época). No se habían cargado porque la planilla oficial con el detalle por medio suma $1.925,25 más que el resumen oficial por tipo de medio, y toda la diferencia está en julio.
+- La planilla de detalle cuadra al centavo con su propia fila de totales, mes por mes.
+- El resumen lo genera el sistema de la Provincia. El detalle, en cambio, es una planilla de cálculo hecha a mano el mismo día. Las demás planillas de 2013 (TV, radio, internet, cine y vía pública) coinciden al centavo con el resumen. Lo más probable es una celda de julio mal escrita en la planilla de gráfica, pero la fuente no permite saber cuál.
+- Se cargan los medios tal como los publica la planilla oficial. La diferencia es el 0,005 % de la gráfica de ese año.
+
+**PBA: 257/2022, 138/2023 y 142/2023.** Sus anexos se ven bien, pero la tipografía del PDF no dice qué letra es cada dibujo, así que no se podían leer como texto. Cada dibujo de letra se identificó comparándolo con el mismo dibujo en anexos de PBA de 2022 y 2023 que sí traen texto: los 9.136 caracteres sin texto tienen un solo equivalente posible.
+
+| Resolución | Mes de las órdenes | Órdenes | Monto nominal |
+|---|---|---:|---:|
+| [257/2022](https://normas.gba.gob.ar/ar-b/resolucion/2022/257/322187) | septiembre de 2022 | 112 | $56.930.252 |
+| [138/2023](https://normas.gba.gob.ar/ar-b/resolucion/2023/138/361818) | marzo de 2023 | 29 | $549.907 |
+| [142/2023](https://normas.gba.gob.ar/ar-b/resolucion/2023/142/363230) | abril de 2023 | 88 | $88.479.194 |
+
+**En números:**
+- Santa Fe: se agregan **772 órdenes** por **$35,2 millones** nominales ($9.659 millones en pesos de abril de 2026). Santa Fe pasa de 63.813 a 64.585 órdenes; 2013, de 2.538 a 3.310.
+- PBA: se agregan **229 órdenes** por **$146 millones** nominales ($1.276 millones en pesos de abril de 2026). PBA pasa de 57.345 a 57.574 órdenes.
+- Solo se agregan órdenes. Ninguna orden que ya estaba cambia.
+
+**Evidencia.**
+- Gráfica 2013: los 12 meses de la base coinciden al centavo con la fila de totales de la planilla oficial.
+- PBA: cada anexo suma, al centavo, el total impreso al pie. Además se comparó a ojo con la imagen del PDF: el anexo 138/2023 completo y una página de cada uno de los otros dos.
+- Ninguna de esas órdenes de PBA estaba ya en la base: ningún bloque comparte más de 33 órdenes con un anexo, y esos bloques ya tienen asignada su propia resolución, de otro mes.
+- El detalle está en [`etl/actualizacion_2026-10-15_santafe/`](etl/actualizacion_2026-10-15_santafe/LEEME.md) y [`etl/actualizacion_2026-10-15_pba/`](etl/actualizacion_2026-10-15_pba/LEEME.md).
+
+**Número de orden (#).** Las órdenes de Santa Fe cambian de número; el resto lo conserva.
+
 ## 16 de octubre de 2026: PBA, tres resoluciones más
 
 En la carga anterior de PBA quedaron afuera tres resoluciones porque ni su resumen ni su anexo decían de qué mes eran las órdenes. Bajamos el texto oficial de cada una desde normas.gba.gob.ar, que sí lo dice, y las sumamos.
@@ -100,10 +130,10 @@ Los datos de la Provincia de Buenos Aires se arman resolución por resolución, 
   - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales; se cargaron después, ver la entrada "PBA, tres resoluciones más");
   - en una la suma de las órdenes no da el total impreso;
   - y otra no imprime total.
-- 3 anexos de 2022 y 2023 están publicados en un formato que no se puede leer como texto.
+- 3 anexos de 2022 y 2023 están publicados en un formato que no se puede leer como texto (se cargaron después, ver la entrada "Santa Fe gráfica 2013 y tres anexos de PBA").
 - En 2020 hay 12 resoluciones que aprueban gasto pero no publican el detalle de las órdenes.
 - 2023 tiene 2.159 órdenes ($3.358 millones) cuya resolución no está publicada en normas.gba.gob.ar. Se mantienen: no hay evidencia de que estén mal.
-- Las rescisiones (órdenes que se dieron de baja) de 2024 y 2025 no se restan. Es una decisión de criterio pendiente.
+- Las rescisiones de 2024 y 2025 no se restan: dan de baja saldos sin usar de órdenes viejas (2018-2025), y la base muestra lo aprobado.
 
 **Otros cambios que se ven en el sitio.**
 - **Rankings.** En el ranking histórico de todas las jurisdicciones, Sentidos S.A. entra 5.º entre los proveedores y Grupo Olmos entra 5.º entre los grupos. En PBA 2025, Parador Diez S.A. pasa al primer lugar.
@@ -282,7 +312,7 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
   - Mantenemos el dato de la fuente, con su detalle por orden, y lo aclaramos en la cobertura de Nación del sitio.
 - **Nación, junio de 2009.** No figura en ninguna publicación oficial.
 - **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no estaban en la base. Se agregaron después: ver «CABA 2023 completo», más arriba.
-- **Santa Fe.** Se corrigió el 16 de octubre: ver «Santa Fe corregido», más arriba. Queda Gráfica 2013 ($35,2 millones de la época), que no coincide con el resumen oficial.
+- **Santa Fe.** Se corrigió el 16 de octubre: ver «Santa Fe corregido», más arriba. Gráfica 2013 se agregó el mismo día: ver «Santa Fe gráfica 2013 y tres anexos de PBA», más arriba.
 - **Provincia de Buenos Aires.** Faltaban resoluciones publicadas, sobre todo en 2020-2022. Se agregaron el 16 de octubre: ver «PBA completo con los anexos publicados», más arriba, con lo que todavía no se pudo cargar.
 
 ### Cómo verificarlo

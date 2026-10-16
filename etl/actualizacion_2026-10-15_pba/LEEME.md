@@ -1,6 +1,6 @@
 # PBA: anexos oficiales que faltaban (15-16/10/2026)
 
-Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. La etapa 1 (78 resoluciones) y la etapa 2 (3 resoluciones más, ver abajo) están publicadas desde el 16/10/2026.
+Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. La etapa 1 (78 resoluciones), la etapa 2 (3 resoluciones sin mes) y la etapa 3 (3 anexos con fuente sin texto) están publicadas desde el 16/10/2026.
 
 La fe de erratas para publicar está en [`CORRECCIONES.md`](../../CORRECCIONES.md). Este archivo es el detalle técnico para revisar la rama. Repite el método de [`etl/actualizacion_2026-10-15/`](../actualizacion_2026-10-15/LEEME.md): cada fuente verificada por SHA-256, conciliación al centavo y el resto del CSV idéntico byte a byte.
 
@@ -65,6 +65,28 @@ Ni el resumen ni el anexo de estas tres resoluciones dicen de qué mes son las �
 - `conciliacion_etapa2.tsv` y `validacion_despues_etapa2.md` (11 atípicos, igual que antes).
 - Proveedores y medios normalizados no cambian (6.521; 16.022 medios con Santa Fe corregido).
 
+## Etapa 3 (16/10/2026): 257/2022, 138/2023 y 142/2023, los anexos "ilegibles"
+
+Los tres PDF se ven bien, pero su fuente TrueType embebida no trae la tabla que dice qué letra es cada glifo: pdfplumber devuelve `\x00` en 9.136 caracteres. `agregar_ilegibles.py` los lee sin OCR:
+
+- **Firma de cada glifo:** SHA-1 de sus contornos (`glyf`) y su ancho de avance (`hmtx`). El mismo carácter de la misma fuente tiene siempre la misma firma, aunque cambie el número de glifo en cada subconjunto.
+- **Rótulos:** las firmas se rotulan con los 181 anexos legibles que concilian al centavo, promulgados en 2022-2023 (`anexos.tsv`), más las letras que sí tienen texto en los propios 3 anexos. Solo fuentes Type0 con `CIDToGIDMap` Identity. Resultado: 124 firmas, ninguna con dos rótulos, y todos los glifos sin texto de los 3 anexos tienen rótulo.
+- **Lectura:** con el texto repuesto corre el mismo `leer_anexos.leer_pdf` y la misma conciliación de la etapa 1.
+- **Control a ojo:** se comparó contra la imagen del PDF el anexo 138/2023 completo, la primera página de 257/2022 y la última de 142/2023.
+- **Duplicados:** ningún bloque de PBA de la base comparte más de la mitad de sus órdenes (monto, proveedor y medio) con un anexo. El que más comparte tiene 33 de 112, 14 de 29 y 17 de 88, y ya está asignado a su propia resolución de otro mes (`bloques_base.tsv`): son órdenes mensuales que se repiten.
+- **Mes:** el del resumen oficial de cada resolución (`pba_resoluciones_normas_gba.tsv`). La hoja de firmas de 138/2023 lo confirma ("Publicidad Oficial marzo").
+
+| Resolución | Anexo | Mes | Expediente | Órdenes | Suma = total impreso |
+|---|---|---|---|---:|---:|
+| 257/2022 | `yBo8ORVz.pdf` | 2022-09 | 2140-4429-2022 | 112 | 56.930.252,00 |
+| 138/2023 | `30PEDyxP.pdf` | 2023-03 | 2140-4701-2023 | 29 | 549.907,00 |
+| 142/2023 | `dV9KZYxO.pdf` | 2023-04 | 2140-4708-2023 | 88 | 88.479.194,00 |
+
+- **Resultado:** +229 órdenes, +145.959.353,00 nominales, +1.275,7 M de abril de 2026. Van al final del bloque de PBA (`#id` 506.198 a 506.426); Santa Fe corre su número en 229.
+- Parte del CSV con Gráfica 2013 de Santa Fe ya agregada (SHA-256 `585d1b80…6df6`): 570.782 → 571.011 órdenes, SHA-256 `d5f61321…32b0`. `git diff --numstat` de toda la actualización: 1.001 líneas agregadas (772 de Santa Fe y 229 de PBA), 0 quitadas.
+- PBA 2022 pasa de 10.907 a 11.019 órdenes y 2023 de 14.602 a 14.719.
+- `conciliacion_etapa3.tsv`. Requiere `fontTools`; tarda un minuto y medio.
+
 ## Fuente
 
 - La lista de resoluciones de pauta de normas.gba.gob.ar armada por la auditoría de fuentes del 2026-10-15: `pba_resoluciones_normas_gba.tsv`, con 456 resoluciones y 427 anexos (462 filas, una por anexo).
@@ -89,7 +111,7 @@ Ni el resumen ni el anexo de estas tres resoluciones dicen de qué mes son las �
 |---|---|---|---|
 | 79/2020 | `lxkRme02.pdf` | una sola orden ($353.088) y sin total impreso | no se carga |
 | 17/2021 | `n0vlmmBE.pdf` | las 158 órdenes suman $30.766.762 y el total impreso dice $30.843.184 ($76.422 más) | no se carga |
-| 257/2022, 138/2023, 142/2023 | `yBo8ORVz`, `30PEDyxP`, `dV9KZYxO` | la fuente del PDF no tiene texto (requiere OCR) | no se carga |
+| 257/2022, 138/2023, 142/2023 | `yBo8ORVz`, `30PEDyxP`, `dV9KZYxO` | la fuente del PDF no tiene texto | se cargan en la etapa 3 |
 | 259/2024, 208/2025, 283/2025, 284/2025 | | sin total impreso | no: ya estaban completas en la base |
 | 251/2024, 298/2025 | 6 anexos | rescisiones (otro formato) | aparte, ver abajo |
 
@@ -109,7 +131,7 @@ Resultado (`resoluciones.tsv`, columnas `estado` y `accion`):
 | se cargan las órdenes que faltan | 78 |
 | no se carga (sin mes, sin total o no concilia); las 3 sin mes se cargan en la etapa 2 | 5 |
 | sin anexo con órdenes publicado (incluye rectificaciones sin anexo y resoluciones de personal) | 35 |
-| anexo ilegible | 3 |
+| anexo ilegible (se cargan en la etapa 3) | 3 |
 | repite el anexo de otra resolución | 4 |
 | rescisión | 2 |
 | **Total** | **456** |
@@ -182,9 +204,8 @@ La auditoría vio que `tabula-15.csv` y `tabula-90.csv` comparten 139 filas idé
 |---|---:|---:|---|---|
 | 79/2020 | 1 | 353.088 | el anexo no imprime total | comparar con el monto del artículo 1 de la resolución |
 | 17/2021 | 158 | 30.766.762 | no concilia: el total impreso dice $76.422 más | ídem; puede faltar una orden en el anexo |
-| 257/2022, 138/2023, 142/2023 | ? | ? | anexo ilegible | OCR |
 
-- **Rescisiones** (251/2024 y 298/2025, 6 anexos de "compromisos sin devengar", "OP no prestadas" u "OP no coincidentes"): no se suman ni se restan. Restarlas de la pauta es una decisión de criterio pendiente.
+- **Rescisiones** (251/2024 y 298/2025, 6 anexos de "compromisos sin devengar", "OP no prestadas" u "OP no coincidentes"): no se suman ni se restan, por decisión del usuario: la base muestra lo aprobado. Dan de baja el saldo reservado y no usado de órdenes de compra de 2018-2025 (unos $80 M en 251/2024 y $330 M en 298/2025, menos del 1 % de PBA por año), con número de orden de compra y no de OP.
 - **Rectificaciones:** las 3 con anexo repiten el anexo de otra resolución (mismo SHA-256) y no cambian nada. Las demás no tienen anexo.
 - **Resoluciones sin anexo con órdenes:** 35. Entre ellas hay 12 aprobaciones de gasto de 2020 (81, 141, 160-162, 164-168, 175 y 196/2020) cuyo detalle no está publicado; el resto son rectificaciones y resoluciones de personal.
 
@@ -220,6 +241,7 @@ python etl/build_db.py
 | Archivo | Qué tiene |
 |---|---|
 | `leer_anexos.py`, `cruzar.py`, `agregar.py` | los scripts |
+| `agregar_ilegibles.py` | etapa 3: lee los 3 anexos con fuente sin texto y los agrega |
 | `pba_resoluciones_normas_gba.tsv` | las 456 resoluciones de pauta de normas.gba.gob.ar, con resumen y anexos |
 | `manifest_anexos.tsv` | los 427 anexos: URL, tamaño, SHA-256 y fecha de descarga |
 | `anexos.tsv` | cada anexo leído: órdenes, suma, total impreso, si concilia y por qué no |
@@ -230,3 +252,4 @@ python etl/build_db.py
 | `validacion_antes.md`, `validacion_despues.md` | `validar.py` antes y después |
 | `manifest_textos_resoluciones.tsv` | etapa 2: los 3 textos oficiales bajados (URL, tamaño, SHA-256, fecha) |
 | `conciliacion_etapa2.tsv`, `validacion_despues_etapa2.md` | etapa 2: conciliación y `validar.py` |
+| `conciliacion_etapa3.tsv`, `validacion_despues_etapa3.md` | etapa 3: conciliación y `validar.py` |

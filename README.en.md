@@ -9,7 +9,7 @@
 🌐 **Production deploy:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 🎬 **Presentation video:** [Watch on YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
-A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **570,010 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
+A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **571,011 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
 
 The stance is strictly informative: no accusation, no opinion.
 
@@ -19,7 +19,7 @@ The stance is strictly informative: no accusation, no opinion.
 
 Until this project, the information was scattered across open data portals, spreadsheets and PDFs from each jurisdiction, in formats incompatible with one another and with no way to compare amounts across years or governments.
 
-**PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution**, from the annexes published on [normas.gba.gob.ar](https://normas.gba.gob.ar), to reconstruct the detail of each order (supplier, media outlet, amount, file number). This data does not exist in any open data portal. Coverage is partial: every published annex that can be read and reconciled with its total is loaded, but some resolutions do not publish the order detail or publish it unreadable, especially in 2020.
+**PBA 2020–2024 is a dataset exclusive to this project.** Provincia de Buenos Aires does not publish its advertising orders in open datasets for that period: the information was buried in individual PDF resolutions. Through a scripted process I extracted the data **resolution by resolution**, from the annexes published on [normas.gba.gob.ar](https://normas.gba.gob.ar), to reconstruct the detail of each order (supplier, media outlet, amount, file number). This data does not exist in any open data portal. Coverage is partial: every published annex that can be read and reconciled with its total is loaded, but some resolutions do not publish the order detail or publish it without a total that reconciles, especially in 2020.
 
 ---
 
@@ -29,9 +29,9 @@ Until this project, the information was scattered across open data portals, spre
 |---|---|---|
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 partial) | 224.677 |
-| Santa Fe | 2008–2023 | 63.813 |
-| PBA | 2020–2025 (partial) | 57.345 |
-| **Total** | **2003–2025** | **570.010** |
+| Santa Fe | 2008–2023 | 64.585 |
+| PBA | 2020–2025 (partial) | 57.574 |
+| **Total** | **2003–2025** | **571.011** |
 
 Coverage gaps are shown explicitly on the website: aggregates that could mislead due to incomplete coverage are never presented.
 
@@ -48,7 +48,7 @@ Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
 ↓
 Extractores Python (etl/extractores/extract_{caba,nacion,pba,santa_fe}.py)
 ↓
-unificar.py → CSV canónico (8 columnas, 570.010 filas) → validar.py
+unificar.py → CSV canónico (8 columnas, 571.011 filas) → validar.py
 ↓
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)
@@ -78,7 +78,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 
 ## 🎯 Features
 
-**Explorable table of 569 thousand orders**
+**Explorable table of 571 thousand orders**
 - Cross filters by jurisdiction and year, grouping by supplier/media outlet with expandable rows and pagination of 25 records per page
 - Instant first paint: the initial state is precomputed and inlined by Astro (`home.json`) — sql.js initializes only when the user interacts
 - The displayed value is the **exact raw value from the official source**, without normalization

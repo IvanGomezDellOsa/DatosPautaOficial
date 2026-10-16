@@ -1,7 +1,7 @@
 # Datos Pauta Oficial: guía para agentes de IA
 
 Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
-oficial argentina: ~570 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+oficial argentina: ~571 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
 montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
 Proyecto muy sensible: un número mal cargado se publica como dato oficial.
 
@@ -235,7 +235,19 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
   oficial de cada resolución, bajado con permiso del usuario (`manifest_textos_resoluciones.tsv`;
   crudos en `side-session-notes\local_5cee6ed6-…\pba_resoluciones_sin_mes_2026-10-16\`).
   `agregar.py --etapa 2` verifica el SHA-256 del texto, el mes y el total de su artículo 1.
-- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 570.010
+- **Santa Fe Gráfica 2013 y PBA etapa 3: publicado** (2026-10-16, aprobado por el usuario).
+  Detalle en `CORRECCIONES.md`:
+  - Gráfica 2013 (`corregir.py --aplicar ...,grafica2013`): +772 filas, $35,2 M nominales.
+    El usuario aceptó la diferencia de $1.925,25 en julio contra el resumen del sistema:
+    el detalle es una planilla de Calc hecha a mano (13/04/2016, 10:34) y el resumen, un
+    reporte GeneXus de 33 minutos antes; las demás planillas de 2013 concilian al centavo.
+    Se corrió `corregir.py` sobre el CSV previo a PBA con y sin `grafica2013`, y las 772
+    filas de diferencia (contiguas) se insertaron en el CSV vigente en el mismo lugar.
+  - PBA 257/2022, 138/2023 y 142/2023 (`agregar_ilegibles.py`): +229 filas, $146,0 M
+    nominales. La fuente embebida no tiene texto: cada glifo se identifica por la firma de
+    su contorno TrueType, rotulada con los anexos legibles que concilian (sin ambigüedad).
+    Cada anexo concilia al centavo con su total impreso.
+- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 571.011
   órdenes.
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
@@ -246,10 +258,6 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     pauta de PBA en 2020-2024 (456 con 2025);
   - formulario de contacto en vez del mail (ver "Formulario de contacto").
 - **Pendientes conocidos, sin corregir:**
-  - Santa Fe, Gráfica 2013: faltan 97 medios ($35,2 M nominales). El detalle del PDF
-    concilia con su propia fila de totales, pero suma $1.925,25 más que el resumen
-    oficial por tipo de medio, todo en julio. Por eso no se carga (`grafica2013` en
-    `etl/actualizacion_2026-10-15_santafe/corregir.py`).
   - Nación 2013: la fuente (`DatosPublicidadOficialEnero2013_Mayo2014.csv`, columna
     `IMPORTE NETO`) da el importe sin IVA. 2013-H1 suma $87,9 M nominales menos que el
     PDF oficial, que es con IVA. No hay un factor único de IVA. Se mantiene el dato
@@ -257,16 +265,19 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     por las celdas del PDF, perdería el detalle por orden.
   - IVA sin verificar en Nación 2014-2015 (columna `total`) y 2021-10 a 2022-04
     (`total_general`). 2016-2021 usan `total_con_iva`; 2009-2013-H1 en PDF son con IVA.
+    El usuario cree que probablemente son con IVA y lo considera menor: no se toca.
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
   - PBA, después de la carga de los anexos (ver `etl/actualizacion_2026-10-15_pba/LEEME.md`):
     - no se cargan 79/2020 (sin total impreso) y 17/2021 (no concilia por $76.422);
-    - 257/2022, 138/2023 y 142/2023 tienen el anexo ilegible (OCR);
     - 2023: 2.159 filas de 16 `tabula-*` no tienen anexo publicado. **No son
       duplicados:** los pares que comparten filas son meses distintos con órdenes
       mensuales iguales (p. ej. `tabula-15` = Res. 47/2023 y `tabula-90` = Res. 88/2023);
     - la Res. 301/2025 se verificó a mano: 120 órdenes reales, no subtotales;
-    - las rescisiones (251/2024 y 298/2025) no se restan: decisión pendiente.
+    - las rescisiones (251/2024 y 298/2025) no se restan, por decisión del usuario, y
+      no se aclara en Metodología. Dan de baja el "compromiso sin devengar" (saldo
+      reservado y no usado) de órdenes de compra de 2018-2025, ~$80 M y ~$330 M
+      nominales, menos del 1 % de PBA por año. Usan número de OC, no el de OP.
   - CABA 2013: hay una celda ambigua que se resuelve con el XLSX oficial.
 - **R2 (verificado en el panel el 2026-10-15):** el bucket `datospautaoficial-db` solo
   tiene la regla por defecto "Default Multipart Abort Rule", que aborta subidas

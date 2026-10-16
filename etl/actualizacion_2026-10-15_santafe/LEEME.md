@@ -1,6 +1,7 @@
 # Santa Fe: corrección de errores de carga (preparada el 15/10/2026)
 
 **Estado: aplicada y publicada el 16/10/2026** con el OK del usuario, sin `grafica2013`.
+`grafica2013` se aplicó después, el mismo 16/10/2026, también con el OK del usuario (ver más abajo).
 
 - El script exige como entrada el CSV revisado, previo a la carga de PBA (SHA-256
   `dbe7b01f…`). Se corrió sobre ese CSV y dio exactamente la salida de `verificacion.txt`.
@@ -38,7 +39,14 @@ Requiere `pdfplumber`.
 No se aplica por defecto `grafica2013` (Gráfica 2013, +772 filas, +35.163.104,46): el detalle
 concilia al centavo con su propia fila de totales, pero suma **1.925,25 más** que el resumen
 oficial por tipo de medio, todo en julio (3.861.918,30 contra 3.859.993,05). No hay forma de saber
-con la fuente qué renglón difiere. Queda para decisión del usuario.
+con la fuente qué renglón difiere.
+
+**Aplicada el 16/10/2026 con el OK del usuario**, que aceptó esa diferencia: el detalle es una
+planilla de Calc hecha a mano (13/04/2016, 10:34) y el resumen, un reporte del sistema generado 33
+minutos antes; las demás planillas de 2013 concilian al centavo. Se corrió `corregir.py` sobre el
+CSV previo a PBA con y sin `grafica2013`, y las 772 filas de diferencia, contiguas, se insertaron
+en el CSV vigente en el mismo lugar (después de la última fila de Gráfica 2013 que ya estaba). El
+resto del CSV quedó idéntico. Santa Fe pasa de 63.813 a 64.585 órdenes y 2013, de 2.538 a 3.310.
 
 ## Método
 
@@ -76,7 +84,7 @@ con la fuente qué renglón difiere. Queda para decisión del usuario.
 | 2016 | Internet | 0,00 | 10.631.199,48 | 10.631.199,48 | 0,00 |
 | 2016 | Radio | 26.817.720,05 | 26.831.358,05 | 26.831.358,05 | 0,00 |
 | 2017 | Vía pública | 71.630.370,22 | 74.026.533,22 | 74.026.533,22 | 0,00 |
-| 2013 | Gráfica (no se aplica) | 3.307.717,41 | 38.470.821,87 ² | 38.468.896,62 | +1.925,25 |
+| 2013 | Gráfica (aplicada aparte el 16/10) | 3.307.717,41 | 38.470.821,87 ² | 38.468.896,62 | +1.925,25 |
 
 ¹ 2008, 2009 y 2011 no tienen resumen por tipo de medio: el oficial es por mes, todos los tipos
 juntos. Los centavos de diferencia son redondeo de la fuente (en 2009 sus propios meses suman 1
