@@ -1,7 +1,7 @@
 # Datos Pauta Oficial: guía para agentes de IA
 
 Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
-oficial argentina: ~554 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+oficial argentina: ~567 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
 montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
 Proyecto muy sensible: un número mal cargado se publica como dato oficial.
 
@@ -213,8 +213,16 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     órdenes;
   - cada archivo concilia al centavo con la suma de su planilla oficial, y el resto del
     CSV queda idéntico.
-- Las cifras escritas a mano del front (hero, cobertura, `DISPONIBILIDAD`, README)
-  reflejan 554.021 órdenes.
+- **PBA completo con los anexos publicados: en la rama `claude/youthful-lewin-0bda30`,
+  sin publicar** (falta el OK del usuario). Detalle en `CORRECCIONES.md` y
+  `etl/actualizacion_2026-10-15_pba/`:
+  - se agregan 13.136 órdenes de 78 resoluciones (2020-2025), leídas de los anexos PDF;
+  - cada anexo concilia al centavo con su total impreso, y el resto del CSV queda idéntico;
+  - las filas nuevas van al final del bloque de PBA, con la URL de la resolución en
+    `resolucion` y el nombre del PDF en `archivo_origen`;
+  - la tabla por resolución está en `resoluciones.tsv`.
+- Las cifras escritas a mano del front (hero, cobertura, README) reflejan 567.157
+  órdenes (con la carga de PBA de la rama; en producción, 554.021).
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
     puede tener errores y no debe tomarse como fuente única;
@@ -239,11 +247,15 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     (`total_general`). 2016-2021 usan `total_con_iva`; 2009-2013-H1 en PDF son con IVA.
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
-  - PBA, cobertura contra los anexos publicados en normas.gba.gob.ar:
-    - 2020: 36 %; 2021: 45 %; 2022: 73 %; 2024: 90 %; 2025: 93 %;
-    - 2023 no se puede cerrar: hay meses sin resolución publicada, y unas 1.149 filas
-      repetidas entre archivos `tabula-*` (duplicado probable);
-    - la Res. 301/2025 hay que verificarla a mano.
+  - PBA, después de la carga de los anexos (ver `etl/actualizacion_2026-10-15_pba/LEEME.md`):
+    - no se cargan 33/2023, 45/2023 y 274/2024 (sin mes: hace falta el texto de la
+      resolución), 79/2020 (sin total impreso) y 17/2021 (no concilia por $76.422);
+    - 257/2022, 138/2023 y 142/2023 tienen el anexo ilegible (OCR);
+    - 2023: 2.159 filas de 16 `tabula-*` no tienen anexo publicado. **No son
+      duplicados:** los pares que comparten filas son meses distintos con órdenes
+      mensuales iguales (p. ej. `tabula-15` = Res. 47/2023 y `tabula-90` = Res. 88/2023);
+    - la Res. 301/2025 se verificó a mano: 120 órdenes reales, no subtotales;
+    - las rescisiones (251/2024 y 298/2025) no se restan: decisión pendiente.
   - CABA 2013: hay una celda ambigua que se resuelve con el XLSX oficial.
 - **R2 (verificado en el panel el 2026-10-15):** el bucket `datospautaoficial-db` solo
   tiene la regla por defecto "Default Multipart Abort Rule", que aborta subidas
