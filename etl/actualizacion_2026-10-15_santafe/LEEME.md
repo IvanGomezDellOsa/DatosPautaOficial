@@ -1,7 +1,16 @@
 # Santa Fe: corrección de errores de carga (preparada el 15/10/2026)
 
-**Estado: preparada, sin aplicar.** El CSV publicado no cambió. Para aplicarla falta el OK del
-usuario (regla 1 de `AGENTS.md`). Con el OK, el comando es:
+**Estado: aplicada y publicada el 16/10/2026** con el OK del usuario, sin `grafica2013`.
+
+- El script exige como entrada el CSV revisado, previo a la carga de PBA (SHA-256
+  `dbe7b01f…`). Se corrió sobre ese CSV y dio exactamente la salida de `verificacion.txt`.
+- Después se reinsertaron, en su mismo lugar, las 13.136 filas de PBA agregadas ese día, que
+  son contiguas y van antes del bloque de Santa Fe.
+- Resultado: 569.783 filas, SHA-256
+  `b6b492c894e3ba76d520fc099da30b8bfbf8143a409fab5715e6d8962b79409f`. Las filas fuera de Santa Fe
+  quedaron idénticas a las de la versión con PBA.
+
+El comando original, sobre el CSV previo a PBA, era:
 
 ```bash
 git show HEAD:etl/data/pauta_oficial_unificado_v2.csv > /tmp/antes.csv
