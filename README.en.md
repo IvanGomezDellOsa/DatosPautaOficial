@@ -41,7 +41,7 @@ Every data correction is logged, with its evidence, in [CORRECCIONES.md](CORRECC
 
 ## 🏗️ Architecture
 
-The data runs **100% without a backend or servers**: the full SQLite database (~176 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. The only server-side piece is the contact form: a Cloudflare Worker (`workers/contacto`) that forwards the message through Email Routing without exposing the destination address.
+The data runs **100% without a backend or servers**: the full SQLite database (~181 MB) lives on Cloudflare R2 as a single versioned file, and the browser queries only the bytes it needs via HTTP Range Requests thanks to `sql.js-httpvfs`. The only server-side piece is the contact form: a Cloudflare Worker (`workers/contacto`) that forwards the message through Email Routing without exposing the destination address.
 
 ```text
 Fuentes oficiales (CSV / Excel / PDF por jurisdicción)

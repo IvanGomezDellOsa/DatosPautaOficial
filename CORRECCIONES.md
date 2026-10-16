@@ -224,7 +224,7 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
   - Faltan algunos medios en 2011 ($25,2 millones) y 2013 ($42,8 millones).
   - Falta Internet 2016 ($10,6 millones).
   - Falta un proveedor de vía pública de 2017 ($2,4 millones).
-- **Provincia de Buenos Aires.** No todas las resoluciones publicadas están cargadas, sobre todo en 2020-2022. En 2020 la base tiene el 36 % de lo publicado, en 2021 el 45 % y en 2022 el 73 %.
+- **Provincia de Buenos Aires.** Faltaban resoluciones publicadas, sobre todo en 2020-2022. Se agregaron el 16 de octubre: ver «PBA completo con los anexos publicados», más arriba, con lo que todavía no se pudo cargar.
 
 ### Cómo verificarlo
 

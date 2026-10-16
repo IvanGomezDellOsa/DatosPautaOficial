@@ -213,16 +213,15 @@ Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
     órdenes;
   - cada archivo concilia al centavo con la suma de su planilla oficial, y el resto del
     CSV queda idéntico.
-- **PBA completo con los anexos publicados: en la rama `claude/youthful-lewin-0bda30`,
-  sin publicar** (falta el OK del usuario). Detalle en `CORRECCIONES.md` y
-  `etl/actualizacion_2026-10-15_pba/`:
+- **PBA completo con los anexos publicados: publicado** (2026-10-16, aprobado por el
+  usuario). Detalle en `CORRECCIONES.md` y `etl/actualizacion_2026-10-15_pba/`:
   - se agregan 13.136 órdenes de 78 resoluciones (2020-2025), leídas de los anexos PDF;
   - cada anexo concilia al centavo con su total impreso, y el resto del CSV queda idéntico;
   - las filas nuevas van al final del bloque de PBA, con la URL de la resolución en
     `resolucion` y el nombre del PDF en `archivo_origen`;
   - la tabla por resolución está en `resoluciones.tsv`.
 - Las cifras escritas a mano del front (hero, cobertura, README) reflejan 567.157
-  órdenes (con la carga de PBA de la rama; en producción, 554.021).
+  órdenes.
 - **También publicado el 2026-10-15:**
   - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
     puede tener errores y no debe tomarse como fuente única;
