@@ -9,7 +9,7 @@
 🌐 **Production deploy:** [datospautaoficial.com.ar](https://datospautaoficial.com.ar)
 🎬 **Presentation video:** [Watch on YouTube](https://youtu.be/o8Ht_Qv4Ji4)
 
-A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **569,783 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
+A public, neutral and open source website that consolidates Argentina's official advertising (pauta) data in a single place: **570,010 advertising orders** from four jurisdictions (Nación, CABA, Provincia de Buenos Aires and Santa Fe), covering 2003–2025, with amounts deflated by inflation so the figures are comparable across years.
 
 The stance is strictly informative: no accusation, no opinion.
 
@@ -30,8 +30,8 @@ Until this project, the information was scattered across open data portals, spre
 | Nación | 2009–2022 | 224.175 |
 | CABA | 2003–2025 (2025 partial) | 224.677 |
 | Santa Fe | 2008–2023 | 63.813 |
-| PBA | 2020–2025 (partial) | 57.118 |
-| **Total** | **2003–2025** | **569.783** |
+| PBA | 2020–2025 (partial) | 57.345 |
+| **Total** | **2003–2025** | **570.010** |
 
 Coverage gaps are shown explicitly on the website: aggregates that could mislead due to incomplete coverage are never presented.
 
@@ -48,7 +48,7 @@ Fuentes oficiales (CSV / Excel / PDF por jurisdicción)
 ↓
 Extractores Python (etl/extractores/extract_{caba,nacion,pba,santa_fe}.py)
 ↓
-unificar.py → CSV canónico (8 columnas, 569.783 filas) → validar.py
+unificar.py → CSV canónico (8 columnas, 570.010 filas) → validar.py
 ↓
 build_db.py → SQLite deflactada (IPC INDEC) + caches precomputados
 (totals_cache, rankings_cache, groups_cache, home.json)

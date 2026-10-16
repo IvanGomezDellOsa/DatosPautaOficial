@@ -22,10 +22,16 @@ resoluciones (año y número) y, dentro de cada una, en el orden del anexo. Camp
   - resolucion: la URL de la resolución en normas.gba.gob.ar, como en PBA_2025.csv;
   - archivo_origen: el nombre del PDF del anexo.
 
+Etapa 2 (--etapa 2, 16/10/2026): las 3 resoluciones cuyo resumen y anexo no dicen el mes
+(33/2023, 45/2023 y 274/2024). El mes sale del texto oficial de la resolución, que se bajó con
+permiso del usuario: el script exige que el PDF tenga el SHA-256 de PERIODO_DEL_TEXTO, que diga
+"emitida(s) durante el mes de <mes> del año <año>" y que el monto de su artículo 1 sea el total
+del anexo. Se parte del CSV que dejó la etapa 1 y las filas van al final del bloque de PBA.
+
 Uso (desde la raíz del repo):
   python -I etl/actualizacion_2026-10-15_pba/agregar.py ENTRADA.csv LECTURA_DIR CRUCE_DIR
-      [--salida etl/data/pauta_oficial_unificado_v2.csv] [--informe DIR]
-Sin --salida solo verifica e informa.
+      [--etapa 2 --textos DIR_TEXTOS] [--salida etl/data/pauta_oficial_unificado_v2.csv] [--informe DIR]
+Sin --salida solo verifica e informa. CRUCE_DIR es la salida de cruzar.py sobre ENTRADA.csv.
 """
 
 import argparse
@@ -40,7 +46,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "actualizacion_2026
 import regenerar  # noqa: E402  (agrega etl/ y etl/extractores al path)
 from regenerar import a_lineas, comun, fila_dict, posprocesar, sha256  # noqa: E402
 
-ENTRADA_SHA256 = "dbe7b01fc41e9051972b237799ad8de24c475fe10ba0f3f1b02e5dfbb431c74a"
+ENTRADA_SHA256 = {
+    1: "dbe7b01fc41e9051972b237799ad8de24c475fe10ba0f3f1b02e5dfbb431c74a",  # antes de la etapa 1
+    2: "e9ac121acab5e72500e454ee4a9a27f393359cbb068f51d2f03c6e2e2915cddf",  # después de la etapa 1
+}
 
 # Resoluciones que se cargan (resolución -> estado esperado en cruzar.py). Ver LEEME.md.
 CARGAR = {
@@ -66,6 +75,38 @@ CARGAR = {
     "309/2025": "faltante", "311/2025": "faltante",
 }
 
+# Etapa 2: resolución -> (mes de las órdenes, PDF del texto oficial, su SHA-256, total del art. 1)
+PERIODO_DEL_TEXTO = {
+    "33/2023": ("2022-11", "xDwLdZSK.pdf",
+                "01b1722a470b7af614dc113f7dbb950b0c3bf7157c940fc14f481413fecd3603", "1875500.00"),
+    "45/2023": ("2022-12", "xb3Ra5cp.pdf",
+                "dbbce15db463b0c2c4ec6462877fa7845e4fbaf49dfee481de2303084f08842c", "60191748.00"),
+    "274/2024": ("2024-11", "0XnqrlHd.pdf",
+                 "7a5199bb3d00b2fa1013914c7a447af08f560334b71c6f0d6516d0197588c9c3", "237373821.00"),
+}
+MESES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+         "agosto": 8, "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12}
+
+
+def verificar_texto(carpeta, res):
+    """Controla el texto oficial de la resolución y devuelve el mes de las órdenes."""
+    import re
+    import pdfplumber
+    periodo, archivo, sha, total = PERIODO_DEL_TEXTO[res]
+    path = Path(carpeta) / archivo
+    if sha256(path) != sha:
+        raise SystemExit(f"ERROR {res}: {path} no es el texto revisado")
+    with pdfplumber.open(path) as pdf:
+        t = " ".join((p.extract_text() or "").replace(chr(10), " ") for p in pdf.pages)
+    art1 = t[t.index("ARTÍCULO 1"):t.index("ARTÍCULO 2")]
+    m = re.search(r"emitidas? durante el mes de (\w+) del año (\d{4})", art1)
+    if not m or f"{m.group(2)}-{MESES[m.group(1).lower()]:02d}" != periodo:
+        raise SystemExit(f"ERROR {res}: el artículo 1 no dice el mes {periodo}")
+    mt = re.search(r"\(\s*\$\s*([\d.]+,\d{2})\s*\)", art1)
+    if not mt or Decimal(mt.group(1).replace(".", "").replace(",", ".")) != Decimal(total):
+        raise SystemExit(f"ERROR {res}: el artículo 1 no dice el total {total}")
+    return periodo
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -74,8 +115,11 @@ def main():
     ap.add_argument("cruce")
     ap.add_argument("--salida")
     ap.add_argument("--informe")
+    ap.add_argument("--etapa", type=int, choices=(1, 2), default=1)
+    ap.add_argument("--textos")
     a = ap.parse_args()
-    if sha256(a.entrada) != ENTRADA_SHA256:
+    cargar = CARGAR if a.etapa == 1 else {r: "faltante" for r in PERIODO_DEL_TEXTO}
+    if sha256(a.entrada) != ENTRADA_SHA256[a.etapa]:
         raise SystemExit(f"ERROR: {a.entrada} no es el CSV publicado (SHA-256 {sha256(a.entrada)})")
     lectura, cruce = Path(a.lectura), Path(a.cruce)
 
@@ -86,7 +130,7 @@ def main():
         faltan[o["resolucion"]].append(o)
 
     registros, informe = [], []
-    for res, estado in sorted(CARGAR.items(), key=lambda kv: (int(kv[0].split("/")[1]), int(kv[0].split("/")[0]))):
+    for res, estado in sorted(cargar.items(), key=lambda kv: (int(kv[0].split("/")[1]), int(kv[0].split("/")[0]))):
         t = resol[res]
         if t["estado"] != estado:
             raise SystemExit(f"ERROR {res}: estado {t['estado']}, se esperaba {estado}")
@@ -102,8 +146,12 @@ def main():
         if Decimal(t["en_base_monto"]) + suma != Decimal(t["total_anexo"]):
             raise SystemExit(f"ERROR {res}: base + agregado no da el total del anexo")
         n0 = len(registros)
+        if a.etapa == 2:
+            if Decimal(t["total_anexo"]) != Decimal(PERIODO_DEL_TEXTO[res][3]):
+                raise SystemExit(f"ERROR {res}: el total del anexo no es el del artículo 1")
+            periodo_texto = verificar_texto(a.textos, res)
         for o in ords:
-            periodo = o["periodo"]
+            periodo = o["periodo"] if a.etapa == 1 else periodo_texto
             if len(periodo) != 7 or periodo.endswith("-00"):
                 raise SystemExit(f"ERROR {res}: sin mes ({periodo!r})")
             m = Decimal(o["monto"])

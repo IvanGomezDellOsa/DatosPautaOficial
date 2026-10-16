@@ -2,6 +2,29 @@
 
 Acá registramos cada corrección de los datos publicados en Datos Pauta Oficial: qué cambió, por qué y con qué evidencia.
 
+## 16 de octubre de 2026: PBA, tres resoluciones más
+
+En la carga anterior de PBA quedaron afuera tres resoluciones porque ni su resumen ni su anexo decían de qué mes eran las órdenes. Bajamos el texto oficial de cada una desde normas.gba.gob.ar, que sí lo dice, y las sumamos.
+
+| Resolución | Mes de las órdenes (según su artículo 1) | Órdenes | Monto nominal |
+|---|---|---:|---:|
+| [33/2023](https://normas.gba.gob.ar/ar-b/resolucion/2023/33/342541) | noviembre de 2022 | 1 | $1.875.500 |
+| [45/2023](https://normas.gba.gob.ar/ar-b/resolucion/2023/45/345675) | diciembre de 2022 | 145 | $60.191.748 |
+| [274/2024](https://normas.gba.gob.ar/ar-b/resolucion/2024/274/478976) | noviembre de 2024 | 81 | $237.373.821 |
+
+**En números:**
+- Se agregan **227 órdenes** por **$299 millones** nominales, que son **$1.260 millones** en pesos de abril de 2026.
+- PBA pasa de 57.118 a 57.345 órdenes: 2022 pasa de 10.761 a 10.907 y 2024, de 7.170 a 7.251.
+- Ahora la base tiene todo lo publicado y legible de PBA en 2021-2025, y el 95,5 % de 2020.
+- Solo se agregan órdenes. Ninguna orden que ya estaba cambia.
+
+**Evidencia.**
+- Cada anexo suma, al centavo, su total impreso.
+- Ese total es también el que aprueba el artículo 1 de la resolución.
+- Los textos usados, con su dirección y su huella digital (SHA-256), están en [`etl/actualizacion_2026-10-15_pba/`](etl/actualizacion_2026-10-15_pba/LEEME.md).
+
+**Número de orden (#).** Las órdenes de Santa Fe cambian de número otra vez; el resto lo conserva.
+
 ## 16 de octubre de 2026: Santa Fe corregido
 
 Revisamos los datos de Santa Fe contra los informes oficiales en PDF de la provincia. Había errores de carga: un informe cargado dos veces y medios que no se habían cargado.
@@ -74,7 +97,7 @@ Los datos de la Provincia de Buenos Aires se arman resolución por resolución, 
 
 **Lo que no se pudo cargar.**
 - 5 resoluciones con anexo publicado:
-  - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales);
+  - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales; se cargaron después, ver la entrada "PBA, tres resoluciones más");
   - en una la suma de las órdenes no da el total impreso;
   - y otra no imprime total.
 - 3 anexos de 2022 y 2023 están publicados en un formato que no se puede leer como texto.

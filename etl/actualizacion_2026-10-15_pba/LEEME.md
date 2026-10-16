@@ -1,6 +1,6 @@
 # PBA: anexos oficiales que faltaban (15-16/10/2026)
 
-Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. **Todavía no está publicado:** falta el OK del usuario para el push.
+Agrega a la base las órdenes de publicidad de PBA de los anexos publicados en normas.gba.gob.ar que no estaban cargados. La etapa 1 (78 resoluciones) está publicada desde el 16/10/2026. La etapa 2 (3 resoluciones más, ver abajo) todavía no.
 
 La fe de erratas para publicar está en [`CORRECCIONES.md`](../../CORRECCIONES.md). Este archivo es el detalle técnico para revisar la rama. Repite el método de [`etl/actualizacion_2026-10-15/`](../actualizacion_2026-10-15/LEEME.md): cada fuente verificada por SHA-256, conciliación al centavo y el resto del CSV idéntico byte a byte.
 
@@ -39,6 +39,31 @@ Se cargan **78 resoluciones**: 69 que no tenían ninguna orden en la base y 9 qu
 | `528c829` | Scripts (`leer_anexos.py`, `cruzar.py`, `agregar.py`) y la evidencia de esta carpeta. No cambia datos. |
 | `6c079b6` | El CSV con las 13.136 filas nuevas. Solo agrega líneas. SHA-256 `e9ac121acab5e72500e454ee4a9a27f393359cbb068f51d2f03c6e2e2915cddf`. |
 | (último) | `home.json`, cifras de la portada y README, nota de cobertura de PBA, AGENTS.md, esta nota y `CORRECCIONES.md`. |
+
+## Etapa 2 (16/10/2026): 33/2023, 45/2023 y 274/2024
+
+Ni el resumen ni el anexo de estas tres resoluciones dicen de qué mes son las órdenes. El usuario autorizó bajar su texto oficial desde normas.gba.gob.ar (`manifest_textos_resoluciones.tsv`: URL, tamaño, SHA-256 y fecha). Los PDF están fuera del repo, en `side-session-notes\local_5cee6ed6-…\pba_resoluciones_sin_mes_2026-10-16\crudos\`.
+
+| Resolución | Texto | Artículo 1: órdenes emitidas en | Artículo 1: total | Anexo: total impreso | Órdenes |
+|---|---|---|---:|---:|---:|
+| 33/2023 | `xDwLdZSK.pdf` | noviembre de 2022 | 1.875.500,00 | 1.875.500,00 | 1 |
+| 45/2023 | `xb3Ra5cp.pdf` | diciembre de 2022 | 60.191.748,00 | 60.191.748,00 | 145 |
+| 274/2024 | `0XnqrlHd.pdf` | noviembre de 2024 | 237.373.821,00 | 237.373.821,00 | 81 |
+
+- `agregar.py --etapa 2 --textos DIR` parte del CSV de la etapa 1 (SHA-256 `e9ac121a…cddf`) y del cruce sobre ese CSV. Para cada resolución exige:
+  - el SHA-256 del texto;
+  - que el artículo 1 diga ese mes y ese total;
+  - que el total del anexo sea el mismo, y las mismas condiciones que la etapa 1.
+- Con el CSV de la etapa 1, `cruzar.py` da las 78 resoluciones de la etapa 1 como "cargada": las filas agregadas emparejan con su anexo.
+- La etapa 1 se sigue reproduciendo igual: con el CSV de antes da otra vez `e9ac121a…cddf`.
+- **Resultado:** +227 órdenes, +299.441.069,00 nominales, +1.259,6 M de abril de 2026. Van al final del bloque de PBA (`#id` 505.971 a 506.197); Santa Fe corre su número en 227 más.
+  - Sobre el CSV de la etapa 1: 567.157 → 567.384 órdenes (SHA-256 `58c86802…c360`).
+  - Integrado con la corrección de Santa Fe de `main` (d8f6377), que solo cambió el bloque de Santa Fe: 569.783 → 570.010 órdenes y 6.846.542,4 M → 6.847.802,0 M de abril de 2026. Se verificó que el CSV integrado es exactamente el de `main` con las 227 filas en su lugar (SHA-256 `a1faee49…739a`).
+- `git diff --numstat`: 227 líneas agregadas, 0 quitadas.
+- PBA por año: 2022 pasa de 10.761 a 10.907 órdenes (84.139,4 M → 84.972,1 M de abril de 2026) y 2024 de 7.170 a 7.251 (47.780,3 M → 48.207,3 M).
+- Cobertura de lo publicado y legible: 2020 95,5 %; 2021 a 2025, 100 %.
+- `conciliacion_etapa2.tsv` y `validacion_despues_etapa2.md` (11 atípicos, igual que antes).
+- Proveedores y medios normalizados no cambian (6.521; 16.022 medios con Santa Fe corregido).
 
 ## Fuente
 
@@ -82,7 +107,7 @@ Resultado (`resoluciones.tsv`, columnas `estado` y `accion`):
 |---|---:|
 | ya estaba completa | 329 |
 | se cargan las órdenes que faltan | 78 |
-| no se carga (sin mes, sin total o no concilia) | 5 |
+| no se carga (sin mes, sin total o no concilia); las 3 sin mes se cargan en la etapa 2 | 5 |
 | sin anexo con órdenes publicado (incluye rectificaciones sin anexo y resoluciones de personal) | 35 |
 | anexo ilegible | 3 |
 | repite el anexo de otra resolución | 4 |
@@ -155,9 +180,6 @@ La auditoría vio que `tabula-15.csv` y `tabula-90.csv` comparten 139 filas idé
 
 | Resolución | Órdenes | Monto | Por qué | Qué haría falta |
 |---|---:|---:|---|---|
-| 33/2023 | 1 | 1.875.500 | ni la resolución ni el anexo dicen el mes (expediente de 2022) | bajar el texto de la resolución (PDF de normas.gba.gob.ar), con permiso |
-| 45/2023 | 145 | 60.191.748 | ídem | ídem |
-| 274/2024 | 81 | 237.373.821 | ídem | ídem |
 | 79/2020 | 1 | 353.088 | el anexo no imprime total | comparar con el monto del artículo 1 de la resolución |
 | 17/2021 | 158 | 30.766.762 | no concilia: el total impreso dice $76.422 más | ídem; puede faltar una orden en el anexo |
 | 257/2022, 138/2023, 142/2023 | ? | ? | anexo ilegible | OCR |
@@ -206,3 +228,5 @@ python etl/build_db.py
 | `conciliacion.tsv` | las 78 resoluciones cargadas |
 | `base_sin_par_2023.csv` | las 2.159 filas de 2023 sin anexo publicado |
 | `validacion_antes.md`, `validacion_despues.md` | `validar.py` antes y después |
+| `manifest_textos_resoluciones.tsv` | etapa 2: los 3 textos oficiales bajados (URL, tamaño, SHA-256, fecha) |
+| `conciliacion_etapa2.tsv`, `validacion_despues_etapa2.md` | etapa 2: conciliación y `validar.py` |
