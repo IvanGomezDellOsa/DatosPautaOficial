@@ -2,6 +2,56 @@
 
 Acá registramos cada corrección de los datos publicados en Datos Pauta Oficial: qué cambió, por qué y con qué evidencia.
 
+## 16 de octubre de 2026: PBA completo con los anexos publicados
+
+Los datos de la Provincia de Buenos Aires se arman resolución por resolución, desde los anexos que publica [normas.gba.gob.ar](https://normas.gba.gob.ar). Faltaban muchos: en 2020 la base tenía el 38 % de lo publicado y en 2021, el 45 %. Leímos los 427 anexos publicados y sumamos las órdenes que no estaban.
+
+**En números:**
+- Se agregan **13.136 órdenes** de **78 resoluciones** por **$11.167 millones** nominales, que son **$92.065 millones** en pesos de abril de 2026.
+- PBA pasa de 43.982 a 57.118 órdenes, y su total sube un 29 %.
+- El total histórico, en pesos de abril de 2026, sube un 1,4 %: de $6,744 billones a $6,836 billones.
+- Solo se agregan órdenes de PBA. Ninguna orden que ya estaba cambia.
+
+| Año | Órdenes de PBA antes → después | Lo publicado que está en la base, antes → después |
+|---|---:|---:|
+| 2020 | 1.304 → 3.305 | 38 % → 95,5 % |
+| 2021 | 4.956 → 11.997 | 45 % → 100 % |
+| 2022 | 8.456 → 10.761 | 79 % → 100 % |
+| 2023 | 13.773 → 14.602 | 94 % → 99,5 % |
+| 2024 | 6.574 → 7.170 | 90 % → 99,1 % |
+| 2025 | 8.919 → 9.283 | 93 % → 100 % |
+
+**Evidencia.**
+- Cada anexo cargado suma, al centavo, el total que imprime el propio anexo.
+- En las 9 resoluciones que ya estaban a medias, lo que había más lo que se agrega da exactamente ese total.
+- Cada orden nueva tiene el enlace a su resolución oficial.
+- Antes de agregar una orden, la buscamos en toda la base de PBA, para no cargarla dos veces.
+
+**Lo que revisamos y está bien.**
+- La resolución 301/2025 tiene 120 órdenes por $1.021,7 millones. Teníamos 74; se agregan las 46 que faltaban.
+- En 2023 parecía haber archivos repetidos. No los hay: son meses distintos con órdenes mensuales iguales.
+- Fuera de 2023, todas las órdenes de PBA de la base están en un anexo oficial.
+
+**Lo que no se pudo cargar.**
+- 5 resoluciones con anexo publicado:
+  - en 3 ni la resolución ni el anexo dicen de qué mes son las órdenes ($299 millones nominales);
+  - en una la suma de las órdenes no da el total impreso;
+  - y otra no imprime total.
+- 3 anexos de 2022 y 2023 están publicados en un formato que no se puede leer como texto.
+- En 2020 hay 12 resoluciones que aprueban gasto pero no publican el detalle de las órdenes.
+- 2023 tiene 2.159 órdenes ($3.358 millones) cuya resolución no está publicada en normas.gba.gob.ar. Se mantienen: no hay evidencia de que estén mal.
+- Las rescisiones (órdenes que se dieron de baja) de 2024 y 2025 no se restan. Es una decisión de criterio pendiente.
+
+**Otros cambios que se ven en el sitio.**
+- **Rankings.** En el ranking histórico de todas las jurisdicciones, Sentidos S.A. entra 5.º entre los proveedores y Grupo Olmos entra 5.º entre los grupos. En PBA 2025, Parador Diez S.A. pasa al primer lugar.
+- **Portada.** La nota de cobertura de PBA ya no dice que faltan resoluciones de 2020–2022. Ahora dice que algunas resoluciones no publican el detalle o lo publican ilegible.
+- **Número de orden (#).** CABA, Nación y PBA conservan su número; las órdenes de Santa Fe cambian de número.
+
+**Cómo verificarlo.** En [`etl/actualizacion_2026-10-15_pba/`](etl/actualizacion_2026-10-15_pba/LEEME.md) están:
+- la tabla resolución por resolución, con qué estaba, qué faltaba y qué se hizo;
+- cada anexo usado, con su dirección y su huella digital (SHA-256);
+- los programas que leyeron los anexos y agregaron las órdenes.
+
 ## 15 de octubre de 2026: CABA 2023 completo
 
 CABA 2023 estaba incompleto. La Ciudad publicó Gráfica, Cine y Medios vecinales de ese año solo en planillas de Excel, y nuestro programa leía solo archivos CSV. Ahora las lee, y esos datos se suman a la base.
