@@ -1,7 +1,7 @@
 # Datos Pauta Oficial: guía para agentes de IA
 
 Sitio público y neutral (https://datospautaoficial.com.ar) que unifica la publicidad
-oficial argentina: ~549 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
+oficial argentina: ~554 mil órdenes de Nación, CABA, PBA y Santa Fe (2003-2025), con
 montos deflactados. Postura estrictamente informativa: sin denuncia ni opinión.
 Proyecto muy sensible: un número mal cargado se publica como dato oficial.
 
@@ -43,7 +43,7 @@ extractores no corren. Los datos cambian únicamente si cambia el CSV versionado
 
 | Ruta | Qué es |
 |---|---|
-| `etl/extractores/` | Un extractor por jurisdicción. `comun.py`: `normalizar_monto` y el separador decimal por columna. |
+| `etl/extractores/` | Un extractor por jurisdicción. `comun.py`: `normalizar_monto`, el separador decimal por columna y `leer_xlsx`. |
 | `etl/unificar.py` | Corre los extractores y escribe el CSV unificado (8 columnas + `archivo_origen`). |
 | `etl/build_db.py` | Normaliza nombres (`aliases.csv`), deflacta (`ipc_indec.csv`), crea `orders` y las caches, `home.json`, `search.json`, `grupos.json` y la copia publicable. |
 | `etl/check_build.py` | Valida config, tamaños y límites de Pages antes del deploy. |
@@ -146,7 +146,7 @@ node etl/upload_r2.mjs --dry-run             # simula la subida (requiere R2_BUC
 
 | Jurisdicción | Fuente | Estado |
 |---|---|---|
-| CABA | https://data.buenosaires.gob.ar/dataset/pauta-publicitaria (archivos en `cdn.buenosaires.gob.ar/datosabiertos/datasets/pauta-publicitaria/`) | Anual. 2011-2025. Usa punto decimal; ojo con los montos de 3 decimales. API CKAN genérica. |
+| CABA | https://data.buenosaires.gob.ar/dataset/pauta-publicitaria (archivos en `cdn.buenosaires.gob.ar/datosabiertos/datasets/secretaria-de-medios/pauta-publicitaria/`) | Anual. 2011-2025. Usa punto decimal; ojo con los montos de 3 decimales. API CKAN genérica. 2023: Cine, Gráfica y Medios vecinales solo en XLSX; el extractor lee los revisados (`XLSX_SIN_CSV`). |
 | Nación 2014-2022 | https://datos.gob.ar/dataset/publicidad-oficial | CSV. Sin actualizar desde 08/2022; 2022 cubre solo enero-abril. |
 | Nación 2009-2013 | https://www.argentina.gob.ar/node/1759 | Solo PDF. Los "por proveedor y rubro" son pivots: no cargar la fila o columna de total. Junio 2009 no existe en la fuente. |
 | PBA | Resoluciones y anexos PDF (normas.gba.gob.ar) | 2020-2024 armado resolución por resolución; 2025 de la fuente oficial. Cobertura parcial. |
@@ -176,8 +176,14 @@ Ahí está también el reporte de auditoría por archivo.
   - se agregan Nación 2012-S2 y CABA 2025.
   - Cada archivo concilia al centavo con su total oficial. 2009 difiere en centavos
     porque la propia fuente redondeó su fila de totales.
-  - Las cifras escritas a mano del front (hero, cobertura, `DISPONIBILIDAD`, README)
-    ya reflejan 549.184 órdenes.
+- **CABA 2023 completo** (2026-10-15, aprobado por el usuario, sin publicar todavía).
+  Detalle en `CORRECCIONES.md` y `etl/actualizacion_2026-10-15_caba2023/`:
+  - se agregan Cine, Gráfica y Medios vecinales 2023, publicados solo en XLSX: 4.837
+    órdenes;
+  - cada archivo concilia al centavo con la suma de su planilla oficial, y el resto del
+    CSV queda idéntico.
+- Las cifras escritas a mano del front (hero, cobertura, `DISPONIBILIDAD`, README)
+  reflejan 554.021 órdenes.
 - **Pendientes conocidos, sin corregir:**
   - Santa Fe: "Radio 2008 (II)" duplicado; medios faltantes en 2011 y 2013; Internet
     2016 sin OCR.
@@ -185,7 +191,6 @@ Ahí está también el reporte de auditoría por archivo.
     2013-H1 suma $87,9 M nominales menos que el PDF oficial. Se dejó como está: no hay
     un factor único de IVA y corregirlo exige elegir entre perder el detalle por orden
     o aclararlo en Metodología. Lo decide el usuario.
-  - CABA 2023: Gráfica, Cine y Medios vecinales solo en Excel; no están en la base.
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
   - PBA: cobertura parcial en 2020-2022.
