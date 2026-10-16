@@ -98,7 +98,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 - Form at `/contacto`: messages arrive by email without the address appearing on the site
 
 **Methodology page**
-- Sources, deflation criteria and normalization criteria documented publicly
+- Sources, deflation criteria and normalization criteria documented publicly, along with the limits of the data: the database is checked against each official source, but should not be taken as the only source
 
 ---
 

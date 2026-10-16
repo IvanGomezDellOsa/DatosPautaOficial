@@ -128,6 +128,10 @@ node etl/upload_r2.mjs --dry-run             # simula la subida (requiere R2_BUC
   En `etl/R2_SETUP.md` está el build command recomendado, que agrega `check_build.py`.
 - Variables de entorno de Pages: `R2_BUCKET`, `R2_PUBLIC_URL`, `CLOUDFLARE_API_TOKEN`,
   `CLOUDFLARE_ACCOUNT_ID`.
+- Si un deploy de Pages falla en "Installing python" ("not found in image" o "could
+  not read Username for 'https://github.com'"), es una falla transitoria de
+  Cloudflare: reintentar el deploy desde el panel. Mientras tanto, sigue en vivo la
+  versión anterior.
 - Verificar después del deploy (tarda ~4 min):
   - `https://datospautaoficial.com.ar/data/config.json` apunta a `/v/<version>/`;
   - el objeto de R2 responde 206 con `Cache-Control: ... immutable`;
@@ -176,9 +180,17 @@ Poder Ciudadano y Fundación LED, publicó totales de Nación por semestre de 20
 2015-H1. Coinciden con los PDF oficiales de 2009-2013. Para 2014-2015 dan menos que el
 CSV oficial: se mantiene el oficial.
 
-**Crudos descargados** (con URL y SHA-256): fuera del repo, en
-`%APPDATA%\Claude\side-session-notes\local_70186434-a1ae-4d3d-a6cb-5e7b882c92e4\auditoria_fuentes\`.
-Ahí está también el reporte de auditoría por archivo.
+**Crudos descargados**: fuera del repo y solo en la máquina del autor, bajo
+`%APPDATA%\Claude\side-session-notes\`:
+- `local_70186434-a1ae-4d3d-a6cb-5e7b882c92e4\auditoria_fuentes\`: crudos del
+  2026-10-14, el reporte de auditoría por archivo, la lista de resoluciones de PBA
+  (`pba_resoluciones_normas_gba.tsv`) y los scripts propuestos (`sf_pdf.py`,
+  `pba_anexos.py`);
+- `local_5cee6ed6-35b8-493f-8254-50b2a4e17023\actualizacion-datos_2026-10-15\crudos_caba_2025\`;
+- `local_5cee6ed6-35b8-493f-8254-50b2a4e17023\caba_2023_xlsx\crudos\`.
+
+Los manifiestos de cada descarga (URL, SHA-256, fecha) están versionados en
+`etl/actualizacion_2026-10-15*/`.
 
 ## Estado al 2026-10-15
 
@@ -203,9 +215,21 @@ Ahí está también el reporte de auditoría por archivo.
     CSV queda idéntico.
 - Las cifras escritas a mano del front (hero, cobertura, `DISPONIBILIDAD`, README)
   reflejan 554.021 órdenes.
+- **También publicado el 2026-10-15:**
+  - aviso en Metodología: la base se controló contra cada fuente, pero por su volumen
+    puede tener errores y no debe tomarse como fuente única;
+  - notas de cobertura en la portada: CABA 2025 parcial, Nación 2013 sin IVA y PBA
+    parcial;
+  - README sin "más de 500 resoluciones": normas.gba.gob.ar lista 361 resoluciones de
+    pauta de PBA en 2020-2024 (456 con 2025);
+  - formulario de contacto en vez del mail (ver "Formulario de contacto").
 - **Pendientes conocidos, sin corregir:**
-  - Santa Fe: "Radio 2008 (II)" duplicado; medios faltantes en 2011 y 2013; Internet
-    2016 sin OCR.
+  - Santa Fe (montos nominales):
+    - `Radio 2008 (II).pdf` es el mismo cuadro que `Radio 2008.pdf`: 564 filas
+      cargadas dos veces ($4,73 M);
+    - el curado omitió medios enteros en 2011 (−$25,2 M) y en 2013 (−$42,8 M);
+    - falta Internet 2016 (−$10,6 M; el PDF necesita OCR);
+    - falta PUBLICIDAD SARMIENTO en 2017 (−$2,4 M).
   - Nación 2013: la fuente (`DatosPublicidadOficialEnero2013_Mayo2014.csv`, columna
     `IMPORTE NETO`) da el importe sin IVA. 2013-H1 suma $87,9 M nominales menos que el
     PDF oficial, que es con IVA. No hay un factor único de IVA. Se mantiene el dato
@@ -215,8 +239,15 @@ Ahí está también el reporte de auditoría por archivo.
     (`total_general`). 2016-2021 usan `total_con_iva`; 2009-2013-H1 en PDF son con IVA.
   - CABA 2025: la fuente solo publicó Radio, Gráfica, Medios vecinales y Cine (falta
     TV, Web y Vía pública). La web lo marca como parcial.
-  - PBA: cobertura parcial en 2020-2022.
+  - PBA, cobertura contra los anexos publicados en normas.gba.gob.ar:
+    - 2020: 36 %; 2021: 45 %; 2022: 73 %; 2024: 90 %; 2025: 93 %;
+    - 2023 no se puede cerrar: hay meses sin resolución publicada, y unas 1.149 filas
+      repetidas entre archivos `tabula-*` (duplicado probable);
+    - la Res. 301/2025 hay que verificarla a mano.
+  - CABA 2013: hay una celda ambigua que se resuelve con el XLSX oficial.
 - **R2 (verificado en el panel el 2026-10-15):** el bucket `datospautaoficial-db` solo
   tiene la regla por defecto "Default Multipart Abort Rule", que aborta subidas
   multipart incompletas y no borra objetos. No agregar reglas que borren por
   antigüedad: borrarían la versión en vivo.
+  - Quedan en el bucket los chunks viejos de la raíz y las versiones anteriores en
+    `v/`. Se pueden borrar, salvo la versión a la que apunta `config.json`.

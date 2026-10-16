@@ -98,7 +98,7 @@ Cloudflare Pages (datospautaoficial.com.ar)
 - Formulario en `/contacto`: el mensaje llega por mail sin que la dirección aparezca en el sitio
 
 **Página de metodología**
-- Fuentes, criterios de deflactación y de normalización documentados públicamente
+- Fuentes, criterios de deflactación y de normalización documentados públicamente, con los límites de los datos: la base se controla contra cada fuente oficial, pero no debe tomarse como fuente única
 
 ---
 

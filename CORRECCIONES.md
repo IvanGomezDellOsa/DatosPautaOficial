@@ -169,6 +169,12 @@ La Nación publicó los totales por semestre de la pauta nacional, con datos de 
   - Mantenemos el dato de la fuente, con su detalle por orden, y lo aclaramos en la cobertura de Nación del sitio.
 - **Nación, junio de 2009.** No figura en ninguna publicación oficial.
 - **CABA 2023.** Gráfica, Cine y Medios vecinales se publicaron solo en Excel y todavía no estaban en la base. Se agregaron después: ver «CABA 2023 completo», más arriba.
+- **Santa Fe.** Montos de la época:
+  - El informe de Radio 2008 está cargado dos veces, porque el portal lo publica en dos archivos con el mismo cuadro: suma $4,7 millones de más.
+  - Faltan algunos medios en 2011 ($25,2 millones) y 2013 ($42,8 millones).
+  - Falta Internet 2016 ($10,6 millones).
+  - Falta un proveedor de vía pública de 2017 ($2,4 millones).
+- **Provincia de Buenos Aires.** No todas las resoluciones publicadas están cargadas, sobre todo en 2020-2022. En 2020 la base tiene el 36 % de lo publicado, en 2021 el 45 % y en 2022 el 73 %.
 
 ### Cómo verificarlo
 
