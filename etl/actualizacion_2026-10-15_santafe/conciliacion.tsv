@@ -1,0 +1,12 @@
+correccion	archivo_origen	filas_antes	filas_despues	total_antes	total_despues	total_pdf_celdas	total_impreso_pdf	nota
+radio2008	Radio 2008 (II).pdf	564	0	4731056.35	0.00			mismo cuadro que Radio 2008.pdf: 1060 palabras en la misma posición; 564 filas idénticas en la base
+sf2011	Gràfica 2011.pdf	351	1031	8931499.86	26470724.19	26470724.19	26470724.18	128 medios en el PDF, 42 ya cargados (el formato de nombre reproduce 42); 5 filas con total impreso a 1 centavo de la suma de sus meses (redondeo de la fuente)
+sf2011	Internet 2011.pdf	407	804	883539.14	1807508.24	1807508.24	1807508.24	77 medios en el PDF, 38 ya cargados (el formato de nombre reproduce 36)
+sf2011	Radio 2011.pdf	398	1165	1230236.93	6846621.05	6846621.05	6846621.05	107 medios en el PDF, 36 ya cargados (el formato de nombre reproduce 36)
+sf2011	TV 2011.pdf	320	406	18385007.23	19486055.33	19486055.33	19486055.33	43 medios en el PDF, 32 ya cargados (el formato de nombre reproduce 32); 1 filas con total impreso a 1 centavo de la suma de sus meses (redondeo de la fuente)
+tv2013	TELE 2013.pdf	294	401	33259509.59	40883724.16	40883724.16	40883724.16	38 medios en el PDF, 28 ya cargados (el formato de nombre reproduce 28)
+vp2017	Vía pública 2017.pdf	221	229	71630370.22	74026533.22	74026533.22	74026533.22	28 medios en el PDF, 27 ya cargados (el formato de nombre reproduce 4)
+chicos	Vía pública 2009.pdf	28	30	712171.50	728196.50	728196.50	728196.50	6 medios en el PDF, 6 ya cargados (el formato de nombre reproduce 6)
+chicos	Radios 2015.pdf	1380	1387	37940933.28	37947573.28	37947573.28	37947573.28	149 medios en el PDF, 148 ya cargados (el formato de nombre reproduce 148)
+chicos	Informe inversión en radio 2016.pdf	1543	1554	26817720.05	26831358.05	26831358.05	26831358.05	143 medios en el PDF, 142 ya cargados (el formato de nombre reproduce 141)
+internet2016	Informe inversión publicitaria internet 2016.pdf	0	1125	0.00	10631199.48	10631199.48		132 medios; fuente sin mapa Unicode, decodificada con MAPA_2016
