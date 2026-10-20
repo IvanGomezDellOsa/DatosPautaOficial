@@ -35,8 +35,6 @@ Until this project, the information was scattered across open data portals, spre
 
 Coverage gaps are shown explicitly on the website: aggregates that could mislead due to incomplete coverage are never presented.
 
-Every data correction is logged, with its evidence, in [CORRECCIONES.md](CORRECCIONES.md) (in Spanish).
-
 ---
 
 ## 🏗️ Architecture

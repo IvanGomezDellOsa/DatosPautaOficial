@@ -35,8 +35,6 @@ Hasta este proyecto, la información estaba dispersa en portales de datos abiert
 
 Los huecos de cobertura se muestran de forma explícita en la web: nunca se presentan agregados que puedan engañar por cobertura incompleta.
 
-Cada corrección de datos queda registrada, con su evidencia, en [CORRECCIONES.md](CORRECCIONES.md).
-
 ---
 
 ## 🏗️ Arquitectura

@@ -1,5 +1,0 @@
-entrada: 549184 filas, SHA-256 edd5ea3ce9c1d02dc16ec06e91ec5cdf155f9f5d01a4a287ecff7fd23febf5ac
-salida: 554021 filas, SHA-256 dbe7b01fc41e9051972b237799ad8de24c475fe10ba0f3f1b02e5dfbb431c74a
-las 549184 filas de la entrada siguen idénticas byte a byte y en el mismo orden; SHA-256 0d27bfc39320c975eca9af833143b77aabb9028181b3846249c661b9a9ce85aa
-orden de la carpeta 2023 (extract_caba.extraer): BA_DATA_2023_Medios_Vecinales.xlsx, BA_DATA_2023_Web.csv, pauta-publicitaria-cine-2023.xlsx, pauta-publicitaria-medios-graficos-2023.xlsx, pauta-publicitaria-radios-2023.csv, pauta-publicitaria-tv-abierta-2023.csv, pauta-publicitaria-tv-cable-2023.csv, pauta-publicitaria-via-publica-2023.csv
-BA DATA 2023 - Medios Vecinales.xlsx (manifest n=3) es idéntico a BA_DATA_2023_Medios_Vecinales.xlsx: SHA-256 e68cbe3e1f6f361081e113c771e81ac9fea5b2108d8b810281446e4c90865ba1
